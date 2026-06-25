@@ -21,7 +21,7 @@ const CONFIG = {
   appTitle: "Progressive Overload Coach",
 
   // Weight unit shown everywhere. "kg" or "lb".
-  units: "kg",
+  units: "lb",
 
   // Gyms you train at. Add as many as you want.
   // `id` must be a short unique slug (no spaces). `name` is what people see.
@@ -1711,13 +1711,56 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (e) {}
     return normalize({});
   }
+  // ============================================================
+  // ONE-TIME MIGRATION — this app has no canonical base unit; every
+  // stored weight is a raw number labeled by whatever `units` was at
+  // the time. Now that the default display unit is lb, any state that
+  // was already saved under kg needs every stored number converted so
+  // the real-world weights stay correct (a "60kg bench" must read
+  // "132 lb", not "60 lb"). Runs once, gated by a flag so re-toggling
+  // units in Settings later never re-triggers it.
+  // ============================================================
+  const KG_TO_LB = 2.20462;
+  const UNITS_MIGRATED_KEY = 'po_coach_units_migrated_lb_v1';
+  function migrateKgToLb(s) {
+    if (s.units !== 'kg') return s;
+    try { if (localStorage.getItem(UNITS_MIGRATED_KEY)) return s; } catch (e) {}
+    (s.exercises || []).forEach(ex => {
+      if (typeof ex.startWeight === 'number') ex.startWeight = +(ex.startWeight * KG_TO_LB).toFixed(2);
+      if (typeof ex.step === 'number') ex.step = +(ex.step * KG_TO_LB).toFixed(2);
+    });
+    if (s.logs && typeof s.logs === 'object') {
+      Object.keys(s.logs).forEach(exId => {
+        (s.logs[exId] || []).forEach(entry => {
+          if (typeof entry.weight === 'number') entry.weight = +(entry.weight * KG_TO_LB).toFixed(2);
+        });
+      });
+    }
+    s.units = 'lb';
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) {}
+    // Bodyweight log ('po_coach_weights') shares the same global units —
+    // convert it alongside so the weigh-in chart stays correct too.
+    try {
+      const wtRaw = localStorage.getItem('po_coach_weights');
+      const wtArr = wtRaw ? JSON.parse(wtRaw) : [];
+      if (Array.isArray(wtArr)) {
+        wtArr.forEach(entry => {
+          if (typeof entry.weight === 'number') entry.weight = +(entry.weight * KG_TO_LB).toFixed(1);
+        });
+        localStorage.setItem('po_coach_weights', JSON.stringify(wtArr));
+      }
+    } catch (e) {}
+    try { localStorage.setItem(UNITS_MIGRATED_KEY, '1'); } catch (e) {}
+    return s;
+  }
   function normalize(s) {
     s = s || {};
-    s.units = s.units || CONFIG.units || 'kg';
+    s.units = s.units || CONFIG.units || 'lb';
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
+    s = migrateKgToLb(s);
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Split rotation lives in state so the user can edit it via the pill modal.
