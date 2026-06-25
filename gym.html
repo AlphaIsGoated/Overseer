@@ -3627,9 +3627,9 @@ img, video, canvas, svg { max-width: 100%; }
   //     segmentalLean: { rightArm, leftArm, trunk, rightLeg, leftLeg } (% of ideal),
   //     segmentalFat:  { rightArm, leftArm, trunk, rightLeg, leftLeg } (lbs/kg) }]
   //
-  // Uses the same browser-stored Anthropic key as the Nova coach
-  // widget ('nova_lite_api_key') — paste it once on the Nova page and
-  // both features work.
+  // Reads the image via the serverless /api/vision-tool proxy — the
+  // Anthropic key lives in Vercel's ANTHROPIC_API_KEY env var, never
+  // in the browser, so this works the same on every device.
   // ============================================================
   const IB_KEY = 'po_coach_inbody';
   let inbodyScans = [];
@@ -3642,9 +3642,6 @@ img, video, canvas, svg { max-width: 100%; }
 
   function ibSave() {
     try { localStorage.setItem(IB_KEY, JSON.stringify(inbodyScans)); } catch (e) {}
-  }
-  function ibSavedKey() {
-    try { return localStorage.getItem('nova_lite_api_key') || ''; } catch (e) { return ''; }
   }
 
   // Merge a weight reading into the SAME timeline the quick "Enter
@@ -3758,34 +3755,20 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   async function ibScanImage(base64, mediaType) {
-    const key = ibSavedKey();
-    if (!key) { const e = new Error('NO_KEY'); e.code = 'NO_KEY'; throw e; }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/vision-tool', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json', 'x-api-key': key,
-        'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
-        max_tokens: 1536,
         system: IB_SYSTEM,
-        tools: [IB_TOOL],
-        tool_choice: { type: 'tool', name: 'read_inbody_scan' },
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Read this body-composition result and record every figure on it.' }
-          ]
-        }]
+        tool: IB_TOOL,
+        image: base64,
+        mediaType,
+        prompt: 'Read this body-composition result and record every figure on it.'
       })
     });
     const json = await res.json();
-    if (json.error) { const e = new Error(json.error.message || 'Anthropic API error'); e.code = 'API'; throw e; }
-    const block = (json.content || []).find(b => b && b.type === 'tool_use' && b.name === 'read_inbody_scan');
-    if (!block || !block.input) { const e = new Error('Could not read that image.'); e.code = 'API'; throw e; }
-    return block.input;
+    if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that image.'); e.code = 'API'; throw e; }
+    return json;
   }
 
   // ---- UI state ----
@@ -3824,11 +3807,7 @@ img, video, canvas, svg { max-width: 100%; }
       ibShowConfirm(data, img.dataUrl);
     } catch (e) {
       ibHide($('wtIbBusy'));
-      if (e && e.code === 'NO_KEY') {
-        ibShowError('Add your Anthropic API key on the Nova page first (the 🧠 chat button), then try again.');
-      } else {
-        ibShowError((e && e.message) || "Couldn't reach Anthropic — check your connection and key.");
-      }
+      ibShowError((e && e.message) || "Couldn't reach the image reader — check your connection.");
     }
   }
 
@@ -4533,7 +4512,6 @@ img, video, canvas, svg { max-width: 100%; }
 <script>
 (function () {
   'use strict';
-  const KEY_LS = 'nova_lite_api_key';
   const $ = (id) => document.getElementById(id);
   const fab = $('nvFab'), panel = $('nvPanel'), body = $('nvBody'), input = $('nvInput');
   let busy = false, greeted = false;
@@ -4542,8 +4520,6 @@ img, video, canvas, svg { max-width: 100%; }
   // top-right of the page content (not the far viewport corner).
   const shell = document.querySelector('.po-shell');
   if (shell) { shell.appendChild(fab); shell.appendChild(panel); }
-
-  function savedKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
 
   function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
   function md(t){
@@ -4593,22 +4569,19 @@ img, video, canvas, svg { max-width: 100%; }
 
   async function ask(text){
     text = (text||'').trim(); if (!text || busy) return;
-    const key = savedKey();
     addMsg('user', md(text));
-    if (!key){ addMsg('coach', md("Paste your **Anthropic API key** on the Nova page first (the 🧠 tile on the home screen) — it's saved in this browser and I'll use it here too.")); return; }
     busy = true;
     const loading = addMsg('coach', '<span class="nv-dots"><i></i><i></i><i></i></span>');
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/ai-chat', {
         method: 'POST',
-        headers: { 'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-        body: JSON.stringify({ model:'claude-opus-4-8', max_tokens:1024, system: SYS + gymContext(), messages:[{role:'user', content:text}] }),
+        headers: { 'content-type':'application/json' },
+        body: JSON.stringify({ system: SYS + gymContext(), messages:[{role:'user', content:text}] }),
       });
       const json = await res.json();
-      if (json.error){ loading.innerHTML = md('- ' + (json.error.message || 'Something went wrong — check your API key.')); busy=false; return; }
-      const reply = (json.content && json.content[0] && json.content[0].text) || 'Hmm, no reply.';
-      loading.innerHTML = md(reply);
-    } catch(e){ loading.innerHTML = md('- Could not reach Anthropic — check your connection and key.'); }
+      if (!res.ok || json.error){ loading.innerHTML = md('- ' + (json.error || 'Something went wrong.')); busy=false; return; }
+      loading.innerHTML = md(json.text || 'Hmm, no reply.');
+    } catch(e){ loading.innerHTML = md('- Could not reach Nova — check your connection.'); }
     body.scrollTop = body.scrollHeight; busy = false;
   }
 

@@ -5,19 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Nova Lite · AI Mentor</title>
 <!-- ============================================================
- * NOVA LITE — a simple, drop-in AI mentor for ANY dashboard.
- * Single self-contained file. No backend, no build step.
+ * NOVA LITE — a simple AI mentor for the dashboard.
  *
- * HOW IT WORKS (bring-your-own-key):
- *   • The viewer pastes their OWN Anthropic API key (stored only in
- *     their browser's localStorage — never sent anywhere but Anthropic).
+ * HOW IT WORKS:
  *   • Nova reads whatever the dashboard saved in localStorage for context.
- *   • Calls the Claude API directly from the browser using the
- *     `anthropic-dangerous-direct-browser-access` header.
+ *   • Calls the serverless /api/ai-chat proxy, which holds the Anthropic
+ *     key server-side (ANTHROPIC_API_KEY in Vercel) — no key to paste,
+ *     and it works the same on every device since nothing is per-browser.
  *
  * This is the lightweight version: a flat CSS orb (no 3D), basic chat.
- * The premium build (3D avatar, Spark voice scheduler, secure server
- * proxy, palettes) is the paid Patreon episode.
  * ============================================================ -->
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,11 +29,6 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
 .back-btn:hover, .back-btn:active { background: rgba(255,255,255,.07); color: var(--fg); }
 .back-btn svg { display: block; }
 .top { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-.key-toggle { margin-left: auto; border: 1px solid var(--line); background: rgba(255,255,255,.03); border-radius: 10px; padding: 7px 10px; cursor: pointer; font-size: 15px; line-height: 1; opacity: .55; transition: opacity .15s; }
-.key-toggle:hover { opacity: 1; }
-.key-toggle.has-key { opacity: 1; border-color: var(--accent); }
-.keypanel { display: none; }
-.keypanel.open { display: block; }
 
 /* ---- flat CSS orb avatar (lightweight, no Three.js) ---- */
 .orb { width: 60px; height: 60px; border-radius: 50%; position: relative; flex-shrink: 0;
@@ -55,15 +46,6 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
 .title h1 { font-family: 'Times New Roman', Georgia, serif; font-style: italic; font-size: 26px; font-weight: 500;
   background: linear-gradient(90deg, var(--accent-2), var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .title .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
-
-/* ---- key setup ---- */
-.keybar { display: flex; gap: 8px; margin-bottom: 16px; }
-.keybar input { flex: 1; background: rgba(255,255,255,.03); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 11px 13px; font-size: 13px; outline: none; }
-.keybar input:focus { border-color: var(--accent); }
-.keybar button { border: 0; border-radius: 10px; padding: 0 16px; cursor: pointer; color: #04140d; background: var(--accent); font-weight: 600; font-size: 13px; }
-.hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 18px; }
-.hint a { color: var(--accent-2); }
-.hint.saved { color: var(--accent); }
 
 /* ---- chat ---- */
 .feed { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
@@ -98,18 +80,6 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     <div class="top">
       <div class="orb" id="orb"></div>
       <div class="title"><h1>Nova Lite</h1><div class="role">your mentor</div></div>
-      <button id="keyToggle" class="key-toggle" aria-label="API key settings" title="API key">🔑</button>
-    </div>
-
-    <div class="keypanel" id="keypanel">
-      <div class="keybar">
-        <input id="keyInput" type="password" placeholder="paste your Anthropic API key (sk-ant-…)" autocomplete="off" />
-        <button id="keySave">Save</button>
-      </div>
-      <div class="hint" id="hint">
-        Your key is stored only in <b>this browser</b> and sent straight to Anthropic — never to us.
-        Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
-      </div>
     </div>
 
     <div class="feed" id="feed"></div>
@@ -122,38 +92,18 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
 
 <script>
 (function(){
-  const KEY_LS = 'nova_lite_api_key';
   const feed = document.getElementById('feed');
   const input = document.getElementById('chatInput');
   const orb = document.getElementById('orb');
-  const keyInput = document.getElementById('keyInput');
-  const hint = document.getElementById('hint');
-  const keypanel = document.getElementById('keypanel');
-  const keyToggle = document.getElementById('keyToggle');
-  keyToggle.addEventListener('click', () => keypanel.classList.toggle('open'));
 
   function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function setOrb(s){ orb.className = 'orb' + (s ? ' ' + s : ''); }
-
-  // ---- key handling ----
-  function savedKey(){ try { return localStorage.getItem(KEY_LS) || ''; } catch(e){ return ''; } }
-  if (savedKey()) { hint.classList.add('saved'); hint.innerHTML = '✓ Key saved in this browser. Ask away.'; keyInput.placeholder = '•••• key saved ••••'; keyToggle.classList.add('has-key'); }
-  document.getElementById('keySave').addEventListener('click', () => {
-    const k = keyInput.value.trim();
-    if (!k) return;
-    try { localStorage.setItem(KEY_LS, k); } catch(e){}
-    keyInput.value = ''; keyInput.placeholder = '•••• key saved ••••';
-    hint.classList.add('saved'); hint.innerHTML = '✓ Key saved in this browser. Ask away.';
-    keyToggle.classList.add('has-key');
-    keypanel.classList.remove('open'); // tuck it away so it's not on screen
-  });
 
   // ---- read whatever the dashboard stored (for context) ----
   function dashboardData(){
     const out = {};
     for (let i = 0; i < localStorage.length; i++){
       const k = localStorage.key(i);
-      if (k === KEY_LS) continue; // never send the key as data
       try { out[k] = JSON.parse(localStorage.getItem(k)); } catch(e){ out[k] = localStorage.getItem(k); }
     }
     return out;
@@ -188,34 +138,24 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
   let busy = false;
   async function ask(text){
     text = (text||'').trim(); if (!text || busy) return;
-    const key = savedKey();
-    if (!key){ addCoach('- Paste your **Anthropic API key** above first, then ask me again.'); return; }
     busy = true; addUser(text); input.value = '';
     setOrb('think');
     const loading = addCoach('<span class="dots"><i></i><i></i><i></i></span>');
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/ai-chat', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-opus-4-8',
-          max_tokens: 1024,
           system: SYS + JSON.stringify(dashboardData()),
           messages: [{ role: 'user', content: text }],
         }),
       });
       const json = await res.json();
-      if (json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error.message || 'Something went wrong — check your API key.')); setOrb(''); busy = false; return; }
-      const reply = (json.content && json.content[0] && json.content[0].text) || 'Hmm, no reply.';
-      loading.querySelector('div:last-child').innerHTML = render(reply);
+      if (!res.ok || json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error || 'Something went wrong.')); setOrb(''); busy = false; return; }
+      loading.querySelector('div:last-child').innerHTML = render(json.text || 'Hmm, no reply.');
       setOrb('happy'); setTimeout(() => setOrb(''), 2500);
     } catch(e){
-      loading.querySelector('div:last-child').innerHTML = render('- Could not reach Anthropic — check your connection and key.');
+      loading.querySelector('div:last-child').innerHTML = render('- Could not reach Nova — check your connection.');
       setOrb('');
     }
     busy = false;
@@ -224,7 +164,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
   document.getElementById('send').addEventListener('click', () => ask(input.value));
   input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(input.value); });
 
-  addCoach('Hey — I am <b>Nova</b>. Paste your key above, then ask me about food, training, sleep, or where to start. I keep it short and give you <b>one thing to act on</b>.');
+  addCoach('Hey — I am <b>Nova</b>. Ask me about food, training, sleep, or where to start. I keep it short and give you <b>one thing to act on</b>.');
 })();
 </script>
 </body>
