@@ -347,8 +347,8 @@ body::after {
       <div class="field-row">
         <input class="set-input" id="weight" type="number" min="0" inputmode="decimal" placeholder="weight">
         <div class="seg" id="weightUnitSeg">
-          <button type="button" data-u="kg" class="on">kg</button>
-          <button type="button" data-u="lb">lb</button>
+          <button type="button" data-u="kg">kg</button>
+          <button type="button" data-u="lb" class="on">lb</button>
         </div>
       </div>
     </div>
@@ -405,14 +405,14 @@ body::after {
 
   // Mirror of topbar.js defaultWaterState so we never clobber the water tracker.
   function defaultWater() {
-    return { unit:'bottle', bottleMl:500, glassMl:250, weightUnit:'kg',
+    return { unit:'bottle', bottleMl:500, glassMl:250, weightUnit:'lb',
       profile:{ weightKg:75, age:25, sex:'m', activityHrsPerWeek:5 },
       caffeineMgPerDay:200, substances:[], logs:{} };
   }
 
   /* ---------- unit state ---------- */
   let heightUnit = 'cm';   // 'cm' | 'ft'
-  let weightUnit = 'kg';   // 'kg' | 'lb'
+  let weightUnit = 'lb';   // 'kg' | 'lb'
   let sex = 'm';
 
   function setHeightUnit(u) {
@@ -448,7 +448,7 @@ body::after {
   function populate() {
     const w = loadJSON(WATER_KEY, defaultWater());
     const p = w.profile || {};
-    setWeightUnit(w.weightUnit === 'lb' ? 'lb' : 'kg');
+    setWeightUnit(w.weightUnit === 'kg' ? 'kg' : 'lb');
     setHeightUnit(p.heightUnit === 'ft' ? 'ft' : 'cm');
     setSex(p.sex === 'f' ? 'f' : 'm');
     fillHeight(p.heightCm || null);
