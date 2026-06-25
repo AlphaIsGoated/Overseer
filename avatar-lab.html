@@ -22,6 +22,12 @@ html, body { background: var(--bg); }
 body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: var(--fg); min-height: 100vh; }
 
 .shell { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 18px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background .15s ease, color .15s ease; }
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,.07); color: var(--fg); }
+.back-btn svg { display: block; }
 header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
 header h1 { font-family: 'Times New Roman', Georgia, serif; font-style: italic; font-weight: 500; font-size: 30px;
   background: linear-gradient(90deg, var(--c2), var(--c1)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
@@ -154,6 +160,10 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
 </head>
 <body data-state="idle">
   <div class="shell">
+    <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      <span>Back</span>
+    </a>
     <header>
       <h1>Avatar Lab</h1><span class="role">Nova design playground</span>
     </header>

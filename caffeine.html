@@ -51,6 +51,17 @@ body::after {
 @keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
 
 .page { max-width: 1100px; margin: 0 auto; }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 8px 10px; margin: 0 0 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px; color: var(--text-secondary);
+  font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.back-btn svg { display: block; }
 .dash-title {
   margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
   background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
@@ -184,6 +195,11 @@ body::after {
 </head>
 <body>
 <div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
 
   <h1 class="dash-title">Caffeine</h1>
 

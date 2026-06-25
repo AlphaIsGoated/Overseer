@@ -87,6 +87,17 @@ html, body {
   min-height: 100vh;
 }
 .shell { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 8px 10px; margin: 0 0 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,0.07); color: var(--text-1); }
+.back-btn svg { display: block; }
 
 /* ----- Top day pill + header ----- */
 .day-pill {
@@ -463,6 +474,12 @@ html, body {
 <body>
 
 <div class="shell">
+
+  <a href="index.html" class="back-btn" id="backBtn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+  <script>if (window.self !== window.top) document.getElementById('backBtn').style.display = 'none';</script>
 
   <button class="day-pill" id="dayPill" type="button">
     <span id="dayPillLabel">—</span>

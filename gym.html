@@ -129,6 +129,17 @@ html, body {
   padding: 24px 16px calc(40px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 8px 10px; margin: 0 0 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text-3);
+  font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,0.07); color: var(--text-1); }
+.back-btn svg { display: block; }
 /* Defeat the default `min-width: auto` on flex/grid items — without
    this, long text or wide buttons can force their parent past the
    viewport even with max-width set. */
@@ -1418,6 +1429,10 @@ img, video, canvas, svg { max-width: 100%; }
 <body>
 
 <div class="po-shell">
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
   <button class="po-day-pill" type="button" id="dayPill" title="Tap to switch the day filter to today's split">
     <span class="po-day-date" id="dayPillDate">—</span>
     <span class="po-day-sep">·</span>

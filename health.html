@@ -75,6 +75,17 @@ main {
   padding: 56px 20px 80px;
   padding-top: max(56px, env(safe-area-inset-top, 56px));
 }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 8px 10px; margin: 0 0 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text-secondary);
+  font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.back-btn svg { display: block; }
 
 .section-title {
   font-family: var(--font-mono);
@@ -508,6 +519,11 @@ main {
 <body>
 
 <main>
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
 
   <!-- ===== WHOOP card (full) ===== -->
   <style>
