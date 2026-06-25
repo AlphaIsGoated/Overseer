@@ -1138,6 +1138,154 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-photo-date { color: var(--good); }
 .wt-photo-weight { color: var(--text-1); }
 
+/* InBody body-composition summary */
+.wt-ib-summary {
+  margin-top: 18px; padding: 14px 16px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.wt-ib-summary-h {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.wt-ib-summary-label {
+  font-size: 10px; letter-spacing: 0.16em; font-weight: 700;
+  text-transform: uppercase; color: var(--text-3);
+}
+.wt-ib-summary-date {
+  font-size: 10px; color: var(--text-4);
+  font-family: var(--font-mono);
+}
+.wt-ib-stat-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px 8px; margin-bottom: 16px;
+}
+@media (max-width: 420px) { .wt-ib-stat-row { grid-template-columns: repeat(2, 1fr); } }
+.wt-ib-stat { display: flex; flex-direction: column; gap: 2px; }
+.wt-ib-stat-label {
+  font-size: 9px; letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--text-4); font-weight: 600;
+}
+.wt-ib-stat-val {
+  font-size: 15px; font-weight: 600; color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.wt-ib-stat-delta { font-size: 10.5px; font-family: var(--font-mono); }
+.wt-ib-stat-delta.up   { color: var(--bad); }
+.wt-ib-stat-delta.down { color: var(--good); }
+.wt-ib-stat-delta.flat { color: var(--text-4); }
+.wt-ib-stat-def {
+  font-size: 9.5px; line-height: 1.35; color: var(--text-4);
+  margin-top: 1px;
+}
+.wt-ib-chart-wrap { position: relative; }
+.wt-ib-chart { display: block; width: 100%; height: 80px; }
+.wt-ib-legend {
+  display: flex; gap: 14px; margin-top: 8px;
+  font-size: 10.5px; color: var(--text-3);
+}
+.wt-ib-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.wt-ib-legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.wt-ib-legend-dot-fat   { background: var(--warn); }
+.wt-ib-legend-dot-smm   { background: #7DD3FC; }
+.wt-ib-legend-dot-scan  { background: #7DD3FC; }
+.wt-ib-legend-dot-train { background: var(--good); }
+
+/* Muscle-balance pentagon */
+.wt-ib-radar-wrap {
+  margin: 4px 0 18px; padding: 14px 16px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border); border-radius: 12px;
+}
+.wt-ib-radar-h { margin-bottom: 8px; }
+.wt-ib-radar-svg { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto; }
+.wt-ib-radar-callout {
+  margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--text-2);
+  text-align: center;
+}
+.wt-ib-radar-callout b { color: var(--text-1); }
+.wt-ib-radar-callout .strong-tag { color: var(--good); font-weight: 700; }
+.wt-ib-radar-callout .weak-tag   { color: var(--bad); font-weight: 700; }
+
+/* Per-metric trend chart grid */
+.wt-ib-metric-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+@media (max-width: 420px) { .wt-ib-metric-grid { grid-template-columns: 1fr; } }
+.wt-ib-metric-card {
+  padding: 10px 12px; background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.wt-ib-metric-h { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.wt-ib-metric-label {
+  font-size: 10px; letter-spacing: 0.06em; font-weight: 700; color: var(--text-2);
+}
+.wt-ib-metric-val {
+  font-size: 13px; font-weight: 600; color: var(--text-1);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.wt-ib-metric-def {
+  font-size: 9.5px; line-height: 1.35; color: var(--text-4);
+  margin: 2px 0 6px;
+}
+.wt-ib-metric-svg { display: block; width: 100%; height: 44px; }
+.wt-ib-metric-empty { font-size: 11px; color: var(--text-4); padding: 10px 0; text-align: center; }
+
+/* Confirm-card "review all metrics" */
+.wt-ib-review { margin: -4px 0 14px; }
+.wt-ib-review summary {
+  font-size: 11.5px; color: var(--good); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; padding: 4px 0;
+}
+.wt-ib-review-body { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.wt-ib-review-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 12px; padding: 3px 0; border-bottom: 1px solid var(--border);
+}
+.wt-ib-review-row span:first-child { color: var(--text-3); }
+.wt-ib-review-row span:last-child { color: var(--text-1); font-variant-numeric: tabular-nums; }
+
+/* InBody overlay — busy / error / confirm states */
+.wt-ib-busy { display: flex; align-items: center; gap: 12px; padding: 14px 0; }
+.wt-ib-busy.hidden { display: none; }
+.wt-ib-busy-thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border); }
+.wt-ib-busy-text { font-size: 13px; color: var(--text-2); }
+.wt-ib-dots::after { content: '…'; animation: ibDots 1.2s steps(4,end) infinite; }
+@keyframes ibDots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+.wt-ib-error {
+  margin: 10px 0; font-size: 12.5px; color: var(--bad);
+  background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.20);
+  border-radius: 10px; padding: 10px 12px;
+}
+.wt-ib-error.hidden { display: none; }
+.wt-ib-confirm { margin-bottom: 18px; }
+.wt-ib-confirm.hidden { display: none; }
+.wt-ib-confirm-thumb {
+  width: 100%; max-height: 180px; object-fit: contain;
+  border-radius: 10px; background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border); margin-bottom: 12px;
+}
+.wt-ib-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.wt-ib-field { display: flex; flex-direction: column; gap: 4px; }
+.wt-ib-field label {
+  font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3); font-weight: 600;
+}
+.wt-ib-field input {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  border-radius: 9px; color: var(--text-1); font-family: inherit;
+  font-size: 14px; padding: 9px 11px; outline: none; width: 100%;
+}
+.wt-ib-field input:focus { border-color: rgba(110,231,183,0.4); }
+.wt-ib-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wt-ib-viewer-stats {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+  margin: 10px 0; font-size: 13px; color: var(--text-2);
+}
+.wt-ib-viewer-stats div { display: flex; justify-content: space-between; }
+.wt-ib-viewer-stats span:last-child { color: var(--text-1); font-weight: 600; }
+
 /* Camera modal */
 .wt-cam {
   position: fixed; inset: 0; background: #000; z-index: 300;
@@ -1348,6 +1496,39 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
+    <!-- Body composition (InBody) — only shown once at least one scan exists -->
+    <div class="wt-ib-summary hidden" id="wtIbSummary">
+      <div class="wt-ib-summary-h">
+        <span class="wt-ib-summary-label">Body composition</span>
+        <span class="wt-ib-summary-date" id="wtIbLatestDate">—</span>
+      </div>
+      <div class="wt-ib-stat-row" id="wtIbStatRow"></div>
+
+      <!-- Muscle Balance pentagon — InBody segmental lean % vs recent training volume -->
+      <div class="wt-ib-radar-wrap" id="wtIbRadarWrap">
+        <div class="wt-ib-radar-h">
+          <span class="wt-ib-summary-label">Muscle balance</span>
+        </div>
+        <svg class="wt-ib-radar-svg" id="wtIbRadarSvg" viewBox="0 0 220 220"></svg>
+        <div class="wt-ib-legend">
+          <span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-scan"></span>InBody scan</span>
+          <span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-train"></span>Training volume (30d)</span>
+        </div>
+        <div class="wt-ib-radar-callout" id="wtIbRadarCallout">—</div>
+      </div>
+
+      <!-- One small trend chart + definition per InBody metric -->
+      <div class="wt-ib-metric-grid" id="wtIbMetricCharts"></div>
+    </div>
+
+    <button class="wt-progress-link" id="wtIbLink" type="button" aria-label="Open InBody scans">
+      <div>
+        <div class="wt-progress-label">INBODY SCANS</div>
+        <div class="wt-progress-count" id="wtIbCount">0 scans</div>
+      </div>
+      <span class="wt-progress-arrow">→</span>
+    </button>
+
     <button class="wt-progress-link" id="wtProgressLink" type="button" aria-label="Open progress photos">
       <div>
         <div class="wt-progress-label">PROGRESS PHOTOS</div>
@@ -1355,6 +1536,92 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
       <span class="wt-progress-arrow">→</span>
     </button>
+  </div>
+
+  <!-- InBody scans overlay -->
+  <div class="wt-overlay" id="wtIbOverlay" aria-hidden="true">
+    <div class="wt-overlay-inner">
+      <div class="wt-overlay-h">
+        <button class="wt-back" id="wtIbBack" aria-label="Back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="wt-overlay-title">InBody Scans</div>
+      </div>
+      <div class="wt-overlay-actions">
+        <button class="wt-overlay-action wt-overlay-primary" id="wtIbTakePhotoBtn">Take Photo</button>
+        <button class="wt-overlay-action wt-overlay-secondary" id="wtIbFromLibraryBtn">From Library</button>
+      </div>
+      <input type="file" id="wtIbFileCamera" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="wtIbFileLibrary" accept="image/*" style="display:none">
+
+      <!-- Reading / error states -->
+      <div class="wt-ib-busy hidden" id="wtIbBusy">
+        <img class="wt-ib-busy-thumb" id="wtIbBusyThumb" alt="">
+        <div class="wt-ib-busy-text">Reading scan<span class="wt-ib-dots"></span></div>
+      </div>
+      <div class="wt-ib-error hidden" id="wtIbError"></div>
+
+      <!-- Confirm / edit card after a read -->
+      <div class="wt-ib-confirm hidden" id="wtIbConfirm">
+        <img class="wt-ib-confirm-thumb" id="wtIbConfirmThumb" alt="">
+        <div class="wt-ib-fields">
+          <div class="wt-ib-field">
+            <label for="wtIbDate">Date</label>
+            <input type="date" id="wtIbDate">
+          </div>
+          <div class="wt-ib-field">
+            <label for="wtIbWeight">Weight (<span id="wtIbWeightUnit">lb</span>)</label>
+            <input type="number" step="0.1" id="wtIbWeight" inputmode="decimal">
+          </div>
+          <div class="wt-ib-field">
+            <label for="wtIbFat">Body fat %</label>
+            <input type="number" step="0.1" id="wtIbFat" inputmode="decimal">
+          </div>
+          <div class="wt-ib-field">
+            <label for="wtIbSmm">Muscle mass (<span id="wtIbSmmUnit">lb</span>)</label>
+            <input type="number" step="0.1" id="wtIbSmm" inputmode="decimal">
+          </div>
+          <div class="wt-ib-field">
+            <label for="wtIbBmi">BMI</label>
+            <input type="number" step="0.1" id="wtIbBmi" inputmode="decimal">
+          </div>
+          <div class="wt-ib-field">
+            <label for="wtIbVfl">Visceral fat level</label>
+            <input type="number" step="1" id="wtIbVfl" inputmode="decimal">
+          </div>
+        </div>
+        <details class="wt-ib-review">
+          <summary>Review all detected metrics</summary>
+          <div class="wt-ib-review-body" id="wtIbReviewBody"></div>
+        </details>
+        <div class="wt-ib-confirm-actions">
+          <button type="button" class="wt-overlay-action wt-overlay-secondary" id="wtIbDiscard">Discard</button>
+          <button type="button" class="wt-overlay-action wt-overlay-primary" id="wtIbSave">Save scan</button>
+        </div>
+      </div>
+
+      <div class="wt-photo-grid" id="wtIbGrid">
+        <div class="wt-photo-empty">No scans yet · tap Take Photo to start</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- InBody scan viewer -->
+  <div class="wt-viewer" id="wtIbViewer" data-mode="single" aria-hidden="true">
+    <div class="wt-viewer-single">
+      <div class="wt-viewer-stage">
+        <img id="wtIbViewerImg" alt="" style="max-width:100%; max-height:100%; object-fit:contain;">
+      </div>
+      <div class="wt-viewer-meta">
+        <div class="wt-viewer-date" id="wtIbViewerDate">—</div>
+        <div class="wt-viewer-weight" id="wtIbViewerWeight">—</div>
+      </div>
+      <div class="wt-ib-viewer-stats" id="wtIbViewerStats"></div>
+      <div class="wt-viewer-actions">
+        <button class="wt-viewer-btn wt-viewer-close" id="wtIbViewerClose">Close</button>
+        <button class="wt-viewer-btn wt-viewer-delete" id="wtIbViewerDelete">Delete</button>
+      </div>
+    </div>
   </div>
 
   <!-- Progress photos overlay -->
@@ -3329,11 +3596,614 @@ img, video, canvas, svg { max-width: 100%; }
   $('wtCmpSideB').addEventListener('click', cycleCompareTarget);
 
   // ============================================================
+  // INBODY SCANS — upload a photo of an InBody result sheet, read it
+  // with Claude vision, and log it as a real weight tracking entry
+  // (merged into the same wtEntries/po_coach_weights timeline used by
+  // the quick "Enter weight" box) PLUS the full body-composition
+  // breakdown in its own history: per-metric trend charts with plain-
+  // English definitions, and a 5-axis "muscle balance" pentagon that
+  // cross-references InBody's segmental lean data against how much
+  // each region has actually been trained recently.
+  //
+  //   po_coach_inbody : [{ id, dateKey, ts, imageDataUrl,
+  //     weight, bodyFatPercent, skeletalMuscleMass, bmi, visceralFatLevel,
+  //     bodyFatMass, leanBodyMass, totalBodyWater, intracellularWater,
+  //     extracellularWater, dryLeanMass, ecwTbwRatio, basalMetabolicRate, smi,
+  //     segmentalLean: { rightArm, leftArm, trunk, rightLeg, leftLeg } (% of ideal),
+  //     segmentalFat:  { rightArm, leftArm, trunk, rightLeg, leftLeg } (lbs/kg) }]
+  //
+  // Uses the same browser-stored Anthropic key as the Nova coach
+  // widget ('nova_lite_api_key') — paste it once on the Nova page and
+  // both features work.
+  // ============================================================
+  const IB_KEY = 'po_coach_inbody';
+  let inbodyScans = [];
+  try {
+    const raw = localStorage.getItem(IB_KEY);
+    if (raw) inbodyScans = JSON.parse(raw);
+  } catch (e) { inbodyScans = []; }
+  if (!Array.isArray(inbodyScans)) inbodyScans = [];
+  inbodyScans.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+  function ibSave() {
+    try { localStorage.setItem(IB_KEY, JSON.stringify(inbodyScans)); } catch (e) {}
+  }
+  function ibSavedKey() {
+    try { return localStorage.getItem('nova_lite_api_key') || ''; } catch (e) { return ''; }
+  }
+
+  // Merge a weight reading into the SAME timeline the quick "Enter
+  // weight" box uses, so InBody scans become part of normal weight
+  // tracking instead of a separate, disconnected log. An InBody
+  // reading overwrites a same-day manual entry (it's the more precise
+  // measurement) but never removes entries on other days.
+  function wtUpsertEntry(dateKey, weight, source) {
+    const existing = wtEntries.find(e => e.dateKey === dateKey);
+    if (existing) { existing.weight = weight; existing.source = source; }
+    else { wtEntries.push({ dateKey, weight, source }); wtEntries.sort((a, b) => a.dateKey.localeCompare(b.dateKey)); }
+    wtSave(wtEntries);
+  }
+
+  // Definitions shown under every metric so the numbers are legible,
+  // not just labeled. "weight" = a mass value that needs unit
+  // conversion when the sheet's unit differs from the app's; "plain" /
+  // "ratio" / "kcal" / "smi" never get converted.
+  const IB_METRIC_DEFS = [
+    { key: 'weight',               label: 'Weight',               def: 'Total body weight.',                                                                          kind: 'weight', decimals: 1, good: 'neutral', color: '#7DD3FC' },
+    { key: 'bodyFatPercent',       label: 'Body fat %',           def: 'Percent Body Fat (PBF) — share of total weight that is fat.',                                kind: 'percent', decimals: 1, good: 'down',    color: '#fbbf24' },
+    { key: 'skeletalMuscleMass',   label: 'Muscle mass',          def: 'Skeletal Muscle Mass (SMM) — muscle attached to bone that you can train and grow.',           kind: 'weight',  decimals: 1, good: 'up',      color: '#6ee7b7' },
+    { key: 'bmi',                  label: 'BMI',                  def: 'Body Mass Index — weight relative to height². A rough sizing index; doesn’t separate fat from muscle.', kind: 'plain', decimals: 1, good: 'neutral', color: '#c9b8ff' },
+    { key: 'visceralFatLevel',     label: 'Visceral fat',         def: 'Estimated fat surrounding internal organs. Aim to keep this under 10.',                       kind: 'plain',   decimals: 0, good: 'down',    color: '#ff8a8a' },
+    { key: 'bodyFatMass',          label: 'Fat mass',             def: 'Body Fat Mass — the actual mass of fat tissue on your body.',                                 kind: 'weight',  decimals: 1, good: 'down',    color: '#fbbf24' },
+    { key: 'leanBodyMass',         label: 'Lean mass',            def: 'Lean Body Mass — everything that isn’t fat: muscle, bone, organs, water.',                kind: 'weight',  decimals: 1, good: 'up',      color: '#6ee7b7' },
+    { key: 'totalBodyWater',       label: 'Total body water',     def: 'All water in the body, inside and outside cells.',                                            kind: 'weight',  decimals: 1, good: 'neutral', color: '#7DD3FC' },
+    { key: 'intracellularWater',   label: 'Intracellular water',  def: 'Water held inside cells, mostly within muscle tissue.',                                       kind: 'weight',  decimals: 1, good: 'neutral', color: '#7DD3FC' },
+    { key: 'extracellularWater',   label: 'Extracellular water',  def: 'Water outside cells — blood plasma and fluid between tissues.',                                kind: 'weight',  decimals: 1, good: 'neutral', color: '#7DD3FC' },
+    { key: 'dryLeanMass',          label: 'Dry lean mass',        def: 'Lean tissue with the water removed — mostly protein and minerals.',                           kind: 'weight',  decimals: 1, good: 'up',      color: '#c9b8ff' },
+    { key: 'ecwTbwRatio',          label: 'ECW/TBW',              def: 'Balance of water outside vs. total body water. A rising ratio can flag fluid retention or inflammation.', kind: 'ratio', decimals: 3, good: 'down', color: '#ff8a8a' },
+    { key: 'basalMetabolicRate',   label: 'BMR',                  def: 'Basal Metabolic Rate — calories burned at rest just to stay alive.',                          kind: 'kcal',    decimals: 0, good: 'neutral', color: '#fbbf24' },
+    { key: 'smi',                  label: 'SMI (kg/m²)',          def: 'Skeletal Muscle Index — muscle mass relative to height². Used to screen for low muscle mass.', kind: 'smi',     decimals: 1, good: 'up',      color: '#6ee7b7' }
+  ];
+  const IB_REGIONS = [
+    { key: 'rightArm', label: 'Right arm' },
+    { key: 'leftArm',  label: 'Left arm' },
+    { key: 'trunk',    label: 'Trunk' },
+    { key: 'rightLeg', label: 'Right leg' },
+    { key: 'leftLeg',  label: 'Left leg' }
+  ];
+  const IB_SEGMENTAL_DEF = 'Segmental Lean Analysis — muscle in that region as a % of the ideal amount for your build. 100% = ideal.';
+
+  // ---- Vision read — forced tool-use so we get clean structured JSON back ----
+  const IB_TOOL = {
+    name: 'read_inbody_scan',
+    description: 'Record every figure on a photo of an InBody (or similar bioelectrical impedance) result sheet or app screenshot.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        readable: { type: 'boolean', description: 'True if this looks like an InBody-style body composition result with at least a weight and body fat %.' },
+        date: { type: 'string', description: 'The test date printed on the sheet, as YYYY-MM-DD. Empty string if no date is visible.' },
+        weightUnit: { type: 'string', enum: ['kg', 'lb'], description: 'Unit used for all mass figures on the sheet (Weight, SMM, fat mass, lean mass, water, etc).' },
+        weight: { type: 'number', description: 'Body weight.' },
+        bodyFatPercent: { type: 'number', description: 'Percent body fat (PBF).' },
+        skeletalMuscleMass: { type: 'number', description: 'Skeletal muscle mass (SMM), in weightUnit.' },
+        bmi: { type: 'number', description: 'Body mass index.' },
+        visceralFatLevel: { type: 'number', description: 'Visceral fat level (a small integer, typically 1-20).' },
+        bodyFatMass: { type: 'number', description: 'Body fat mass, in weightUnit. 0 if not shown.' },
+        leanBodyMass: { type: 'number', description: 'Lean body mass, in weightUnit (Total Body Water + Dry Lean Mass). 0 if not shown.' },
+        totalBodyWater: { type: 'number', description: 'Total body water, in weightUnit. 0 if not shown.' },
+        intracellularWater: { type: 'number', description: 'Intracellular water, in weightUnit. 0 if not shown.' },
+        extracellularWater: { type: 'number', description: 'Extracellular water, in weightUnit. 0 if not shown.' },
+        dryLeanMass: { type: 'number', description: 'Dry lean mass, in weightUnit. 0 if not shown.' },
+        ecwTbwRatio: { type: 'number', description: 'ECW/TBW ratio (e.g. 0.371). 0 if not shown.' },
+        basalMetabolicRate: { type: 'number', description: 'Basal Metabolic Rate in kcal. 0 if not shown.' },
+        smi: { type: 'number', description: 'Skeletal Muscle Index in kg/m². 0 if not shown.' },
+        segmentalLeanRightArmPct: { type: 'number', description: 'Right Arm segmental lean, % of ideal. 0 if not shown.' },
+        segmentalLeanLeftArmPct:  { type: 'number', description: 'Left Arm segmental lean, % of ideal. 0 if not shown.' },
+        segmentalLeanTrunkPct:    { type: 'number', description: 'Trunk segmental lean, % of ideal. 0 if not shown.' },
+        segmentalLeanRightLegPct: { type: 'number', description: 'Right Leg segmental lean, % of ideal. 0 if not shown.' },
+        segmentalLeanLeftLegPct:  { type: 'number', description: 'Left Leg segmental lean, % of ideal. 0 if not shown.' },
+        segmentalFatRightArm: { type: 'number', description: 'Right Arm segmental fat mass, in weightUnit. 0 if not shown.' },
+        segmentalFatLeftArm:  { type: 'number', description: 'Left Arm segmental fat mass, in weightUnit. 0 if not shown.' },
+        segmentalFatTrunk:    { type: 'number', description: 'Trunk segmental fat mass, in weightUnit. 0 if not shown.' },
+        segmentalFatRightLeg: { type: 'number', description: 'Right Leg segmental fat mass, in weightUnit. 0 if not shown.' },
+        segmentalFatLeftLeg:  { type: 'number', description: 'Left Leg segmental fat mass, in weightUnit. 0 if not shown.' }
+      },
+      required: ['readable', 'date', 'weightUnit', 'weight', 'bodyFatPercent', 'skeletalMuscleMass', 'bmi', 'visceralFatLevel']
+    }
+  };
+  const IB_SYSTEM =
+    "You read photos of InBody (or similar bioelectrical impedance) body-composition result sheets, "
+    + "or screenshots of the InBody app, and extract every figure on the page. "
+    + "Always call the read_inbody_scan tool exactly once with your best reading. "
+    + "The test date is usually printed near the top of the sheet — read it carefully, this may be a PAST "
+    + "scan being logged retroactively, not today. Numbers must be plain (no units, no thousands separators). "
+    + "Use 0 for any field that genuinely isn't visible on this particular sheet — never guess a non-zero value. "
+    + "Only set readable=false if this clearly isn't a body-composition result sheet.";
+
+  function ibDownscale(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        const MAX = 1568;
+        const scale = Math.min(1, MAX / Math.max(w, h || 1));
+        w = Math.max(1, Math.round(w * scale));
+        h = Math.max(1, Math.round(h * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', 0.85);
+        resolve({ dataUrl, base64: dataUrl.split(',')[1] || '', mediaType: 'image/jpeg' });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read that image.")); };
+      img.src = url;
+    });
+  }
+
+  async function ibScanImage(base64, mediaType) {
+    const key = ibSavedKey();
+    if (!key) { const e = new Error('NO_KEY'); e.code = 'NO_KEY'; throw e; }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json', 'x-api-key': key,
+        'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-8',
+        max_tokens: 1536,
+        system: IB_SYSTEM,
+        tools: [IB_TOOL],
+        tool_choice: { type: 'tool', name: 'read_inbody_scan' },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: 'Read this body-composition result and record every figure on it.' }
+          ]
+        }]
+      })
+    });
+    const json = await res.json();
+    if (json.error) { const e = new Error(json.error.message || 'Anthropic API error'); e.code = 'API'; throw e; }
+    const block = (json.content || []).find(b => b && b.type === 'tool_use' && b.name === 'read_inbody_scan');
+    if (!block || !block.input) { const e = new Error('Could not read that image.'); e.code = 'API'; throw e; }
+    return block.input;
+  }
+
+  // ---- UI state ----
+  let ibPendingImage = null;   // { dataUrl, base64, mediaType } for the scan currently in the confirm card
+  let ibPendingExtracted = null; // raw tool output for the pending scan, with weights converted to state.units
+  function ibShow(el) { el.classList.remove('hidden'); }
+  function ibHide(el) { el.classList.add('hidden'); }
+  function ibNum(v) { const n = Number(v); return n ? n : null; } // 0 from the model means "not shown"
+
+  function ibResetOverlay() {
+    ibHide($('wtIbBusy')); ibHide($('wtIbError')); ibHide($('wtIbConfirm'));
+    ibPendingImage = null; ibPendingExtracted = null;
+  }
+  function ibShowError(msg) {
+    ibHide($('wtIbBusy')); ibHide($('wtIbConfirm'));
+    $('wtIbError').textContent = '⚠ ' + msg;
+    ibShow($('wtIbError'));
+  }
+
+  async function ibHandleFile(file) {
+    if (!file || !/^image\//.test(file.type)) { ibShowError('Please choose an image file.'); return; }
+    ibHide($('wtIbError')); ibHide($('wtIbConfirm'));
+    let img;
+    try { img = await ibDownscale(file); }
+    catch (e) { ibShowError(e.message || "Couldn't read that image."); return; }
+    ibPendingImage = img;
+    $('wtIbBusyThumb').src = img.dataUrl;
+    ibShow($('wtIbBusy'));
+    try {
+      const data = await ibScanImage(img.base64, img.mediaType);
+      ibHide($('wtIbBusy'));
+      if (data.readable === false) {
+        ibShowError("Couldn't find a body-composition result in that image. Try a clearer photo.");
+        return;
+      }
+      ibShowConfirm(data, img.dataUrl);
+    } catch (e) {
+      ibHide($('wtIbBusy'));
+      if (e && e.code === 'NO_KEY') {
+        ibShowError('Add your Anthropic API key on the Nova page first (the 🧠 chat button), then try again.');
+      } else {
+        ibShowError((e && e.message) || "Couldn't reach Anthropic — check your connection and key.");
+      }
+    }
+  }
+
+  function ibShowConfirm(data, dataUrl) {
+    $('wtIbConfirmThumb').src = dataUrl;
+    // Read in whatever unit the sheet used, convert every mass figure to the app's display unit.
+    const sheetUnit = data.weightUnit === 'kg' ? 'kg' : 'lb';
+    const conv = sheetUnit === state.units ? 1 : (sheetUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
+    const cw = (v) => { const n = ibNum(v); return n == null ? null : n * conv; };
+
+    ibPendingExtracted = {
+      bodyFatMass: cw(data.bodyFatMass),
+      leanBodyMass: cw(data.leanBodyMass),
+      totalBodyWater: cw(data.totalBodyWater),
+      intracellularWater: cw(data.intracellularWater),
+      extracellularWater: cw(data.extracellularWater),
+      dryLeanMass: cw(data.dryLeanMass),
+      ecwTbwRatio: ibNum(data.ecwTbwRatio),
+      basalMetabolicRate: ibNum(data.basalMetabolicRate),
+      smi: ibNum(data.smi),
+      segmentalLean: {
+        rightArm: ibNum(data.segmentalLeanRightArmPct),
+        leftArm: ibNum(data.segmentalLeanLeftArmPct),
+        trunk: ibNum(data.segmentalLeanTrunkPct),
+        rightLeg: ibNum(data.segmentalLeanRightLegPct),
+        leftLeg: ibNum(data.segmentalLeanLeftLegPct)
+      },
+      segmentalFat: {
+        rightArm: cw(data.segmentalFatRightArm),
+        leftArm: cw(data.segmentalFatLeftArm),
+        trunk: cw(data.segmentalFatTrunk),
+        rightLeg: cw(data.segmentalFatRightLeg),
+        leftLeg: cw(data.segmentalFatLeftLeg)
+      }
+    };
+
+    $('wtIbDate').value = /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : wtDateKey(new Date());
+    $('wtIbWeight').value = (Number(data.weight) * conv).toFixed(1);
+    $('wtIbFat').value = Number(data.bodyFatPercent).toFixed(1);
+    $('wtIbSmm').value = (Number(data.skeletalMuscleMass) * conv).toFixed(1);
+    $('wtIbBmi').value = Number(data.bmi).toFixed(1);
+    $('wtIbVfl').value = Number(data.visceralFatLevel).toFixed(0);
+    $('wtIbWeightUnit').textContent = state.units;
+    $('wtIbSmmUnit').textContent = state.units;
+
+    // Read-only review of everything else that was detected.
+    const ex = ibPendingExtracted;
+    const rows = [];
+    const add = (label, val, decimals, suffix) => { if (val != null) rows.push('<div class="wt-ib-review-row"><span>' + label + '</span><span>' + val.toFixed(decimals) + (suffix || '') + '</span></div>'); };
+    add('Body fat mass', ex.bodyFatMass, 1, ' ' + state.units);
+    add('Lean body mass', ex.leanBodyMass, 1, ' ' + state.units);
+    add('Total body water', ex.totalBodyWater, 1, ' ' + state.units);
+    add('Intracellular water', ex.intracellularWater, 1, ' ' + state.units);
+    add('Extracellular water', ex.extracellularWater, 1, ' ' + state.units);
+    add('Dry lean mass', ex.dryLeanMass, 1, ' ' + state.units);
+    add('ECW/TBW', ex.ecwTbwRatio, 3, '');
+    add('BMR', ex.basalMetabolicRate, 0, ' kcal');
+    add('SMI', ex.smi, 1, ' kg/m²');
+    IB_REGIONS.forEach(r => add(r.label + ' lean % of ideal', ex.segmentalLean[r.key], 1, '%'));
+    IB_REGIONS.forEach(r => add(r.label + ' fat mass', ex.segmentalFat[r.key], 1, ' ' + state.units));
+    $('wtIbReviewBody').innerHTML = rows.length ? rows.join('') : '<div class="wt-ib-review-row"><span>No additional metrics detected on this sheet.</span><span></span></div>';
+
+    ibShow($('wtIbConfirm'));
+  }
+
+  function ibApplyConfirm() {
+    if (!ibPendingImage) return;
+    const dateKey = $('wtIbDate').value;
+    const weight = parseFloat($('wtIbWeight').value);
+    const fat = parseFloat($('wtIbFat').value);
+    const smm = parseFloat($('wtIbSmm').value);
+    const bmi = parseFloat($('wtIbBmi').value);
+    const vfl = parseFloat($('wtIbVfl').value);
+    if (!dateKey || isNaN(weight)) { alert('Date and weight are required.'); return; }
+    const ex = ibPendingExtracted || {};
+    const entry = {
+      id: 'ib_' + Date.now() + '_' + Math.floor(Math.random() * 999),
+      dateKey,
+      ts: Date.now(),
+      imageDataUrl: ibPendingImage.dataUrl,
+      weight,
+      bodyFatPercent: isNaN(fat) ? null : fat,
+      skeletalMuscleMass: isNaN(smm) ? null : smm,
+      bmi: isNaN(bmi) ? null : bmi,
+      visceralFatLevel: isNaN(vfl) ? null : vfl,
+      bodyFatMass: ex.bodyFatMass != null ? ex.bodyFatMass : null,
+      leanBodyMass: ex.leanBodyMass != null ? ex.leanBodyMass : null,
+      totalBodyWater: ex.totalBodyWater != null ? ex.totalBodyWater : null,
+      intracellularWater: ex.intracellularWater != null ? ex.intracellularWater : null,
+      extracellularWater: ex.extracellularWater != null ? ex.extracellularWater : null,
+      dryLeanMass: ex.dryLeanMass != null ? ex.dryLeanMass : null,
+      ecwTbwRatio: ex.ecwTbwRatio != null ? ex.ecwTbwRatio : null,
+      basalMetabolicRate: ex.basalMetabolicRate != null ? ex.basalMetabolicRate : null,
+      smi: ex.smi != null ? ex.smi : null,
+      segmentalLean: ex.segmentalLean || {},
+      segmentalFat: ex.segmentalFat || {}
+    };
+    // Replace any existing scan for the same date (re-uploading / correcting).
+    inbodyScans = inbodyScans.filter(s => s.dateKey !== dateKey);
+    inbodyScans.push(entry);
+    inbodyScans.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+    ibSave();
+    wtUpsertEntry(dateKey, weight, 'inbody');
+    ibResetOverlay();
+    ibRenderGrid();
+    ibRenderSummary();
+    wtRender();
+  }
+
+  function ibFmtDate(key) { return photoFmtDate(key); }
+
+  function ibRenderGrid() {
+    const grid = $('wtIbGrid');
+    if (!inbodyScans.length) {
+      grid.innerHTML = '<div class="wt-photo-empty">No scans yet · tap Take Photo to start</div>';
+    } else {
+      grid.innerHTML = inbodyScans.slice().reverse().map(s =>
+        '<button class="wt-photo-card" data-id="' + s.id + '" type="button">' +
+          '<img src="' + s.imageDataUrl + '" alt="">' +
+          '<div class="wt-photo-overlay"></div>' +
+          '<div class="wt-photo-meta">' +
+            '<span class="wt-photo-date">' + ibFmtDate(s.dateKey) + '</span>' +
+            '<span class="wt-photo-weight">' + (s.bodyFatPercent != null ? s.bodyFatPercent.toFixed(1) + '%' : '—') + '</span>' +
+          '</div>' +
+        '</button>'
+      ).join('');
+      grid.querySelectorAll('.wt-photo-card').forEach(card => {
+        card.addEventListener('click', () => ibOpenViewer(card.dataset.id));
+      });
+    }
+    if (!inbodyScans.length) $('wtIbCount').textContent = '0 scans';
+    else if (inbodyScans.length === 1) $('wtIbCount').textContent = '1 scan · latest ' + ibFmtDate(inbodyScans[0].dateKey);
+    else $('wtIbCount').textContent = inbodyScans.length + ' scans · latest ' + ibFmtDate(inbodyScans[inbodyScans.length - 1].dateKey);
+  }
+
+  let activeIbId = null;
+  function ibOpenViewer(id) {
+    const s = inbodyScans.find(x => x.id === id);
+    if (!s) return;
+    activeIbId = id;
+    $('wtIbViewerImg').src = s.imageDataUrl;
+    $('wtIbViewerDate').textContent = ibFmtDate(s.dateKey).toUpperCase();
+    $('wtIbViewerWeight').textContent = s.weight.toFixed(1) + ' ' + state.units;
+    const rows = [];
+    IB_METRIC_DEFS.filter(m => m.key !== 'weight').forEach(m => {
+      const v = s[m.key];
+      if (v == null) return;
+      const suffix = m.kind === 'weight' ? ' ' + state.units : m.kind === 'percent' ? '%' : m.kind === 'kcal' ? ' kcal' : m.kind === 'smi' ? ' kg/m²' : '';
+      rows.push('<div><span>' + m.label + '</span><span>' + v.toFixed(m.decimals) + suffix + '</span></div>');
+    });
+    $('wtIbViewerStats').innerHTML = rows.join('');
+  }
+  function ibCloseViewer() { $('wtIbViewer').classList.remove('is-open'); activeIbId = null; }
+
+  // ============================================================
+  // Per-metric trend charts + definitions
+  // ============================================================
+  function ibSparkPath(values, w, h, pad) {
+    // values: array of numbers (already filtered to non-null), evenly spaced on x.
+    if (values.length < 2) return { path: '', dots: [] };
+    const min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    const range = (max - min) || Math.max(1, Math.abs(max) * 0.1);
+    const padV = range * 0.18;
+    const yMin = min - padV, yMax = max + padV;
+    const xFor = (i) => pad + (i / (values.length - 1)) * (w - pad * 2);
+    const yFor = (v) => h - pad - ((v - yMin) / (yMax - yMin)) * (h - pad * 2);
+    const pts = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
+    return { path: wtSmoothPath(pts), dots: pts };
+  }
+
+  function ibRenderMetricCharts() {
+    const recent = inbodyScans.slice(-12);
+    const wrap = $('wtIbMetricCharts');
+    if (recent.length < 1) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = IB_METRIC_DEFS.map(m => {
+      const vals = recent.map(s => s[m.key]).filter(v => v != null);
+      const last = vals.length ? vals[vals.length - 1] : null;
+      const prev = vals.length > 1 ? vals[vals.length - 2] : null;
+      const suffix = m.kind === 'percent' ? '%' : m.kind === 'kcal' ? ' kcal' : m.kind === 'smi' ? ' kg/m²' : m.kind === 'weight' ? ' ' + state.units : '';
+      let deltaHtml = '';
+      if (last != null && prev != null && m.good !== 'neutral') {
+        const d = last - prev;
+        if (Math.abs(d) >= (m.decimals === 0 ? 0.5 : 0.05)) {
+          const isGood = (d > 0) === (m.good === 'up');
+          deltaHtml = ' <span class="wt-ib-stat-delta ' + (isGood ? 'down' : 'up') + '">' + (d > 0 ? '+' : '−') + Math.abs(d).toFixed(m.decimals) + '</span>';
+        }
+      }
+      let chartHtml;
+      if (vals.length < 2) {
+        chartHtml = '<div class="wt-ib-metric-empty">' + (vals.length === 1 ? 'Need another scan to chart this' : 'Not detected yet') + '</div>';
+      } else {
+        const sp = ibSparkPath(vals, 200, 44, 5);
+        chartHtml = '<svg class="wt-ib-metric-svg" viewBox="0 0 200 44" preserveAspectRatio="none">'
+          + '<path fill="none" stroke="' + m.color + '" stroke-width="2" d="' + sp.path + '"></path>'
+          + sp.dots.map((p, i) => '<circle cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="' + (i === sp.dots.length - 1 ? 3 : 2) + '" fill="' + m.color + '"></circle>').join('')
+          + '</svg>';
+      }
+      return '<div class="wt-ib-metric-card">'
+        + '<div class="wt-ib-metric-h">'
+        +   '<span class="wt-ib-metric-label">' + m.label + '</span>'
+        +   '<span class="wt-ib-metric-val">' + (last != null ? last.toFixed(m.decimals) + suffix : '—') + deltaHtml + '</span>'
+        + '</div>'
+        + '<div class="wt-ib-metric-def">' + m.def + '</div>'
+        + chartHtml
+        + '</div>';
+    }).join('');
+  }
+
+  // ============================================================
+  // MUSCLE BALANCE PENTAGON — InBody's 5 segmental regions (the only
+  // granularity an InBody scan actually measures) plotted against how
+  // much each region has been trained in the last 30 days. Exercises
+  // aren't individually tagged with a muscle group, so volume is
+  // attributed by a simple keyword match on the exercise name — good
+  // enough to spot a region nobody is training, not a precise split.
+  // ============================================================
+  function ibRegionsForExercise(ex) {
+    const n = (ex.name || '').toLowerCase();
+    if (/bicep|curl|tricep|pushdown|skull|forearm|wrist/.test(n)) return ['rightArm', 'leftArm'];
+    if (/squat|deadlift|leg press|lunge|hamstring|quad|calf|glute|hip thrust|leg curl|leg extension/.test(n)) return ['rightLeg', 'leftLeg'];
+    return ['trunk']; // chest / back / shoulder / compound presses & rows — the region InBody itself groups them into
+  }
+  function ibTrainingVolumeByRegion(days) {
+    const vol = { rightArm: 0, leftArm: 0, trunk: 0, rightLeg: 0, leftLeg: 0 };
+    const cutoff = Date.now() - days * 86400000;
+    state.exercises.forEach(ex => {
+      const logs = state.logs[ex.id] || [];
+      const regions = ibRegionsForExercise(ex);
+      logs.forEach(l => {
+        const t = new Date(l.date).getTime();
+        if (isNaN(t) || t < cutoff) return;
+        const v = ex.bw ? (l.reps || 0) * 5 : (l.weight || 0) * (l.reps || 0);
+        regions.forEach(r => { vol[r] += v; });
+      });
+    });
+    return vol;
+  }
+  const IB_RADAR_AXES = [
+    { key: 'trunk',    label: 'Trunk',     angle: -90 },
+    { key: 'rightArm', label: 'R. Arm',    angle: -18 },
+    { key: 'rightLeg', label: 'R. Leg',    angle: 54 },
+    { key: 'leftLeg',  label: 'L. Leg',    angle: 126 },
+    { key: 'leftArm',  label: 'L. Arm',    angle: 198 }
+  ];
+  function ibRenderRadar() {
+    const wrap = $('wtIbRadarWrap');
+    const last = inbodyScans[inbodyScans.length - 1];
+    const lean = last && last.segmentalLean;
+    const haveScanData = lean && IB_RADAR_AXES.some(a => lean[a.key] != null);
+    const trainVol = ibTrainingVolumeByRegion(30);
+    const maxVol = Math.max.apply(null, Object.values(trainVol));
+    const haveTrainData = maxVol > 0;
+    if (!haveScanData && !haveTrainData) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+
+    const cx = 110, cy = 110, R = 88;
+    const toXY = (angleDeg, frac) => {
+      const rad = angleDeg * Math.PI / 180;
+      const r = R * Math.max(0, Math.min(1, frac));
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    };
+    let svg = '';
+    // Grid rings at 25/50/75/100%
+    [0.25, 0.5, 0.75, 1].forEach(f => {
+      const pts = IB_RADAR_AXES.map(a => toXY(a.angle, f));
+      svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"></polygon>';
+    });
+    // Axis lines + labels
+    IB_RADAR_AXES.forEach(a => {
+      const edge = toXY(a.angle, 1);
+      const labelPt = toXY(a.angle, 1.22);
+      svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + edge.x.toFixed(1) + '" y2="' + edge.y.toFixed(1) + '" stroke="rgba(255,255,255,0.08)" stroke-width="1"></line>';
+      svg += '<text x="' + labelPt.x.toFixed(1) + '" y="' + labelPt.y.toFixed(1) + '" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle" dominant-baseline="middle">' + a.label + '</text>';
+    });
+    // Scan trace: segmental lean % of ideal, mapped 50%→0, 150%→1
+    if (haveScanData) {
+      const pts = IB_RADAR_AXES.map(a => toXY(a.angle, ((lean[a.key] || 50) - 50) / 100));
+      svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="rgba(125,211,252,0.18)" stroke="#7DD3FC" stroke-width="2"></polygon>';
+      pts.forEach(p => { svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#7DD3FC"></circle>'; });
+    }
+    // Training trace: volume normalized to the highest-volume region
+    if (haveTrainData) {
+      const pts = IB_RADAR_AXES.map(a => toXY(a.angle, trainVol[a.key] / maxVol));
+      svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="rgba(110,231,183,0.14)" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="4 3"></polygon>';
+      pts.forEach(p => { svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#6ee7b7"></circle>'; });
+    }
+    $('wtIbRadarSvg').innerHTML = svg;
+
+    // Strong / weak callout — ranks regions by InBody segmental lean %,
+    // and notes whether a weak region is also under-trained.
+    const calloutEl = $('wtIbRadarCallout');
+    if (!haveScanData) {
+      calloutEl.innerHTML = haveTrainData ? 'Upload an InBody scan to see which regions are strongest and weakest.' : 'Log workouts and upload a scan to see your muscle balance.';
+      return;
+    }
+    const ranked = IB_RADAR_AXES.map(a => ({ label: a.label, key: a.key, val: lean[a.key] })).filter(r => r.val != null).sort((a, b) => b.val - a.val);
+    if (ranked.length < 3) { calloutEl.textContent = 'Need more segmental data from a scan to rank regions.'; return; }
+    const strong = ranked.slice(0, 2);
+    const weak = ranked.slice(-2).reverse();
+    const trainRanked = haveTrainData ? IB_RADAR_AXES.map(a => ({ key: a.key, vol: trainVol[a.key] })).sort((a, b) => a.vol - b.vol) : [];
+    const lowTrainKeys = trainRanked.slice(0, 2).map(r => r.key);
+    const weakNotes = weak.map(w => {
+      const undertrained = haveTrainData && lowTrainKeys.includes(w.key);
+      return w.label + (undertrained ? ' (also under-trained)' : '');
+    });
+    calloutEl.innerHTML = '<span class="strong-tag">Strong:</span> ' + strong.map(s => s.label).join(', ')
+      + ' &nbsp;·&nbsp; <span class="weak-tag">Weak:</span> ' + weakNotes.join(', ');
+  }
+
+  // ---- Summary card orchestration on the main Weight section ----
+  function ibRenderSummary() {
+    const wrap = $('wtIbSummary');
+    if (!inbodyScans.length) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    const last = inbodyScans[inbodyScans.length - 1];
+    const prev = inbodyScans.length > 1 ? inbodyScans[inbodyScans.length - 2] : null;
+    $('wtIbLatestDate').textContent = ibFmtDate(last.dateKey);
+
+    function statHtml(m) {
+      const val = last[m.key], prevVal = prev && prev[m.key];
+      const suffix = m.kind === 'weight' ? ' ' + state.units : m.kind === 'percent' ? '%' : m.kind === 'kcal' ? ' kcal' : m.kind === 'smi' ? ' kg/m²' : '';
+      let deltaHtml = '';
+      if (val != null && prevVal != null && m.good !== 'neutral') {
+        const d = val - prevVal;
+        if (Math.abs(d) >= (m.decimals === 0 ? 0.5 : 0.05)) {
+          const isGood = (d > 0) === (m.good === 'up');
+          deltaHtml = '<span class="wt-ib-stat-delta ' + (isGood ? 'down' : 'up') + '">' + (d > 0 ? '+' : '−') + Math.abs(d).toFixed(m.decimals) + '</span>';
+        }
+      }
+      return '<div class="wt-ib-stat">'
+        + '<span class="wt-ib-stat-label">' + m.label + '</span>'
+        + '<span class="wt-ib-stat-val">' + (val != null ? val.toFixed(m.decimals) + suffix : '—') + '</span>'
+        + deltaHtml
+        + '<span class="wt-ib-stat-def">' + m.def + '</span>'
+        + '</div>';
+    }
+    // Headline stats: the 6 figures most people check first.
+    const headline = ['bodyFatPercent', 'skeletalMuscleMass', 'bmi', 'visceralFatLevel', 'leanBodyMass', 'basalMetabolicRate'];
+    $('wtIbStatRow').innerHTML = IB_METRIC_DEFS.filter(m => headline.includes(m.key)).map(statHtml).join('');
+
+    ibRenderRadar();
+    ibRenderMetricCharts();
+  }
+
+  function ibDeleteActive() {
+    if (!activeIbId) return;
+    if (!confirm('Delete this InBody scan? This cannot be undone.')) return;
+    inbodyScans = inbodyScans.filter(s => s.id !== activeIbId);
+    ibSave();
+    ibCloseViewer();
+    ibRenderGrid();
+    ibRenderSummary();
+  }
+
+  // ---- Wiring ----
+  $('wtIbLink').addEventListener('click', () => {
+    ibResetOverlay();
+    ibRenderGrid();
+    $('wtIbOverlay').classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  });
+  $('wtIbBack').addEventListener('click', () => {
+    $('wtIbOverlay').classList.remove('is-open');
+    document.body.style.overflow = '';
+  });
+  $('wtIbTakePhotoBtn').addEventListener('click', () => $('wtIbFileCamera').click());
+  $('wtIbFileCamera').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) ibHandleFile(f);
+    e.target.value = '';
+  });
+  $('wtIbFromLibraryBtn').addEventListener('click', () => $('wtIbFileLibrary').click());
+  $('wtIbFileLibrary').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) ibHandleFile(f);
+    e.target.value = '';
+  });
+  $('wtIbDiscard').addEventListener('click', ibResetOverlay);
+  $('wtIbSave').addEventListener('click', ibApplyConfirm);
+  $('wtIbViewerClose').addEventListener('click', ibCloseViewer);
+  $('wtIbViewerDelete').addEventListener('click', ibDeleteActive);
+
+  // ============================================================
   // BOOT
   // ============================================================
   renderAll();
   wtRender();
   photosRender();
+  ibRenderGrid();
+  ibRenderSummary();
 
   // ============================================================
   // CLOUD SYNC via Supabase  (OPTIONAL — leave blank for local-only)
@@ -3638,6 +4508,7 @@ img, video, canvas, svg { max-width: 100%; }
     <button class="nv-chip" data-q="Give me an overview of how everything is going — bodyweight trend, training consistency, and what to focus on next.">📊 Overview</button>
     <button class="nv-chip" data-q="How is my bodyweight trending and am I on track?">⚖️ Weight</button>
     <button class="nv-chip" data-q="Look at my recent workouts — am I progressing and what should I push next?">💪 Lifts</button>
+    <button class="nv-chip" data-q="Look at my InBody scan history and segmental lean balance — how is my body composition trending, and which muscle groups are strong vs. lagging compared to how much I train them?">🧬 InBody</button>
   </div>
   <div class="nv-foot">
     <input class="nv-input" id="nvInput" type="text" placeholder="Ask Nova…" autocomplete="off">
@@ -3684,11 +4555,14 @@ img, video, canvas, svg { max-width: 100%; }
     const prof = (readLS('po_water_v1', {}) || {}).profile || {};
     const photosRaw = readLS('po_coach_photos', []) || [];
     const photos = (Array.isArray(photosRaw)?photosRaw:[]).map(p=>({ date:p.dateKey||p.date||p.d, weight:p.weight||p.w }));
+    const inbodyRaw = readLS('po_coach_inbody', []) || [];
+    const inbody = (Array.isArray(inbodyRaw)?inbodyRaw:[]).map(s => sanitize(Object.assign({}, s, { imageDataUrl: undefined }), 0));
     let ctx = {
       today: new Date().toDateString(),
       profile: { heightCm:prof.heightCm, weightKg:prof.weightKg, age:prof.age, sex:prof.sex, activityHrsPerWeek:prof.activityHrsPerWeek },
       weightLog: sanitize(readLS('po_coach_weights', []), 0),
       progressPhotos: { count: photos.length, timeline: photos.slice(-30) },
+      inbodyScans: { count: inbody.length, history: inbody.slice(-12), note: 'segmentalLean is % of ideal lean mass per region (rightArm, leftArm, trunk, rightLeg, leftLeg); 100% = ideal.' },
       workouts: sanitize(readLS('po_coach_v1', null), 0),
       workoutsDone: sanitize(readLS('po_coach_workout_done', null), 0),
     };
@@ -3697,8 +4571,9 @@ img, video, canvas, svg { max-width: 100%; }
     return s;
   }
   const SYS = "You are Nova, the user's personal gym coach living inside their fitness dashboard. "
-    + "You can see their body profile, bodyweight log (entries have dateKey + weight), workout logs, and progress-photo timeline (dates + bodyweight; the actual images are not included). "
+    + "You can see their body profile, bodyweight log (entries have dateKey + weight), workout logs, progress-photo timeline (dates + bodyweight; images not included), and InBody scan history (full body-composition breakdown including segmental lean % per region — rightArm, leftArm, trunk, rightLeg, leftLeg). "
     + "Coach concisely and specifically. For an overview, cover: bodyweight trend, training consistency, standout progress, and 1-2 concrete next steps. "
+    + "When asked about InBody/body composition, reference real figures (body fat %, muscle mass, visceral fat, segmental lean balance) and note any region that's lagging vs. its training volume in their workout logs. "
     + "Use short markdown bullets, be encouraging but honest. Weights may be kg or lb per their profile. Keep replies under ~180 words. Their data as JSON: ";
 
   async function ask(text){
