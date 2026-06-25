@@ -171,6 +171,8 @@ body::after {
 .field { margin-bottom: 14px; }
 .field-label { font-size: 11px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 7px; display: block; }
 .field-row { display: flex; gap: 8px; align-items: center; }
+.age-readout { font-size: 13px; color: var(--text-tertiary); white-space: nowrap; flex-shrink: 0; }
+.age-readout.set { color: var(--text-primary); font-weight: 600; }
 .set-input {
   flex: 1; min-width: 0; padding: 11px 13px;
   border: 1px solid rgba(255,255,255,0.08); border-radius: 11px;
@@ -333,11 +335,11 @@ body::after {
     <div class="field">
       <label class="field-label">Height</label>
       <div class="field-row">
-        <input class="set-input" id="heightA" type="number" min="0" inputmode="decimal" placeholder="cm">
-        <input class="set-input" id="heightB" type="number" min="0" inputmode="decimal" placeholder="in" style="display:none">
+        <input class="set-input" id="heightA" type="number" min="0" inputmode="decimal" placeholder="ft">
+        <input class="set-input" id="heightB" type="number" min="0" inputmode="decimal" placeholder="in" style="">
         <div class="seg" id="heightUnitSeg">
-          <button type="button" data-u="cm" class="on">cm</button>
-          <button type="button" data-u="ft">ft/in</button>
+          <button type="button" data-u="cm">cm</button>
+          <button type="button" data-u="ft" class="on">ft/in</button>
         </div>
       </div>
     </div>
@@ -354,8 +356,11 @@ body::after {
     </div>
 
     <div class="field">
-      <label class="field-label">Age</label>
-      <input class="set-input" id="age" type="number" min="0" inputmode="numeric" placeholder="years">
+      <label class="field-label">Birthday</label>
+      <div class="field-row">
+        <input class="set-input" id="birthDate" type="date">
+        <span class="age-readout" id="ageReadout">—</span>
+      </div>
     </div>
 
     <div class="field">
@@ -411,9 +416,29 @@ body::after {
   }
 
   /* ---------- unit state ---------- */
-  let heightUnit = 'cm';   // 'cm' | 'ft'
+  let heightUnit = 'ft';   // 'cm' | 'ft'
   let weightUnit = 'lb';   // 'kg' | 'lb'
   let sex = 'm';
+
+  /* ---------- birthday → age ---------- */
+  function ageFromBirthDate(iso) {
+    if (!iso) return null;
+    const d = new Date(iso + 'T00:00');
+    if (isNaN(d)) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const beforeBirthday = (now.getMonth() < d.getMonth()) ||
+      (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+    if (beforeBirthday) age--;
+    return age >= 0 ? age : null;
+  }
+  function renderAgeReadout() {
+    const age = ageFromBirthDate($('birthDate').value);
+    const el = $('ageReadout');
+    if (age == null) { el.textContent = '—'; el.classList.remove('set'); return; }
+    el.textContent = age + (age === 1 ? ' year old' : ' years old');
+    el.classList.add('set');
+  }
 
   function setHeightUnit(u) {
     heightUnit = u;
@@ -449,12 +474,13 @@ body::after {
     const w = loadJSON(WATER_KEY, defaultWater());
     const p = w.profile || {};
     setWeightUnit(w.weightUnit === 'kg' ? 'kg' : 'lb');
-    setHeightUnit(p.heightUnit === 'ft' ? 'ft' : 'cm');
+    setHeightUnit(p.heightUnit === 'cm' ? 'cm' : 'ft');
     setSex(p.sex === 'f' ? 'f' : 'm');
     fillHeight(p.heightCm || null);
     if (p.weightKg) $('weight').value = weightUnit === 'lb' ? Math.round(p.weightKg * 2.20462) : Math.round(p.weightKg);
     else $('weight').value = '';
-    $('age').value = p.age || '';
+    $('birthDate').value = p.birthDate || '';
+    renderAgeReadout();
     $('activity').value = (p.activityHrsPerWeek != null ? p.activityHrsPerWeek : '');
   }
 
@@ -466,7 +492,12 @@ body::after {
     if (cm) { w.profile.heightCm = cm; w.profile.heightUnit = heightUnit; }
     const wv = parseFloat($('weight').value);
     if (wv > 0) { w.profile.weightKg = weightUnit === 'lb' ? +(wv / 2.20462).toFixed(1) : wv; w.weightUnit = weightUnit; }
-    const age = parseInt($('age').value, 10); if (age > 0) w.profile.age = age;
+    const birthDate = $('birthDate').value;
+    if (birthDate) {
+      w.profile.birthDate = birthDate;
+      const age = ageFromBirthDate(birthDate);
+      if (age != null) w.profile.age = age;
+    }
     w.profile.sex = sex;
     const act = parseFloat($('activity').value); if (act >= 0 && !isNaN(act)) w.profile.activityHrsPerWeek = act;
     saveJSON(WATER_KEY, w);
@@ -492,6 +523,7 @@ body::after {
     if (kg) $('weight').value = weightUnit === 'lb' ? Math.round(kg * 2.20462) : Math.round(kg);
   }));
   $('sexSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => setSex(b.dataset.s)));
+  $('birthDate').addEventListener('input', renderAgeReadout);
 
   /* ---------- WHOOP ---------- */
   let whStats = null;

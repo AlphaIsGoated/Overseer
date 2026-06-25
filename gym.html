@@ -2980,11 +2980,7 @@ img, video, canvas, svg { max-width: 100%; }
   let wtEntries = wtLoad();
 
   function wtSaveEntry(weight) {
-    const key = wtDateKey(new Date());
-    const existing = wtEntries.find(e => e.dateKey === key);
-    if (existing) existing.weight = weight;
-    else { wtEntries.push({ dateKey: key, weight }); wtEntries.sort((a,b) => a.dateKey.localeCompare(b.dateKey)); }
-    wtSave(wtEntries);
+    wtUpsertEntry(wtDateKey(new Date()), weight, 'manual');
     wtRender();
   }
 
@@ -3654,6 +3650,22 @@ img, video, canvas, svg { max-width: 100%; }
     if (existing) { existing.weight = weight; existing.source = source; }
     else { wtEntries.push({ dateKey, weight, source }); wtEntries.sort((a, b) => a.dateKey.localeCompare(b.dateKey)); }
     wtSave(wtEntries);
+    // If this is the most recent entry overall, it's the current weight —
+    // push it into the shared health profile so caffeine dosing, water
+    // targets, etc. everywhere else in the dashboard reflect it too.
+    const latest = wtEntries[wtEntries.length - 1];
+    if (latest && latest.dateKey === dateKey) syncProfileWeight(weight);
+  }
+  function syncProfileWeight(weightInAppUnits) {
+    try {
+      const raw = localStorage.getItem('po_water_v1');
+      const w = raw ? JSON.parse(raw) : null;
+      if (!w || typeof w !== 'object') return;
+      w.profile = w.profile || {};
+      const kg = state.units === 'lb' ? weightInAppUnits / KG_TO_LB : weightInAppUnits;
+      w.profile.weightKg = +kg.toFixed(1);
+      localStorage.setItem('po_water_v1', JSON.stringify(w));
+    } catch (e) {}
   }
 
   // Definitions shown under every metric so the numbers are legible,
