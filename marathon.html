@@ -152,11 +152,11 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 
 .mt-review { margin-bottom: 16px; }
 .mt-review.hidden { display: none; }
-.mt-review-row { display: grid; grid-template-columns: 60px 1fr 80px auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.mt-review-row { display: grid; grid-template-columns: 112px 1fr 64px auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
 .mt-review-row input, .mt-review-row select { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; color: var(--text-1); font-family: inherit; font-size: 12px; padding: 5px 6px; width: 100%; }
 .mt-review-row .mt-rm { background: transparent; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; }
 .mt-review-row .mt-rm:hover { color: var(--bad); }
-.mt-review-head { display: grid; grid-template-columns: 60px 1fr 80px auto; gap: 8px; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-4); padding-bottom: 6px; font-weight: 700; }
+.mt-review-head { display: grid; grid-template-columns: 112px 1fr 64px auto; gap: 8px; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-4); padding-bottom: 6px; font-weight: 700; }
 .hidden { display: none !important; }
 
 /* Schedule list */
@@ -377,7 +377,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         <input type="date" class="mt-input" id="mtReviewRaceDate">
       </div>
       <div class="mt-status" id="mtReviewStatus" style="margin-bottom:10px"></div>
-      <div class="mt-review-head"><span>Wk</span><span>Workout</span><span>Mi</span><span></span></div>
+      <div class="mt-review-head"><span>Date</span><span>Workout</span><span>Mi</span><span></span></div>
       <div id="mtReviewRows"></div>
       <button class="mt-btn full primary" id="mtReviewSave" type="button" style="margin-top:14px">Save plan</button>
     </div>
@@ -916,46 +916,53 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
      ============================================================ */
   const IMPORT_TOOL = {
     name: 'import_training_plan',
-    description: 'Record every training day from a photo of a running/marathon training plan, whether it is a table or a calendar grid.',
+    description: 'Record every training day from a running/marathon training plan, whether it is a photographed table/calendar grid, or a markdown/text document using plain dates or relative week/day labels.',
     input_schema: {
       type: 'object',
       properties: {
-        readable: { type: 'boolean', description: 'True if this looks like a structured training plan with weeks/days and workouts.' },
-        raceDateOnSheet: { type: 'string', description: 'Race day date as YYYY-MM-DD if printed on the sheet, else empty string.' },
-        totalWeeks: { type: 'number', description: 'Total number of weeks in the plan (the highest week number present).' },
+        readable: { type: 'boolean', description: 'True if a running/marathon training schedule was found anywhere in the source, in ANY format (date-based list, week/day grid, prose with day names, etc).' },
+        notes: { type: 'string', description: 'One sentence on what format the plan was in and how many days you found — or, if readable=false, specifically what you looked for and why nothing matched. Always fill this in, it is shown to the user for debugging.' },
+        raceDateOnSheet: { type: 'string', description: 'Race day date as YYYY-MM-DD if stated anywhere, else empty string.' },
+        totalWeeks: { type: 'number', description: 'Total number of weeks in the plan if it uses week numbers. 0 if entries use direct dates instead.' },
         entries: {
           type: 'array',
+          description: 'Every training day found. Each entry needs EITHER a direct date OR a weekNumber+dayOfWeek pair — use whichever the source actually provides.',
           items: {
             type: 'object',
             properties: {
-              weekNumber: { type: 'number', description: '1-indexed week number.' },
-              dayOfWeek: { type: 'string', enum: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+              date: { type: 'string', description: 'Exact calendar date as YYYY-MM-DD, ONLY if the source states a real date for this day. Empty string otherwise.' },
+              weekNumber: { type: 'number', description: '1-indexed week number, ONLY if the source uses relative week numbers instead of real dates. 0 otherwise.' },
+              dayOfWeek: { type: 'string', enum: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun',''], description: 'Day of week, used together with weekNumber when no direct date is given. Empty string if a direct date was provided instead.' },
               type: { type: 'string', enum: ['easy','long','speed','tempo','rest','cross','race','other'] },
-              label: { type: 'string', description: 'Short workout description as printed, e.g. "6 mi easy" or "Rest".' },
+              label: { type: 'string', description: 'Short workout description as written, e.g. "6 mi easy" or "Rest".' },
               distanceMi: { type: 'number', description: 'Distance in miles. 0 for rest days or if not specified.' }
             },
-            required: ['weekNumber', 'dayOfWeek', 'type', 'label', 'distanceMi']
+            required: ['date', 'weekNumber', 'dayOfWeek', 'type', 'label', 'distanceMi']
           }
         }
       },
-      required: ['readable', 'totalWeeks', 'entries']
+      required: ['readable', 'notes', 'totalWeeks', 'entries']
     }
   };
   const IMPORT_SYSTEM =
     "You read photos of running/marathon training plans — tables or calendar grids showing weeks and daily workouts — "
     + "and extract every single day. Always call the import_training_plan tool exactly once with your best reading. "
-    + "weekNumber is 1-indexed from the start of the plan. Distances should be converted to miles if shown in km "
-    + "(1 km = 0.621371 mi). Include rest days with type='rest' and distanceMi=0 — don't skip them. "
-    + "Only set readable=false if this clearly isn't a training plan.";
+    + "Prefer real dates if the sheet shows any; otherwise use weekNumber (1-indexed) + dayOfWeek. Distances should be "
+    + "converted to miles if shown in km (1 km = 0.621371 mi). Include rest days with type='rest' and distanceMi=0 — "
+    + "don't skip them. Always fill in `notes` with what you found. Only set readable=false if this clearly isn't a "
+    + "training plan at all.";
   const IMPORT_SYSTEM_MD =
-    "You read markdown (or plain text) documents that may contain a LOT more than just a running plan — strength "
+    "You read markdown or plain-text documents that may contain a LOT more than just a running plan — strength "
     + "training, nutrition notes, journal entries, other sports, whatever else the person tracks in the same file. "
-    + "Your job is to find and extract ONLY the running/marathon training plan portion and ignore everything else "
-    + "in the document. Always call the import_training_plan tool exactly once with your best reading of just that "
-    + "portion. weekNumber is 1-indexed from the start of the running plan specifically (not the whole document). "
-    + "Distances should be converted to miles if shown in km (1 km = 0.621371 mi). Include rest days with "
-    + "type='rest' and distanceMi=0 — don't skip them. Only set readable=false if the document contains no "
-    + "identifiable running/marathon training schedule at all.";
+    + "Your job is to find and extract ONLY the running/marathon training plan portion, in WHATEVER format it's "
+    + "written — a markdown table, a bulleted list, a list of real dates ('2026-07-04: 6mi easy' or 'July 4: rest'), "
+    + "prose ('On Mondays I do an easy 5'), or relative week/day labels ('Week 3, Tuesday: tempo run'). Read the "
+    + "WHOLE document before deciding nothing is there. For each day found, use a real date if one is stated; only "
+    + "fall back to weekNumber+dayOfWeek if no real date is given anywhere for that entry. Always call the "
+    + "import_training_plan tool exactly once. Convert distances to miles if shown in km (1 km = 0.621371 mi). "
+    + "Include rest days with type='rest' and distanceMi=0 — don't skip them. Always fill in `notes` explaining "
+    + "what you found (or searched for and didn't find). Only set readable=false if there is truly no running/"
+    + "training schedule anywhere in the document — skim every section before concluding that.";
 
   function downscaleImage(file) {
     return new Promise((resolve, reject) => {
@@ -1022,7 +1029,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       const data = await scanPlanImage(img.base64, img.mediaType);
       ibHide($('mtBusy'));
       if (data.readable === false || !Array.isArray(data.entries) || !data.entries.length) {
-        showImportError("Couldn't find a training plan in that image. Try a clearer photo.");
+        showImportError("Couldn't find a training plan in that image." + (data.notes ? ' (' + data.notes + ')' : ' Try a clearer photo.'));
         return;
       }
       importExtracted = data;
@@ -1051,10 +1058,10 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     $('mtBusyThumb').style.display = 'none';
     ibShow($('mtBusy'));
     try {
-      const data = await scanPlanMarkdown(text.slice(0, 60000));
+      const data = await scanPlanMarkdown(text.slice(0, 300000));
       ibHide($('mtBusy'));
       if (data.readable === false || !Array.isArray(data.entries) || !data.entries.length) {
-        showImportError("Couldn't find a running/marathon plan in that file.");
+        showImportError("Couldn't find a running/marathon plan in that file." + (data.notes ? ' (' + data.notes + ')' : ''));
         return;
       }
       importExtracted = data;
@@ -1064,52 +1071,78 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       showImportError((e && e.message) || "Couldn't reach the plan reader — check your connection.");
     }
   }
+  // Resolve one extracted entry to an absolute calendar date: use its own
+  // date if the source gave one directly, otherwise back-calculate from
+  // the race date using weekNumber + dayOfWeek (counting backward from
+  // the LAST week of the plan, same as before).
+  function resolveEntryDate(e, raceDate, totalWeeks) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(e.date)) return e.date;
+    if (!raceDate) return '';
+    const dayIndexOf = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
+    const race = parseKey(raceDate);
+    const raceDayIdx = isoDayIndex(race);
+    const weekNumber = e.weekNumber || 1;
+    const dow = e.dayOfWeek || 'Mon';
+    const entryDayIdx = dayIndexOf[dow] != null ? dayIndexOf[dow] : 0;
+    const offsetDays = ((totalWeeks || weekNumber) - weekNumber) * 7 + (raceDayIdx - entryDayIdx);
+    const d = new Date(race); d.setDate(d.getDate() - offsetDays);
+    return dateKey(d);
+  }
   function showReview(data) {
-    $('mtReviewRaceDate').value = /^\d{4}-\d{2}-\d{2}$/.test(data.raceDateOnSheet) ? data.raceDateOnSheet : (plan.raceDate || '');
+    const raceDate = /^\d{4}-\d{2}-\d{2}$/.test(data.raceDateOnSheet) ? data.raceDateOnSheet : (plan.raceDate || '');
+    $('mtReviewRaceDate').value = raceDate;
+    const totalWeeks = data.totalWeeks || Math.max.apply(null, data.entries.map(e => e.weekNumber || 1)) || 1;
     const rows = data.entries.map((e, i) =>
       '<div class="mt-review-row" data-i="' + i + '">'
-      + '<input type="number" class="mt-rev-week" value="' + (e.weekNumber || 1) + '" min="1">'
+      + '<input type="date" class="mt-rev-date" value="' + (resolveEntryDate(e, raceDate, totalWeeks)) + '">'
       + '<input type="text" class="mt-rev-label" value="' + escapeHtml(e.label || '') + '">'
       + '<input type="number" step="0.1" class="mt-rev-mi" value="' + (e.distanceMi || 0) + '">'
       + '<button type="button" class="mt-rm" data-i="' + i + '">×</button>'
       + '</div>'
     ).join('');
     $('mtReviewRows').innerHTML = rows;
-    $('mtReviewStatus').textContent = data.entries.length + ' days detected over ' + (data.totalWeeks || '?') + ' weeks. Fix the race date above, then review rows before saving.';
+    const statusBits = [data.entries.length + ' day' + (data.entries.length === 1 ? '' : 's') + ' detected' + (totalWeeks > 1 ? ' over ' + totalWeeks + ' weeks' : '') + '.'];
+    if (data.notes) statusBits.push(data.notes);
+    statusBits.push('Check the dates below (week-based plans need the race date above to place correctly), then save.');
+    $('mtReviewStatus').textContent = statusBits.join(' ');
+    $('mtReviewStatus').style.color = '';
     $('mtReviewRows').querySelectorAll('.mt-rm').forEach(b => b.addEventListener('click', () => {
       const row = b.closest('.mt-review-row'); row.remove();
     }));
+    // Week-based rows (no direct source date) re-anchor if the race date changes.
+    $('mtReviewRaceDate').oninput = () => {
+      const rd = $('mtReviewRaceDate').value;
+      [...$('mtReviewRows').querySelectorAll('.mt-review-row')].forEach(row => {
+        const orig = data.entries[Number(row.dataset.i)];
+        if (!orig || /^\d{4}-\d{2}-\d{2}$/.test(orig.date)) return;
+        const resolved = resolveEntryDate(orig, rd, totalWeeks);
+        if (resolved) row.querySelector('.mt-rev-date').value = resolved;
+      });
+    };
     ibShow($('mtReview'));
   }
   function saveImportedPlan() {
     if (!importExtracted) return;
     const raceDate = $('mtReviewRaceDate').value;
-    if (!raceDate) { $('mtReviewStatus').textContent = 'Race date is required to place each day on the calendar.'; $('mtReviewStatus').style.color = 'var(--bad)'; return; }
     const rows = [...$('mtReviewRows').querySelectorAll('.mt-review-row')];
-    const totalWeeks = importExtracted.totalWeeks || Math.max.apply(null, importExtracted.entries.map(e => e.weekNumber || 1));
-    const race = parseKey(raceDate);
-    const raceDayIdx = isoDayIndex(race);
-    const dayIndexOf = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
+    if (!rows.length) { $('mtReviewStatus').textContent = 'No rows left to save.'; $('mtReviewStatus').style.color = 'var(--bad)'; return; }
     const newEntries = rows.map((row, idx) => {
-      const orig = importExtracted.entries[Number(row.dataset.i)];
-      const weekNumber = parseInt(row.querySelector('.mt-rev-week').value, 10) || 1;
+      const orig = importExtracted.entries[Number(row.dataset.i)] || {};
+      const date = row.querySelector('.mt-rev-date').value;
       const label = row.querySelector('.mt-rev-label').value.trim();
       const distanceMi = parseFloat(row.querySelector('.mt-rev-mi').value) || 0;
-      const dow = orig.dayOfWeek || 'Mon';
-      const entryDayIdx = dayIndexOf[dow] != null ? dayIndexOf[dow] : 0;
-      const offsetDays = (totalWeeks - weekNumber) * 7 + (raceDayIdx - entryDayIdx);
-      const d = new Date(race); d.setDate(d.getDate() - offsetDays);
       return {
-        id: 'm_' + Date.now() + '_' + idx, date: dateKey(d), weekNumber, dayOfWeek: dow,
+        id: 'm_' + Date.now() + '_' + idx, date, weekNumber: orig.weekNumber || null, dayOfWeek: orig.dayOfWeek || null,
         type: orig.type || 'other', label: label || orig.label || '', plannedDistanceMi: distanceMi,
         completed: false, source: null, actualDistanceMi: null, actualDurationSec: null, actualPaceSecPerMi: null
       };
-    });
+    }).filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.date));
+    if (!newEntries.length) { $('mtReviewStatus').textContent = 'Every row needs a valid date — set the race date above for week-based rows, or fix dates directly.'; $('mtReviewStatus').style.color = 'var(--bad)'; return; }
     // Replace the whole schedule with the freshly imported one (keeps any already-completed
     // days for dates that don't appear in the new import, in case this is a partial re-import).
     const newDates = new Set(newEntries.map(e => e.date));
     plan.entries = plan.entries.filter(e => !newDates.has(e.date)).concat(newEntries).sort((a, b) => a.date.localeCompare(b.date));
-    plan.raceDate = raceDate;
+    if (raceDate) plan.raceDate = raceDate;
     savePlan();
     populateGoalForm();
     renderSchedule(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderProgress();
