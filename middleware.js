@@ -8,13 +8,13 @@
 // native autofill/Keychain UI, which iOS doesn't reliably extend to
 // web apps launched from a home-screen icon — the password just never
 // autofills there. A signed session cookie has no such dependency:
-// once /api/login sets it, the browser sends it automatically on
+// once /api/auth sets it, the browser sends it automatically on
 // every later request to this origin, in regular Safari or a
 // home-screen-launched standalone web app alike.
 //
-// /login.html and /api/login (and /api/logout) are exempted from the
-// gate itself, otherwise visiting the login page would be blocked by
-// the very check it exists to satisfy.
+// /login.html and /api/auth (login+logout combined) are exempted from
+// the gate itself, otherwise visiting the login page would be blocked
+// by the very check it exists to satisfy.
 //
 // Setup (REQUIRED):
 //   1. Vercel -> Project -> Settings -> Environment Variables
@@ -31,7 +31,7 @@ export const config = {
   matcher: '/(.*)',
 };
 
-const PUBLIC_PATHS = ['/login.html', '/api/login', '/api/logout'];
+const PUBLIC_PATHS = ['/login.html', '/api/auth'];
 
 export default async function middleware(req) {
   const { pathname } = new URL(req.url);

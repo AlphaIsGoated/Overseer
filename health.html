@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="lock.js"></script>
 <script src="/api/config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -728,7 +727,7 @@ main {
     async function refreshTok(t) {
       if (!t.refresh) return null;
       try {
-        const r = await fetch('/api/whoop-refresh', { method:'POST', headers:{'Content-Type':'application/json','X-App-Secret':(window.DASH_APP_SECRET||'')}, body: JSON.stringify({ refresh_token: t.refresh }) });
+        const r = await fetch('/api/whoop', { method:'POST', headers:{'Content-Type':'application/json','X-App-Secret':(window.DASH_APP_SECRET||'')}, body: JSON.stringify({ refresh_token: t.refresh }) });
         const j = await r.json();
         if (j.access_token) {
           const next = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: Date.now() + (j.expires_in||3500)*1000 };
@@ -740,7 +739,7 @@ main {
     async function whFetch(path, t) {
       const [p, qs] = path.split('?');
       const params = new URLSearchParams(qs || ''); params.set('path', p);
-      const r = await fetch('/api/whoop-data?' + params.toString(), { headers: { 'Authorization': 'Bearer ' + t.access, 'Accept':'application/json', 'X-App-Secret':(window.DASH_APP_SECRET||'') } });
+      const r = await fetch('/api/whoop?' + params.toString(), { headers: { 'Authorization': 'Bearer ' + t.access, 'Accept':'application/json', 'X-App-Secret':(window.DASH_APP_SECRET||'') } });
       if (r.status === 401) { const n = await refreshTok(t); if (n) return whFetch(path, n); throw new Error('unauthorized — reconnect'); }
       if (!r.ok) throw new Error('WHOOP ' + r.status + ': ' + (await r.text()));
       return await r.json();

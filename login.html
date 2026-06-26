@@ -68,7 +68,7 @@ button:disabled { opacity: 0.6; cursor: default; }
     submitBtn.disabled = true;
     submitBtn.textContent = 'Signing in…';
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ password: document.getElementById('password').value })

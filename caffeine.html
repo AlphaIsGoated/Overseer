@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="lock.js"></script>
 <script src="/api/config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -409,7 +408,7 @@ body::after {
     if (!t || !t.access) return;
     async function whFetch(path, tok){
       const [p,qs]=path.split('?'); const params=new URLSearchParams(qs||''); params.set('path',p);
-      const r=await fetch('/api/whoop-data?'+params.toString(),{headers:{'Authorization':'Bearer '+tok.access,'Accept':'application/json','X-App-Secret':(window.DASH_APP_SECRET||'')}});
+      const r=await fetch('/api/whoop?'+params.toString(),{headers:{'Authorization':'Bearer '+tok.access,'Accept':'application/json','X-App-Secret':(window.DASH_APP_SECRET||'')}});
       if(!r.ok) throw new Error('whoop '+r.status); return r.json();
     }
     try{
