@@ -122,6 +122,13 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 .mt-chart-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .mt-chart-legend-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
 .mt-chart-empty { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-4); }
+.mt-week-slider-wrap { margin-top: 12px; }
+.mt-week-slider { width: 100%; height: 20px; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+.mt-week-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--border); }
+.mt-week-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); margin-top: -6px; box-shadow: 0 0 0 4px rgba(255,138,138,0.15); }
+.mt-week-slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border); }
+.mt-week-slider::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: var(--accent); }
+.mt-week-slider-label { text-align: center; font-size: 10.5px; color: var(--text-3); margin-top: 4px; font-family: var(--font-mono); }
 .mt-chart-svg [data-tip] { cursor: pointer; }
 .mt-tooltip {
   position: fixed; z-index: 500; pointer-events: none;
@@ -194,6 +201,19 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   background: transparent; border: none; color: var(--text-3); cursor: pointer;
   font-family: inherit; font-size: 11.5px; padding: 10px 4px; -webkit-tap-highlight-color: transparent;
 }
+
+/* Glossary */
+.glossary-term {
+  border-bottom: 1px dotted var(--accent); cursor: help;
+  -webkit-tap-highlight-color: transparent;
+}
+.mt-glossary-row {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.mt-glossary-row:last-child { border-bottom: none; }
+.mt-glossary-term { font-size: 12.5px; font-weight: 700; color: var(--accent); }
+.mt-glossary-def { font-size: 12px; color: var(--text-2); line-height: 1.45; }
 </style>
 </head>
 <body>
@@ -275,6 +295,10 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       </div>
     </div>
     <div class="mt-chart-empty hidden" id="mtMileageEmpty">Import a plan or log a run to see weekly mileage.</div>
+    <div class="mt-week-slider-wrap hidden" id="mtWeekSliderWrap">
+      <input type="range" id="mtWeekWindow" class="mt-week-slider" min="0" max="0" value="0" step="1">
+      <div class="mt-week-slider-label" id="mtWeekWindowLabel">—</div>
+    </div>
   </div>
 
   <!-- ===== COMPLETION RATE ===== -->
@@ -343,6 +367,12 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     <div class="mt-status" id="mtLogStatus"></div>
   </div>
 
+  <!-- ===== Glossary ===== -->
+  <div class="card">
+    <div class="card-h"><span class="card-title">Training glossary</span></div>
+    <div id="mtGlossaryList"></div>
+  </div>
+
 </div>
 
 <!-- ===== Import overlay ===== -->
@@ -402,12 +432,12 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   function isoDayIndex(d) { return (d.getDay() + 6) % 7; } // Mon=0 ... Sun=6
 
   /* ============================================================
-     CHART TOOLTIPS — a single floating tooltip shared by every
-     chart. Each hoverable SVG shape carries its tooltip text in a
-     data-tip attribute (plain text, newline-separated); one
-     delegated pointer listener per chart reads whatever shape is
-     under the cursor/finger, so charts can be re-rendered freely
-     without re-wiring listeners.
+     TOOLTIPS — a single floating tooltip shared by every chart AND
+     every glossary term in the schedule. Any element anywhere on the
+     page carrying a data-tip attribute (plain text, newline-separated)
+     becomes hoverable via ONE delegated listener on the whole document
+     — works for SVG shapes and regular HTML alike, and needs no
+     re-wiring when charts or the schedule list re-render.
      ============================================================ */
   const tooltipEl = document.createElement('div');
   tooltipEl.className = 'mt-tooltip hidden';
@@ -420,13 +450,78 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     tooltipEl.style.left = x + 'px';
     tooltipEl.style.top = Math.max(t.clientY, 70) + 'px';
   }
-  function attachChartTooltips(svgEl) {
-    svgEl.addEventListener('pointermove', (e) => {
+  function setupGlobalTooltips() {
+    document.addEventListener('pointermove', (e) => {
       const t = e.target.closest('[data-tip]');
       if (t) { tooltipEl.textContent = t.dataset.tip.replace(/\\n/g, '\n'); tooltipEl.classList.remove('hidden'); positionTooltip(e); }
       else tooltipEl.classList.add('hidden');
     });
-    svgEl.addEventListener('pointerleave', () => tooltipEl.classList.add('hidden'));
+    document.addEventListener('pointerleave', () => tooltipEl.classList.add('hidden'));
+    document.addEventListener('click', (e) => {
+      // Touch devices: tap a term to toggle its tooltip (no hover there).
+      const t = e.target.closest('[data-tip]');
+      if (t) { tooltipEl.textContent = t.dataset.tip.replace(/\\n/g, '\n'); tooltipEl.classList.remove('hidden'); positionTooltip(e); }
+      else tooltipEl.classList.add('hidden');
+    });
+  }
+
+  /* ============================================================
+     GLOSSARY — common marathon-training abbreviations/phrases. Shown
+     as a reference card at the bottom of the page, AND auto-highlighted
+     (with the same hover tooltip) wherever they appear inside an
+     imported plan's workout labels.
+     ============================================================ */
+  const GLOSSARY = {
+    'WU': 'Warm-up — easy jogging before the main effort, to prepare your body.',
+    'CD': 'Cool-down — easy jogging after the main effort, to bring your heart rate back down.',
+    'GMP': 'Goal Marathon Pace — the per-mile pace you need to average to hit your target finish time.',
+    'REC': 'Recovery pace — very easy effort, slower than normal easy pace, for active-rest days.',
+    'E': 'Easy (pace) — comfortable, conversational effort. Most of your weekly mileage should be run here.',
+    'L': 'Long (run/pace) — your weekly long run, building distance and endurance at an easy-to-moderate effort.',
+    'T': 'Tempo / Threshold (pace) — "comfortably hard" effort, faster than easy, sustainable for roughly 20–60 min.',
+    'I': 'Interval (pace) — fast repeats (e.g. 400–800m) with rest between, building speed and VO2 max.',
+    'VO2': 'VO2 max — the maximum rate your body can use oxygen; interval training raises it.',
+    'PR': 'Personal Record — your best-ever time for a given distance.',
+    'tempo': 'A sustained "comfortably hard" effort run, faster than easy pace, that builds your lactate threshold.',
+    'threshold': 'Your lactate threshold — the effort just below where fatigue ramps up quickly. Tempo runs train it.',
+    'interval': 'A short, fast repeat (e.g. 400m–1mi) run hard, with a rest/jog recovery between reps.',
+    'intervals': 'Short, fast repeats run hard with rest/jog recovery between reps — builds speed and VO2 max.',
+    'fartlek': 'Swedish for "speed play" — unstructured bursts of faster running mixed into an easy run, no fixed distance/time.',
+    'taper': 'The planned drop in training volume in the final 1–3 weeks before a race, so your legs are fresh on race day.',
+    'strides': 'Short (~20 sec), relaxed accelerations up to near-top speed — sharpens leg speed/form without real fatigue.',
+    'negative split': 'Running the second half of a race or run faster than the first half.',
+    'shakeout': 'A very short, easy run (often the day before a race) just to loosen up — not real training stimulus.',
+    'cutback': 'A deliberately lighter week (lower mileage) between harder weeks, letting your body absorb the training.',
+    'splits': 'Your pace for each individual mile (or other segment) of a run or race.',
+    'cross-training': 'Non-running exercise (cycling, swimming, etc.) that builds fitness while reducing impact on your legs.',
+  };
+  // Only auto-highlight terms safe to match anywhere in free text — bare
+  // single letters (E/L/T/I) are too ambiguous to scan for automatically,
+  // but they're still listed in the glossary card below.
+  const AUTO_HIGHLIGHT_TERMS = ['negative split', 'cross-training', 'fartlek', 'tempo', 'intervals', 'interval', 'threshold', 'taper', 'strides', 'shakeout', 'cutback', 'splits', 'WU', 'CD', 'GMP', 'REC', 'VO2', 'PR'];
+  const GLOSSARY_PATTERN = new RegExp('\\b(' + AUTO_HIGHLIGHT_TERMS.slice().sort((a, b) => b.length - a.length).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi');
+  function glossaryLookup(term) {
+    const lower = term.toLowerCase();
+    const key = Object.keys(GLOSSARY).find(k => k.toLowerCase() === lower);
+    return key ? GLOSSARY[key] : null;
+  }
+  // Wraps any glossary term found in an ALREADY-HTML-ESCAPED string with a
+  // hoverable span. Must run after escapeHtml, never before (it doesn't
+  // re-escape its input).
+  function glossarize(escapedText) {
+    if (!escapedText) return escapedText;
+    return escapedText.replace(GLOSSARY_PATTERN, (m) => {
+      const def = glossaryLookup(m);
+      if (!def) return m;
+      return '<span class="glossary-term" data-tip="' + attrTip(m + ': ' + def) + '">' + m + '</span>';
+    });
+  }
+  function renderGlossaryCard() {
+    const wrap = $('mtGlossaryList');
+    if (!wrap) return;
+    wrap.innerHTML = Object.keys(GLOSSARY).map(term =>
+      '<div class="mt-glossary-row"><span class="mt-glossary-term">' + escapeHtml(term) + '</span><span class="mt-glossary-def">' + escapeHtml(GLOSSARY[term]) + '</span></div>'
+    ).join('');
   }
 
   function defaultPlan() {
@@ -609,6 +704,9 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         plan.entries.push(en);
         changed = true;
       }
+      // A day the user has explicitly tapped (checked OR unchecked) stays
+      // exactly as they left it — Strava sync never overrides a manual call.
+      if (en.manualOverride) return;
       if (!en.completed || en.source === 'strava') {
         en.completed = true; en.source = 'strava'; en.stravaActivityId = hit.id;
         en.actualDistanceMi = hit.distanceMi; en.actualDurationSec = hit.movingSec; en.actualPaceSecPerMi = hit.paceSecPerMi;
@@ -725,12 +823,44 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     });
     return byWeek;
   }
+
+  // ---- Shared week-window slider, drives both the mileage and
+  // completion charts so scrolling one scrolls the other in sync,
+  // covering the WHOLE plan (past weeks through race week), not just
+  // a fixed recent slice. ----
+  const WEEK_WINDOW_SIZE = 12;
+  let weekWindowStart = 0;
+  let weekWindowInited = false;
+  function setupWeekSlider(allWeeks, byWeek) {
+    const wrap = $('mtWeekSliderWrap'), slider = $('mtWeekWindow');
+    if (allWeeks.length <= WEEK_WINDOW_SIZE) { wrap.classList.add('hidden'); weekWindowStart = 0; return; }
+    wrap.classList.remove('hidden');
+    const maxStart = allWeeks.length - WEEK_WINDOW_SIZE;
+    slider.max = String(maxStart);
+    if (!weekWindowInited) {
+      weekWindowInited = true;
+      const todayWk = isoWeekKey(new Date());
+      let idx = allWeeks.indexOf(todayWk);
+      if (idx < 0) idx = allWeeks.length - 1;
+      weekWindowStart = Math.min(maxStart, Math.max(0, idx - 2));
+      slider.value = String(weekWindowStart);
+    } else if (Number(slider.value) > maxStart) {
+      slider.value = String(maxStart);
+      weekWindowStart = maxStart;
+    }
+    const visible = allWeeks.slice(weekWindowStart, weekWindowStart + WEEK_WINDOW_SIZE);
+    if (visible.length) {
+      $('mtWeekWindowLabel').textContent = weekOfLabel(byWeek[visible[0]].monday) + ' – ' + weekOfLabel(byWeek[visible[visible.length - 1]].monday);
+    }
+  }
   function renderMileageChart() {
     const svg = $('mtMileageContent'), empty = $('mtMileageEmpty'), meta = $('mtMileageMeta');
     const byWeek = byWeekBuckets();
-    const weeks = Object.keys(byWeek).sort().slice(-12);
-    if (!weeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
+    const allWeeks = Object.keys(byWeek).sort();
+    if (!allWeeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; $('mtWeekSliderWrap').classList.add('hidden'); return; }
     empty.classList.add('hidden');
+    setupWeekSlider(allWeeks, byWeek);
+    const weeks = allWeeks.slice(weekWindowStart, weekWindowStart + WEEK_WINDOW_SIZE);
     const maxV = Math.max.apply(null, weeks.map(w => Math.max(byWeek[w].planned, byWeek[w].actual))) || 1;
     const W = 320, H = 140, pad = 8, gap = 6;
     const bw = (W - pad * 2) / weeks.length;
@@ -747,36 +877,44 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       const actualTip = attrTip('Week of ' + wkLabel + '\\nActual: ' + wd.actual.toFixed(1) + ' mi' + (pct != null ? ' (' + pct + '% of planned)' : '') + '\\nMiles you actually ran — manual logs + Strava-synced runs.');
       html += '<rect data-tip="' + plannedTip + '" x="' + x.toFixed(1) + '" y="' + (H - 18 - pH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(pH, 1).toFixed(1) + '" fill="#7DD3FC" rx="2"></rect>';
       html += '<rect data-tip="' + actualTip + '" x="' + (x + barW).toFixed(1) + '" y="' + (H - 18 - aH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(aH, 1).toFixed(1) + '" fill="#6ee7b7" rx="2"></rect>';
-      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + w.slice(6) + '</text>';
+      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + wkLabel + '</text>';
     });
     svg.innerHTML = html;
-    const last = byWeek[weeks[weeks.length - 1]];
-    meta.textContent = 'this week: ' + last.actual.toFixed(1) + ' / ' + last.planned.toFixed(1) + ' mi';
+    const todayWk = isoWeekKey(new Date());
+    const thisWeek = byWeek[todayWk];
+    meta.textContent = thisWeek ? ('this week: ' + thisWeek.actual.toFixed(1) + ' / ' + thisWeek.planned.toFixed(1) + ' mi') : '—';
   }
   function renderCompletionChart() {
     const svg = $('mtCompletionContent'), empty = $('mtCompletionEmpty'), meta = $('mtCompletionMeta');
     const byWeek = byWeekBuckets();
-    const weeks = Object.keys(byWeek).filter(w => byWeek[w].plannedDays > 0).sort().slice(-12);
-    if (!weeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
+    const allWeeks = Object.keys(byWeek).sort();
+    if (!allWeeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
     empty.classList.add('hidden');
+    const weeks = allWeeks.slice(weekWindowStart, weekWindowStart + WEEK_WINDOW_SIZE);
     const W = 320, H = 100, pad = 8, gap = 6;
     const bw = (W - pad * 2) / weeks.length;
     const barW = bw - gap;
     let html = '<line x1="' + pad + '" y1="14" x2="' + (W - pad) + '" y2="14" stroke="rgba(255,255,255,0.08)" stroke-width="1"></line>';
     weeks.forEach((w, i) => {
       const wd = byWeek[w];
+      const wkLabel = weekOfLabel(wd.monday);
+      const x = pad + i * bw;
+      if (!wd.plannedDays) {
+        html += '<rect x="' + x.toFixed(1) + '" y="' + (H - 19) + '" width="' + barW.toFixed(1) + '" height="2" fill="rgba(255,255,255,0.10)" rx="1"></rect>';
+        html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + wkLabel + '</text>';
+        return;
+      }
       const pct = Math.min(100, Math.round((wd.completedDays / wd.plannedDays) * 100));
       const h = (pct / 100) * (H - 30);
-      const x = pad + i * bw;
       const color = pct >= 90 ? '#6BE3A4' : pct >= 60 ? '#F2C063' : '#FF8A8A';
-      const wkLabel = weekOfLabel(wd.monday);
       const tip = attrTip('Week of ' + wkLabel + '\\n' + wd.completedDays + ' of ' + wd.plannedDays + ' planned days completed (' + pct + '%)\\nShare of that week\'s training days you actually got done.');
       html += '<rect data-tip="' + tip + '" x="' + x.toFixed(1) + '" y="' + (H - 18 - h).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(h, 1).toFixed(1) + '" fill="' + color + '" rx="2"></rect>';
-      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + w.slice(6) + '</text>';
+      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + wkLabel + '</text>';
     });
     svg.innerHTML = html;
-    const last = byWeek[weeks[weeks.length - 1]];
-    meta.textContent = last.completedDays + '/' + last.plannedDays + ' this week';
+    const todayWk = isoWeekKey(new Date());
+    const thisWeek = byWeek[todayWk];
+    meta.textContent = thisWeek ? (thisWeek.completedDays + '/' + thisWeek.plannedDays + ' this week') : '—';
   }
   const TYPE_COLOR = { easy: '#6ee7b7', long: '#7DD3FC', speed: '#FF8A8A', tempo: '#F2C063', rest: '#4D4B47', cross: '#C9B8FF', race: '#FFD166', other: '#9CA3AF' };
   function renderPaceTrendChart() {
@@ -838,6 +976,9 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     if (e.completed && e.actualDistanceMi) {
       bits.push(e.actualDistanceMi.toFixed(1) + ' mi · ' + fmtSec(e.actualDurationSec) + ' · ' + paceStr(e.actualPaceSecPerMi));
       if (e.source === 'strava') bits.push('<span class="strava-tag">synced from Strava</span>');
+      else if (e.manualOverride) bits.push('checked manually');
+    } else if (e.manualOverride && !e.completed) {
+      bits.push('unchecked manually');
     }
     return bits.join(' · ');
   }
@@ -849,7 +990,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     if (e.type === 'race') cls.push('is-race');
     return '<div class="' + cls.join(' ') + '" data-id="' + e.id + '">'
       + '<div class="mt-day-date"><b>' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</b>' + (e.dayOfWeek || DAY_NAMES[isoDayIndex(d)]) + '</div>'
-      + '<div class="mt-day-info"><div class="mt-day-label">' + (TYPE_ICON[e.type] || '') + ' ' + escapeHtml(e.label || '') + '</div><div class="mt-day-meta">' + dayMetaLine(e) + '</div></div>'
+      + '<div class="mt-day-info"><div class="mt-day-label">' + (TYPE_ICON[e.type] || '') + ' ' + glossarize(escapeHtml(e.label || '')) + '</div><div class="mt-day-meta">' + dayMetaLine(e) + '</div></div>'
       + '<button class="mt-day-check' + (e.completed ? ' on' : '') + '" data-id="' + e.id + '" aria-label="Mark complete">✓</button>'
       + '</div>';
   }
@@ -857,6 +998,10 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     const e = plan.entries.find(x => x.id === id);
     if (!e) return;
     e.completed = !e.completed;
+    // A deliberate tap always sticks — a later Strava sync won't silently
+    // flip it back (see matchStravaToSchedule), so unchecking a day Strava
+    // marked complete actually stays unchecked.
+    e.manualOverride = true;
     if (!e.completed) { e.actualDistanceMi = null; e.actualDurationSec = null; e.actualPaceSecPerMi = null; e.source = null; }
     else if (!e.actualDistanceMi && e.plannedDistanceMi) { e.actualDistanceMi = e.plannedDistanceMi; e.source = 'manual'; }
     savePlan();
@@ -1173,6 +1318,11 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   $('mtFromMdBtn').addEventListener('click', () => $('mtFileMd').click());
   $('mtFileMd').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportMdFile(f); e.target.value = ''; });
   $('mtReviewSave').addEventListener('click', saveImportedPlan);
+  $('mtWeekWindow').addEventListener('input', () => {
+    weekWindowStart = parseInt($('mtWeekWindow').value, 10) || 0;
+    renderMileageChart();
+    renderCompletionChart();
+  });
 
   /* ============================================================
      BOOT
@@ -1183,9 +1333,8 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   renderMileageChart();
   renderCompletionChart();
   renderPaceTrendChart();
-  attachChartTooltips($('mtMileageSvg'));
-  attachChartTooltips($('mtCompletionSvg'));
-  attachChartTooltips($('mtPaceTrendSvg'));
+  setupGlobalTooltips();
+  renderGlossaryCard();
   renderProgress();
   // If already connected, sync quietly on load so the page opens with fresh data.
   if (loadJSON(STRAVA_KEY, null)) syncStrava();
