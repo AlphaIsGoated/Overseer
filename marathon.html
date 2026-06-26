@@ -540,17 +540,28 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       renderStrava();
     }
   }
-  // Auto-mark a plan entry "completed" when a Strava run lands on the same date.
+  // Auto-mark a plan entry "completed" when a Strava run lands on the same
+  // date. If there's NO plan entry for that date at all (e.g. no plan has
+  // been imported yet, or the run falls outside the imported plan), create
+  // one so the run still shows up in the schedule, mileage chart, pace
+  // trend, and progress callout — none of which read raw Strava data
+  // directly, only plan.entries.
   function matchStravaToSchedule(runs) {
     let changed = false;
-    plan.entries.forEach(en => {
-      const hit = runs.find(r => r.date === en.date);
-      if (hit && (!en.completed || en.source === 'strava')) {
+    runs.forEach(hit => {
+      let en = plan.entries.find(e => e.date === hit.date);
+      if (!en) {
+        en = { id: 'm_strava_' + hit.id, date: hit.date, weekNumber: null, dayOfWeek: DAY_NAMES[isoDayIndex(parseKey(hit.date))], type: 'other', label: hit.name || 'Run', plannedDistanceMi: null };
+        plan.entries.push(en);
+        changed = true;
+      }
+      if (!en.completed || en.source === 'strava') {
         en.completed = true; en.source = 'strava'; en.stravaActivityId = hit.id;
         en.actualDistanceMi = hit.distanceMi; en.actualDurationSec = hit.movingSec; en.actualPaceSecPerMi = hit.paceSecPerMi;
         changed = true;
       }
     });
+    plan.entries.sort((a, b) => a.date.localeCompare(b.date));
     if (changed) savePlan();
   }
   $('mtStravaAction').addEventListener('click', () => {
@@ -761,8 +772,19 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     $('mtPastCount').textContent = past.length;
     $('mtPastBody').innerHTML = past.slice().reverse().map(e => dayRowHtml(e, todayKey)).join('');
     $('mtPastBody').querySelectorAll('.mt-day-check').forEach(b => b.addEventListener('click', () => toggleComplete(b.dataset.id)));
+    // No upcoming plan yet (e.g. only synced Strava history, no imported
+    // plan) — open "Past days" once by default so synced runs aren't
+    // hidden behind a collapsed toggle and look like nothing synced.
+    // Only does this once; a manual collapse afterward sticks.
+    if (!pastDaysUserToggled && future.length === 0 && past.length > 0) {
+      $('mtPastBody').style.display = '';
+      $('mtPastArrow').textContent = '▴';
+      $('mtPastToggle').setAttribute('aria-expanded', 'true');
+    }
   }
+  let pastDaysUserToggled = false;
   $('mtPastToggle').addEventListener('click', () => {
+    pastDaysUserToggled = true;
     const open = $('mtPastBody').style.display !== 'none';
     $('mtPastBody').style.display = open ? 'none' : '';
     $('mtPastArrow').textContent = open ? '▾' : '▴';
