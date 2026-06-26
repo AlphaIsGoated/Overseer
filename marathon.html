@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<title>Marathon</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --bg: #0A0A0B;
+  --bg-deep: #050506;
+  --bg-card: rgba(255,255,255,0.04);
+  --text-1: #FAFAFA;
+  --text-2: #B8B6B0;
+  --text-3: #76746E;
+  --text-4: #4D4B47;
+  --border: rgba(255,255,255,0.06);
+  --good: #6BE3A4;
+  --warn: #F2C063;
+  --bad: #FF8A8A;
+  --accent: #FF8A8A;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg-deep); color: var(--text-1); font-family: var(--font); -webkit-font-smoothing: antialiased; min-height: 100%; }
+html, body { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+
+.shell { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
+
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 8px 10px; margin: 0 0 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,0.07); color: var(--text-1); }
+.back-btn svg { display: block; }
+
+.mt-head { margin-bottom: 18px; }
+.mt-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.mt-countdown { font-size: 13px; color: var(--text-3); margin-top: 4px; font-family: var(--font-mono); }
+.mt-countdown b { color: var(--accent); font-weight: 700; }
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 18px 20px; margin-bottom: 14px;
+}
+.card-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; gap: 8px; }
+.card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.card-sub { font-size: 11px; color: var(--text-4); font-family: var(--font-mono); }
+
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; display: block; }
+.field-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mt-input, .mt-select {
+  flex: 1; min-width: 0; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: rgba(255,255,255,0.04); color: var(--text-1);
+  font-family: inherit; font-size: 14px; outline: none;
+}
+.mt-input:focus, .mt-select:focus { border-color: rgba(255,138,138,0.4); }
+.mt-input.small { max-width: 70px; flex: 0 0 70px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.seg button { border: 0; background: transparent; color: var(--text-3); padding: 9px 13px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.seg button.on { background: var(--accent); color: #1a0606; }
+
+.mt-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04); color: var(--text-1);
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background 0.15s;
+}
+.mt-btn:hover { background: rgba(255,255,255,0.08); }
+.mt-btn.primary { background: var(--accent); color: #1a0606; border-color: var(--accent); }
+.mt-btn.primary:hover { filter: brightness(1.08); }
+.mt-btn.full { width: 100%; }
+.mt-btn:disabled { opacity: 0.4; cursor: default; }
+
+.mt-status { font-size: 11px; color: var(--good); margin-top: 8px; min-height: 14px; }
+
+/* Goal pace readout */
+.mt-pace-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.mt-pace-stat { text-align: center; background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; }
+.mt-pace-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mt-pace-label { font-size: 9px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-3); margin-top: 4px; font-weight: 600; }
+
+/* Strava connect card */
+.mt-strava-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mt-strava-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; letter-spacing: 0.04em; }
+.mt-strava-mark { width: 22px; height: 22px; border-radius: 6px; background: #FC4C02; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; }
+.mt-strava-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
+.mt-strava-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-4); }
+.mt-strava-status.on .mt-strava-dot { background: var(--good); box-shadow: 0 0 6px rgba(107,227,164,0.6); }
+.mt-strava-sync { font-size: 10.5px; color: var(--text-4); font-family: var(--font-mono); margin-top: 6px; }
+.mt-strava-err { font-size: 11.5px; color: var(--bad); background: rgba(255,138,138,0.08); border: 1px solid rgba(255,138,138,0.2); border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+.mt-strava-err.hidden { display: none; }
+
+/* Progress callout */
+.mt-progress-headline { font-size: 15px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+.mt-progress-headline.good { color: var(--good); }
+.mt-progress-headline.warn { color: var(--warn); }
+.mt-progress-headline.bad  { color: var(--bad); }
+.mt-progress-sub { font-size: 11.5px; color: var(--text-3); }
+
+/* Mileage chart */
+.mt-chart-wrap { position: relative; }
+.mt-chart-svg { display: block; width: 100%; height: 140px; }
+.mt-chart-legend { display: flex; gap: 14px; margin-top: 6px; font-size: 10.5px; color: var(--text-3); }
+.mt-chart-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.mt-chart-legend-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+.mt-chart-empty { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-4); }
+
+/* Import overlay */
+.mt-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 200; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
+.mt-overlay.is-open { transform: translateY(0); }
+.mt-overlay-inner { max-width: 720px; margin: 0 auto; padding: 24px 16px 60px; }
+.mt-overlay-h { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.mt-overlay-title { font-size: 22px; font-weight: 600; letter-spacing: -0.015em; }
+.mt-overlay-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.mt-busy { display: flex; align-items: center; gap: 12px; padding: 14px 0; }
+.mt-busy.hidden { display: none; }
+.mt-busy-thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border); }
+.mt-busy-text { font-size: 13px; color: var(--text-2); }
+.mt-dots::after { content: '…'; animation: mtDots 1.2s steps(4,end) infinite; }
+@keyframes mtDots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+.mt-error { font-size: 12.5px; color: var(--bad); background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.2); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+.mt-error.hidden { display: none; }
+
+.mt-review { margin-bottom: 16px; }
+.mt-review.hidden { display: none; }
+.mt-review-row { display: grid; grid-template-columns: 60px 1fr 80px auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.mt-review-row input, .mt-review-row select { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; color: var(--text-1); font-family: inherit; font-size: 12px; padding: 5px 6px; width: 100%; }
+.mt-review-row .mt-rm { background: transparent; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; }
+.mt-review-row .mt-rm:hover { color: var(--bad); }
+.mt-review-head { display: grid; grid-template-columns: 60px 1fr 80px auto; gap: 8px; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-4); padding-bottom: 6px; font-weight: 700; }
+.hidden { display: none !important; }
+
+/* Schedule list */
+.mt-week-h { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 4px 8px; }
+.mt-week-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); font-weight: 700; }
+.mt-week-vol { font-size: 11px; color: var(--text-4); font-family: var(--font-mono); }
+.mt-day-row {
+  display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
+  padding: 10px 12px; background: rgba(255,255,255,0.025); border-radius: 10px; margin-bottom: 6px;
+  border-left: 3px solid var(--text-4);
+}
+.mt-day-row.is-today { border-left-color: var(--accent); background: rgba(255,138,138,0.05); }
+.mt-day-row.is-done { border-left-color: var(--good); }
+.mt-day-row.is-race { border-left-color: var(--warn); background: rgba(242,192,99,0.06); }
+.mt-day-date { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); line-height: 1.3; }
+.mt-day-date b { display: block; font-size: 13px; color: var(--text-1); font-family: var(--font); font-weight: 700; }
+.mt-day-info { min-width: 0; }
+.mt-day-label { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.mt-day-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.mt-day-meta .strava-tag { color: #FC9468; }
+.mt-day-check {
+  width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--border);
+  background: transparent; color: transparent; cursor: pointer; font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.mt-day-check.on { background: var(--good); border-color: var(--good); color: #04140d; }
+.mt-empty-card { text-align: center; padding: 36px 20px; background: rgba(255,255,255,0.025); border-radius: 14px; border: 1px dashed var(--border); }
+.mt-empty-icon { font-size: 32px; margin-bottom: 8px; }
+.mt-empty-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.mt-empty-sub { font-size: 12px; color: var(--text-3); line-height: 1.5; max-width: 320px; margin: 0 auto; }
+
+.mt-past-toggle {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  background: transparent; border: none; color: var(--text-3); cursor: pointer;
+  font-family: inherit; font-size: 11.5px; padding: 10px 4px; -webkit-tap-highlight-color: transparent;
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <div class="mt-head">
+    <div class="mt-title">Marathon</div>
+    <div class="mt-countdown" id="mtCountdown">Set a race date to start the countdown.</div>
+  </div>
+
+  <!-- ===== RACE GOAL ===== -->
+  <div class="card">
+    <div class="card-h"><span class="card-title">Race goal</span></div>
+    <div class="field">
+      <label class="field-label">Race date</label>
+      <input type="date" class="mt-input" id="mtRaceDate">
+    </div>
+    <div class="field">
+      <label class="field-label">Distance</label>
+      <div class="seg" id="mtDistSeg">
+        <button type="button" data-d="26.2188">Marathon</button>
+        <button type="button" data-d="13.1094">Half</button>
+        <button type="button" data-d="6.2137">10K</button>
+        <button type="button" data-d="3.1069">5K</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Goal finish time</label>
+      <div class="field-row">
+        <input type="number" class="mt-input small" id="mtGoalH" min="0" max="24" placeholder="hh">
+        <input type="number" class="mt-input small" id="mtGoalM" min="0" max="59" placeholder="mm">
+        <input type="number" class="mt-input small" id="mtGoalS" min="0" max="59" placeholder="ss">
+        <div class="seg" id="mtPaceUnitSeg">
+          <button type="button" data-u="mi" class="on">/mi</button>
+          <button type="button" data-u="km">/km</button>
+        </div>
+      </div>
+    </div>
+    <button class="mt-btn primary full" id="mtSaveGoal" type="button">Save goal</button>
+    <div class="mt-status" id="mtGoalStatus"></div>
+    <div class="mt-pace-grid" id="mtPaceGrid"></div>
+  </div>
+
+  <!-- ===== STRAVA ===== -->
+  <div class="card">
+    <div class="card-h"><span class="card-title">Strava</span></div>
+    <div class="mt-strava-row">
+      <span class="mt-strava-brand"><span class="mt-strava-mark">S</span>Strava</span>
+      <span class="mt-strava-status" id="mtStravaStatus"><span class="mt-strava-dot"></span><span id="mtStravaStatusText">Not connected</span></span>
+    </div>
+    <div class="mt-strava-sync" id="mtStravaSync"></div>
+    <div class="mt-strava-err hidden" id="mtStravaErr"></div>
+    <button class="mt-btn full" id="mtStravaAction" type="button" style="margin-top:12px">Connect Strava</button>
+  </div>
+
+  <!-- ===== PROGRESS TOWARD GOAL PACE ===== -->
+  <div class="card" id="mtProgressCard" style="display:none">
+    <div class="card-h"><span class="card-title">Progress toward goal pace</span></div>
+    <div class="mt-progress-headline" id="mtProgressHeadline">—</div>
+    <div class="mt-progress-sub" id="mtProgressSub">—</div>
+  </div>
+
+  <!-- ===== WEEKLY MILEAGE ===== -->
+  <div class="card">
+    <div class="card-h">
+      <span class="card-title">Weekly mileage</span>
+      <span class="card-sub" id="mtMileageMeta">—</span>
+    </div>
+    <div class="mt-chart-wrap">
+      <svg class="mt-chart-svg" id="mtMileageSvg" viewBox="0 0 320 140" preserveAspectRatio="none"><g id="mtMileageContent"></g></svg>
+      <div class="mt-chart-legend">
+        <span class="mt-chart-legend-item"><span class="mt-chart-legend-dot" style="background:#7DD3FC"></span>Planned</span>
+        <span class="mt-chart-legend-item"><span class="mt-chart-legend-dot" style="background:#6ee7b7"></span>Actual</span>
+      </div>
+    </div>
+    <div class="mt-chart-empty hidden" id="mtMileageEmpty">Import a plan or log a run to see weekly mileage.</div>
+  </div>
+
+  <!-- ===== PACE TREND ===== -->
+  <div class="card">
+    <div class="card-h">
+      <span class="card-title">Pace trend</span>
+      <span class="card-sub" id="mtPaceTrendMeta">—</span>
+    </div>
+    <div class="mt-chart-wrap">
+      <svg class="mt-chart-svg" id="mtPaceTrendSvg" viewBox="0 0 320 140" preserveAspectRatio="none"><g id="mtPaceTrendContent"></g></svg>
+    </div>
+    <div class="mt-chart-empty hidden" id="mtPaceTrendEmpty">Log or sync some runs to see your pace trend.</div>
+  </div>
+
+  <!-- ===== IMPORT PLAN BUTTON ===== -->
+  <button class="mt-btn full" id="mtImportLink" type="button" style="margin-bottom:14px">📋 Import training plan</button>
+
+  <!-- ===== SCHEDULE ===== -->
+  <div class="card-h" style="margin:0 4px 8px">
+    <span class="card-title">Schedule</span>
+    <span class="card-sub" id="mtScheduleCount">0 days</span>
+  </div>
+  <div id="mtScheduleList"></div>
+  <div class="mt-empty-card hidden" id="mtScheduleEmpty">
+    <div class="mt-empty-icon">🏃</div>
+    <div class="mt-empty-title">No training plan yet</div>
+    <div class="mt-empty-sub">Tap "Import training plan" above and upload a photo of your plan — dates, distances and workout types get read automatically.</div>
+  </div>
+  <button type="button" class="mt-past-toggle hidden" id="mtPastToggle" aria-expanded="false">
+    <span>Past days <span id="mtPastCount">0</span></span>
+    <span id="mtPastArrow">▾</span>
+  </button>
+  <div id="mtPastBody" style="display:none"></div>
+
+  <!-- ===== Manual log (a day with no plan entry) ===== -->
+  <div class="card">
+    <div class="card-h"><span class="card-title">Log a run manually</span></div>
+    <div class="field">
+      <label class="field-label">Date</label>
+      <input type="date" class="mt-input" id="mtLogDate">
+    </div>
+    <div class="field-row">
+      <div class="field" style="flex:1;margin-bottom:0">
+        <label class="field-label">Distance (mi)</label>
+        <input type="number" step="0.1" class="mt-input" id="mtLogDist" placeholder="0.0">
+      </div>
+      <div class="field" style="flex:1;margin-bottom:0">
+        <label class="field-label">Time (mm:ss or hh:mm:ss)</label>
+        <input type="text" class="mt-input" id="mtLogTime" placeholder="45:30">
+      </div>
+    </div>
+    <button class="mt-btn full" id="mtLogSave" type="button" style="margin-top:12px">Log run</button>
+    <div class="mt-status" id="mtLogStatus"></div>
+  </div>
+
+</div>
+
+<!-- ===== Import overlay ===== -->
+<div class="mt-overlay" id="mtImportOverlay" aria-hidden="true">
+  <div class="mt-overlay-inner">
+    <div class="mt-overlay-h">
+      <button class="back-btn" id="mtImportBack" type="button" style="margin:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <span>Back</span>
+      </button>
+      <div class="mt-overlay-title">Import training plan</div>
+    </div>
+
+    <div class="mt-overlay-actions">
+      <button class="mt-btn primary" id="mtTakePhotoBtn" type="button">Take Photo</button>
+      <button class="mt-btn" id="mtFromLibraryBtn" type="button">From Library</button>
+    </div>
+    <input type="file" id="mtFileCamera" accept="image/*" capture="environment" class="hidden">
+    <input type="file" id="mtFileLibrary" accept="image/*" class="hidden">
+
+    <div class="mt-busy hidden" id="mtBusy">
+      <img class="mt-busy-thumb" id="mtBusyThumb" alt="">
+      <div class="mt-busy-text">Reading plan<span class="mt-dots"></span></div>
+    </div>
+    <div class="mt-error hidden" id="mtImportError"></div>
+
+    <div class="mt-review hidden" id="mtReview">
+      <div class="field">
+        <label class="field-label">Race date (used to anchor every day below)</label>
+        <input type="date" class="mt-input" id="mtReviewRaceDate">
+      </div>
+      <div class="mt-status" id="mtReviewStatus" style="margin-bottom:10px"></div>
+      <div class="mt-review-head"><span>Wk</span><span>Workout</span><span>Mi</span><span></span></div>
+      <div id="mtReviewRows"></div>
+      <button class="mt-btn full primary" id="mtReviewSave" type="button" style="margin-top:14px">Save plan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  const PLAN_KEY = 'marathon_plan_v1';
+  const STRAVA_KEY = 'strava_tokens_v1';
+  const STRAVA_SYNC_KEY = 'strava_last_sync';
+  const STRAVA_CACHE_KEY = 'strava_activities_v1';
+  const MI_TO_KM = 1.609344;
+  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  function loadJSON(k, f) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch (e) { return f; } }
+  function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function dateKey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function parseKey(k) { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); }
+  function isoDayIndex(d) { return (d.getDay() + 6) % 7; } // Mon=0 ... Sun=6
+
+  function defaultPlan() {
+    return { raceDate: null, distanceMi: 26.2188, goalSec: null, paceUnit: 'mi', entries: [] };
+  }
+  let plan = loadJSON(PLAN_KEY, defaultPlan());
+  if (!Array.isArray(plan.entries)) plan.entries = [];
+
+  function savePlan() { saveJSON(PLAN_KEY, plan); }
+
+  /* ============================================================
+     RACE GOAL
+     ============================================================ */
+  let distanceMi = plan.distanceMi || 26.2188;
+  let paceUnit = plan.paceUnit === 'km' ? 'km' : 'mi';
+
+  function setDistSeg(d) {
+    distanceMi = d;
+    $('mtDistSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', Math.abs(parseFloat(b.dataset.d) - d) < 0.01));
+  }
+  function setPaceUnitSeg(u) {
+    paceUnit = u;
+    $('mtPaceUnitSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.u === u));
+  }
+  function fmtSec(totalSec) {
+    if (totalSec == null || isNaN(totalSec)) return '—';
+    const sign = totalSec < 0 ? '−' : '';
+    totalSec = Math.abs(Math.round(totalSec));
+    const h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60;
+    if (h > 0) return sign + h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    return sign + m + ':' + String(s).padStart(2,'0');
+  }
+  function paceStr(secPerMi) {
+    if (secPerMi == null || isNaN(secPerMi) || !isFinite(secPerMi)) return '—';
+    const v = paceUnit === 'km' ? secPerMi / MI_TO_KM : secPerMi;
+    return fmtSec(v) + ' /' + paceUnit;
+  }
+  function goalPaceSecPerMi() {
+    if (!plan.goalSec || !distanceMi) return null;
+    return plan.goalSec / distanceMi;
+  }
+  function renderCountdown() {
+    const el = $('mtCountdown');
+    if (!plan.raceDate) { el.textContent = 'Set a race date to start the countdown.'; return; }
+    const today = new Date(); today.setHours(0,0,0,0);
+    const race = parseKey(plan.raceDate);
+    const days = Math.round((race - today) / 86400000);
+    if (days > 0) el.innerHTML = '<b>' + days + '</b> day' + (days === 1 ? '' : 's') + ' to race day';
+    else if (days === 0) el.innerHTML = '<b>Race day is today.</b> Good luck!';
+    else el.innerHTML = 'Race day was ' + Math.abs(days) + ' day' + (Math.abs(days) === 1 ? '' : 's') + ' ago.';
+  }
+  function renderPaceGrid() {
+    const gp = goalPaceSecPerMi();
+    $('mtPaceGrid').innerHTML =
+      '<div class="mt-pace-stat"><div class="mt-pace-val">' + (plan.goalSec ? fmtSec(plan.goalSec) : '—') + '</div><div class="mt-pace-label">Goal time</div></div>' +
+      '<div class="mt-pace-stat"><div class="mt-pace-val">' + paceStr(gp) + '</div><div class="mt-pace-label">Goal pace</div></div>' +
+      '<div class="mt-pace-stat"><div class="mt-pace-val">' + distanceMi.toFixed(1) + ' mi</div><div class="mt-pace-label">Distance</div></div>';
+  }
+  function populateGoalForm() {
+    $('mtRaceDate').value = plan.raceDate || '';
+    setDistSeg(distanceMi);
+    setPaceUnitSeg(paceUnit);
+    if (plan.goalSec) {
+      $('mtGoalH').value = Math.floor(plan.goalSec / 3600);
+      $('mtGoalM').value = Math.floor((plan.goalSec % 3600) / 60);
+      $('mtGoalS').value = plan.goalSec % 60;
+    }
+    renderCountdown(); renderPaceGrid();
+  }
+  $('mtDistSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => setDistSeg(parseFloat(b.dataset.d))));
+  $('mtPaceUnitSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { setPaceUnitSeg(b.dataset.u); plan.paceUnit = b.dataset.u; savePlan(); renderPaceGrid(); renderProgress(); renderPaceTrendChart(); }));
+  $('mtSaveGoal').addEventListener('click', () => {
+    plan.raceDate = $('mtRaceDate').value || null;
+    plan.distanceMi = distanceMi;
+    plan.paceUnit = paceUnit;
+    const h = parseInt($('mtGoalH').value, 10) || 0, m = parseInt($('mtGoalM').value, 10) || 0, s = parseInt($('mtGoalS').value, 10) || 0;
+    plan.goalSec = (h * 3600 + m * 60 + s) || null;
+    savePlan();
+    renderCountdown(); renderPaceGrid(); renderProgress(); renderMileageChart(); renderPaceTrendChart(); renderSchedule();
+    const st = $('mtGoalStatus'); st.textContent = 'Saved ✓'; setTimeout(() => st.textContent = '', 1800);
+  });
+
+  /* ============================================================
+     STRAVA — OAuth + activity sync (mirrors the WHOOP integration
+     elsewhere in this dashboard, but pulls running activities
+     instead of recovery/sleep, since that's what Strava actually has).
+     ============================================================ */
+  const STRAVA_CLIENT_ID = (typeof window !== 'undefined' && window.DASH_STRAVA_CLIENT_ID) || '';
+  const STRAVA_REDIRECT = window.location.origin + '/api/strava-callback';
+
+  if (location.hash && location.hash.indexOf('strava_access') !== -1) {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const access = h.get('strava_access'), refresh = h.get('strava_refresh');
+    const expires = Number(h.get('strava_expires')) || Date.now() + 21600e3;
+    if (access) { saveJSON(STRAVA_KEY, { access, refresh, expires }); history.replaceState(null, '', location.pathname + location.search); }
+  }
+
+  function stravaErr(msg) { const el = $('mtStravaErr'); el.textContent = msg || ''; el.classList.toggle('hidden', !msg); }
+  function relTime(ts) {
+    if (!ts) return 'never';
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 60) return 'just now';
+    if (sec < 3600) return Math.floor(sec/60) + ' min ago';
+    if (sec < 86400) return Math.floor(sec/3600) + ' h ago';
+    return Math.floor(sec/86400) + ' d ago';
+  }
+  function renderStrava() {
+    const t = loadJSON(STRAVA_KEY, null);
+    const statusEl = $('mtStravaStatus'), txt = $('mtStravaStatusText'), action = $('mtStravaAction');
+    if (!t || !t.access) {
+      statusEl.classList.remove('on'); txt.textContent = 'Not connected';
+      $('mtStravaSync').textContent = '';
+      action.textContent = STRAVA_CLIENT_ID ? 'Connect Strava' : 'Set STRAVA_CLIENT_ID in Vercel first';
+      action.disabled = !STRAVA_CLIENT_ID;
+      return;
+    }
+    statusEl.classList.add('on'); txt.textContent = 'Connected';
+    $('mtStravaSync').textContent = 'Last synced ' + relTime(Number(localStorage.getItem(STRAVA_SYNC_KEY)) || 0);
+    action.textContent = 'Sync now'; action.disabled = false;
+  }
+  async function stravaRefresh(t) {
+    if (!t.refresh) return null;
+    try {
+      const r = await fetch('/api/strava-refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: t.refresh }) });
+      const j = await r.json();
+      if (j.access_token) {
+        const next = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: (j.expires_at ? j.expires_at * 1000 : Date.now() + 21600e3) };
+        saveJSON(STRAVA_KEY, next); return next;
+      }
+    } catch (e) {}
+    return null;
+  }
+  async function stravaFetch(path, t) {
+    const [p, qs] = path.split('?');
+    const params = new URLSearchParams(qs || ''); params.set('path', p);
+    const r = await fetch('/api/strava-data?' + params.toString(), { headers: { Authorization: 'Bearer ' + t.access, Accept: 'application/json' } });
+    if (r.status === 401) { const n = await stravaRefresh(t); if (n) return stravaFetch(path, n); throw new Error('unauthorized — reconnect'); }
+    if (!r.ok) throw new Error('Strava ' + r.status);
+    return r.json();
+  }
+  // Strava distances are meters, speeds m/s. Convert to miles + sec/mi pace.
+  function activityToRecord(a) {
+    const distanceMi = (a.distance || 0) / 1609.344;
+    const movingSec = a.moving_time || 0;
+    const paceSecPerMi = distanceMi > 0 ? movingSec / distanceMi : null;
+    return {
+      id: a.id, date: (a.start_date_local || a.start_date || '').slice(0, 10),
+      distanceMi: +distanceMi.toFixed(2), movingSec, paceSecPerMi, type: a.type || a.sport_type || 'Run', name: a.name || ''
+    };
+  }
+  async function syncStrava() {
+    let t = loadJSON(STRAVA_KEY, null);
+    if (!t || !t.access) return;
+    if (t.expires && Date.now() > t.expires - 60000) { const n = await stravaRefresh(t); if (n) t = n; }
+    stravaErr('');
+    try {
+      const acts = await stravaFetch('/athlete/activities?per_page=60', t);
+      const runs = (Array.isArray(acts) ? acts : []).filter(a => /run/i.test(a.type || a.sport_type || '')).map(activityToRecord);
+      saveJSON(STRAVA_CACHE_KEY, runs);
+      localStorage.setItem(STRAVA_SYNC_KEY, String(Date.now()));
+      matchStravaToSchedule(runs);
+      renderStrava(); renderMileageChart(); renderPaceTrendChart(); renderProgress(); renderSchedule();
+    } catch (e) {
+      stravaErr((e && e.message) || 'Could not reach Strava.');
+      renderStrava();
+    }
+  }
+  // Auto-mark a plan entry "completed" when a Strava run lands on the same date.
+  function matchStravaToSchedule(runs) {
+    let changed = false;
+    plan.entries.forEach(en => {
+      const hit = runs.find(r => r.date === en.date);
+      if (hit && (!en.completed || en.source === 'strava')) {
+        en.completed = true; en.source = 'strava'; en.stravaActivityId = hit.id;
+        en.actualDistanceMi = hit.distanceMi; en.actualDurationSec = hit.movingSec; en.actualPaceSecPerMi = hit.paceSecPerMi;
+        changed = true;
+      }
+    });
+    if (changed) savePlan();
+  }
+  $('mtStravaAction').addEventListener('click', () => {
+    const t = loadJSON(STRAVA_KEY, null);
+    if (!t || !t.access) {
+      if (!STRAVA_CLIENT_ID) return;
+      const url = 'https://www.strava.com/oauth/authorize'
+        + '?client_id=' + encodeURIComponent(STRAVA_CLIENT_ID)
+        + '&redirect_uri=' + encodeURIComponent(STRAVA_REDIRECT)
+        + '&response_type=code&approval_prompt=auto'
+        + '&scope=' + encodeURIComponent('activity:read_all')
+        + '&state=' + Math.random().toString(36).slice(2);
+      location.href = url;
+      return;
+    }
+    $('mtStravaAction').textContent = 'Syncing…';
+    syncStrava();
+  });
+
+  /* ============================================================
+     MANUAL RUN LOG — for days without Strava / without a plan entry.
+     ============================================================ */
+  function parseTimeToSec(str) {
+    const parts = String(str || '').trim().split(':').map(Number);
+    if (parts.some(isNaN) || !parts.length) return null;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  }
+  $('mtLogSave').addEventListener('click', () => {
+    const date = $('mtLogDate').value;
+    const dist = parseFloat($('mtLogDist').value);
+    const sec = parseTimeToSec($('mtLogTime').value);
+    const st = $('mtLogStatus');
+    if (!date || !(dist > 0) || !sec) { st.textContent = 'Date, distance and time are required.'; st.style.color = 'var(--bad)'; return; }
+    let entry = plan.entries.find(e => e.date === date);
+    if (!entry) {
+      entry = { id: 'm_' + Date.now(), date, weekNumber: null, dayOfWeek: DAY_NAMES[isoDayIndex(parseKey(date))], type: 'other', label: 'Logged run', plannedDistanceMi: null };
+      plan.entries.push(entry);
+      plan.entries.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    entry.completed = true; entry.source = 'manual';
+    entry.actualDistanceMi = dist; entry.actualDurationSec = sec; entry.actualPaceSecPerMi = sec / dist;
+    savePlan();
+    st.textContent = 'Logged ✓'; st.style.color = 'var(--good)';
+    $('mtLogDist').value = ''; $('mtLogTime').value = '';
+    setTimeout(() => st.textContent = '', 1800);
+    renderSchedule(); renderMileageChart(); renderPaceTrendChart(); renderProgress();
+  });
+
+  /* ============================================================
+     PROGRESS TOWARD GOAL PACE
+     ============================================================ */
+  function recentActualPaces(n) {
+    const withPace = plan.entries.filter(e => e.completed && e.actualPaceSecPerMi).sort((a, b) => b.date.localeCompare(a.date));
+    return withPace.slice(0, n).map(e => e.actualPaceSecPerMi);
+  }
+  function renderProgress() {
+    const card = $('mtProgressCard');
+    const gp = goalPaceSecPerMi();
+    const recent = recentActualPaces(5);
+    if (!gp || !recent.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    const avg = recent.reduce((s, v) => s + v, 0) / recent.length;
+    const delta = avg - gp; // positive = slower than goal
+    const headEl = $('mtProgressHeadline'), subEl = $('mtProgressSub');
+    let cls, headline;
+    if (delta <= 0) { cls = 'good'; headline = 'Ahead of goal pace by ' + fmtSec(Math.abs(delta)) + '/' + paceUnit + ' 🎉'; }
+    else if (delta < 15) { cls = 'good'; headline = 'On goal pace — within ' + fmtSec(delta) + '/' + paceUnit; }
+    else if (delta < 40) { cls = 'warn'; headline = fmtSec(delta) + '/' + paceUnit + ' off goal pace — keep building.'; }
+    else { cls = 'bad'; headline = fmtSec(delta) + '/' + paceUnit + ' off goal pace.'; }
+    headEl.textContent = headline; headEl.className = 'mt-progress-headline ' + cls;
+    let weeksLeft = '';
+    if (plan.raceDate) {
+      const days = Math.round((parseKey(plan.raceDate) - new Date()) / 86400000);
+      weeksLeft = days > 0 ? ' · ' + Math.ceil(days / 7) + ' weeks to race day' : '';
+    }
+    subEl.textContent = 'Avg pace over last ' + recent.length + ' run' + (recent.length === 1 ? '' : 's') + ': ' + paceStr(avg) + ' vs goal ' + paceStr(gp) + weeksLeft;
+  }
+
+  /* ============================================================
+     CHARTS — weekly mileage (planned vs actual) and pace trend.
+     Both reuse a tiny shared bar/line renderer.
+     ============================================================ */
+  function isoWeekKey(d) {
+    // Monday-anchored week key, e.g. "2026-W14"
+    const monday = new Date(d); monday.setDate(d.getDate() - isoDayIndex(d));
+    const jan1 = new Date(monday.getFullYear(), 0, 1);
+    const week = Math.ceil((((monday - jan1) / 86400000) + isoDayIndex(jan1) + 1) / 7);
+    return monday.getFullYear() + '-W' + String(week).padStart(2, '0');
+  }
+  function renderMileageChart() {
+    const svg = $('mtMileageContent'), empty = $('mtMileageEmpty'), meta = $('mtMileageMeta');
+    const byWeek = {};
+    plan.entries.forEach(e => {
+      const wk = isoWeekKey(parseKey(e.date));
+      byWeek[wk] = byWeek[wk] || { planned: 0, actual: 0 };
+      byWeek[wk].planned += Number(e.plannedDistanceMi) || 0;
+      if (e.completed) byWeek[wk].actual += Number(e.actualDistanceMi) || 0;
+    });
+    const weeks = Object.keys(byWeek).sort().slice(-12);
+    if (!weeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
+    empty.classList.add('hidden');
+    const maxV = Math.max.apply(null, weeks.map(w => Math.max(byWeek[w].planned, byWeek[w].actual))) || 1;
+    const W = 320, H = 140, pad = 8, gap = 6;
+    const bw = (W - pad * 2) / weeks.length;
+    let html = '';
+    weeks.forEach((w, i) => {
+      const x = pad + i * bw;
+      const pH = (byWeek[w].planned / maxV) * (H - 24);
+      const aH = (byWeek[w].actual / maxV) * (H - 24);
+      const barW = (bw - gap) / 2;
+      html += '<rect x="' + x.toFixed(1) + '" y="' + (H - 18 - pH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + pH.toFixed(1) + '" fill="#7DD3FC" rx="2"></rect>';
+      html += '<rect x="' + (x + barW).toFixed(1) + '" y="' + (H - 18 - aH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + aH.toFixed(1) + '" fill="#6ee7b7" rx="2"></rect>';
+      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + w.slice(6) + '</text>';
+    });
+    svg.innerHTML = html;
+    const last = byWeek[weeks[weeks.length - 1]];
+    meta.textContent = 'this week: ' + last.actual.toFixed(1) + ' / ' + last.planned.toFixed(1) + ' mi';
+  }
+  function renderPaceTrendChart() {
+    const svg = $('mtPaceTrendContent'), empty = $('mtPaceTrendEmpty'), meta = $('mtPaceTrendMeta');
+    const pts = plan.entries.filter(e => e.completed && e.actualPaceSecPerMi).sort((a, b) => a.date.localeCompare(b.date)).slice(-16);
+    if (pts.length < 2) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = pts.length ? paceStr(pts[0].actualPaceSecPerMi) : '—'; return; }
+    empty.classList.add('hidden');
+    const vals = pts.map(p => p.actualPaceSecPerMi);
+    const gp = goalPaceSecPerMi();
+    const allVals = gp ? vals.concat([gp]) : vals;
+    const min = Math.min.apply(null, allVals), max = Math.max.apply(null, allVals);
+    const padV = Math.max((max - min) * 0.2, 5);
+    const yMin = min - padV, yMax = max + padV;
+    const W = 320, H = 140, xPad = 8, yTop = 10, yBot = 122;
+    const xFor = (i) => xPad + (i / (pts.length - 1)) * (W - xPad * 2);
+    const yFor = (v) => yBot - ((v - yMin) / (yMax - yMin)) * (yBot - yTop);
+    let html = '';
+    if (gp) {
+      const y = yFor(gp);
+      html += '<line x1="' + xPad + '" y1="' + y.toFixed(1) + '" x2="' + (W - xPad) + '" y2="' + y.toFixed(1) + '" stroke="#F2C063" stroke-width="1.5" stroke-dasharray="4 3"></line>';
+      html += '<text x="' + (W - xPad) + '" y="' + (y - 4).toFixed(1) + '" font-size="8" fill="#F2C063" text-anchor="end">goal</text>';
+    }
+    let line = '';
+    pts.forEach((p, i) => { const x = xFor(i), y = yFor(p.actualPaceSecPerMi); line += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' '; });
+    html += '<path d="' + line + '" fill="none" stroke="#6ee7b7" stroke-width="2"></path>';
+    pts.forEach((p, i) => { const x = xFor(i), y = yFor(p.actualPaceSecPerMi); html += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="#6ee7b7"></circle>'; });
+    svg.innerHTML = html;
+    meta.textContent = 'latest: ' + paceStr(vals[vals.length - 1]);
+  }
+
+  /* ============================================================
+     SCHEDULE — list view with manual complete toggle.
+     ============================================================ */
+  const TYPE_ICON = { easy: '🟢', long: '🔵', speed: '⚡', tempo: '🟠', rest: '⚪', cross: '🔁', race: '🏆', other: '▫️' };
+  function dayMetaLine(e) {
+    const bits = [];
+    if (e.plannedDistanceMi) bits.push(e.plannedDistanceMi + ' mi planned');
+    if (e.completed && e.actualDistanceMi) {
+      bits.push(e.actualDistanceMi.toFixed(1) + ' mi · ' + fmtSec(e.actualDurationSec) + ' · ' + paceStr(e.actualPaceSecPerMi));
+      if (e.source === 'strava') bits.push('<span class="strava-tag">synced from Strava</span>');
+    }
+    return bits.join(' · ');
+  }
+  function dayRowHtml(e, todayKey) {
+    const d = parseKey(e.date);
+    const cls = ['mt-day-row'];
+    if (e.date === todayKey) cls.push('is-today');
+    if (e.completed) cls.push('is-done');
+    if (e.type === 'race') cls.push('is-race');
+    return '<div class="' + cls.join(' ') + '" data-id="' + e.id + '">'
+      + '<div class="mt-day-date"><b>' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</b>' + (e.dayOfWeek || DAY_NAMES[isoDayIndex(d)]) + '</div>'
+      + '<div class="mt-day-info"><div class="mt-day-label">' + (TYPE_ICON[e.type] || '') + ' ' + escapeHtml(e.label || '') + '</div><div class="mt-day-meta">' + dayMetaLine(e) + '</div></div>'
+      + '<button class="mt-day-check' + (e.completed ? ' on' : '') + '" data-id="' + e.id + '" aria-label="Mark complete">✓</button>'
+      + '</div>';
+  }
+  function toggleComplete(id) {
+    const e = plan.entries.find(x => x.id === id);
+    if (!e) return;
+    e.completed = !e.completed;
+    if (!e.completed) { e.actualDistanceMi = null; e.actualDurationSec = null; e.actualPaceSecPerMi = null; e.source = null; }
+    else if (!e.actualDistanceMi && e.plannedDistanceMi) { e.actualDistanceMi = e.plannedDistanceMi; e.source = 'manual'; }
+    savePlan();
+    renderSchedule(); renderMileageChart(); renderPaceTrendChart(); renderProgress();
+  }
+  function renderSchedule() {
+    const sorted = plan.entries.slice().sort((a, b) => a.date.localeCompare(b.date));
+    $('mtScheduleCount').textContent = sorted.length + (sorted.length === 1 ? ' day' : ' days');
+    $('mtScheduleEmpty').classList.toggle('hidden', sorted.length > 0);
+    const todayKey = dateKey(new Date());
+    const future = sorted.filter(e => e.date >= todayKey);
+    const past = sorted.filter(e => e.date < todayKey);
+
+    // Group future/today entries by week-of-plan for headers.
+    let html = '';
+    let lastWeek = null;
+    future.slice(0, 60).forEach(e => {
+      const wkKey = isoWeekKey(parseKey(e.date));
+      if (wkKey !== lastWeek) {
+        lastWeek = wkKey;
+        const weekEntries = future.filter(x => isoWeekKey(parseKey(x.date)) === wkKey);
+        const vol = weekEntries.reduce((s, x) => s + (Number(x.plannedDistanceMi) || 0), 0);
+        html += '<div class="mt-week-h"><span class="mt-week-label">' + (e.weekNumber ? 'Week ' + e.weekNumber : wkKey) + '</span><span class="mt-week-vol">' + vol.toFixed(1) + ' mi planned</span></div>';
+      }
+      html += dayRowHtml(e, todayKey);
+    });
+    $('mtScheduleList').innerHTML = html;
+    $('mtScheduleList').querySelectorAll('.mt-day-check').forEach(b => b.addEventListener('click', () => toggleComplete(b.dataset.id)));
+
+    $('mtPastToggle').classList.toggle('hidden', past.length === 0);
+    $('mtPastCount').textContent = past.length;
+    $('mtPastBody').innerHTML = past.slice().reverse().map(e => dayRowHtml(e, todayKey)).join('');
+    $('mtPastBody').querySelectorAll('.mt-day-check').forEach(b => b.addEventListener('click', () => toggleComplete(b.dataset.id)));
+  }
+  $('mtPastToggle').addEventListener('click', () => {
+    const open = $('mtPastBody').style.display !== 'none';
+    $('mtPastBody').style.display = open ? 'none' : '';
+    $('mtPastArrow').textContent = open ? '▾' : '▴';
+    $('mtPastToggle').setAttribute('aria-expanded', String(!open));
+  });
+
+  /* ============================================================
+     IMPORT PLAN — photo of a training plan, read via the shared
+     /api/vision-tool serverless proxy (same pattern as the InBody
+     scanner in the gym module; Anthropic key stays server-side).
+     ============================================================ */
+  const IMPORT_TOOL = {
+    name: 'import_training_plan',
+    description: 'Record every training day from a photo of a running/marathon training plan, whether it is a table or a calendar grid.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        readable: { type: 'boolean', description: 'True if this looks like a structured training plan with weeks/days and workouts.' },
+        raceDateOnSheet: { type: 'string', description: 'Race day date as YYYY-MM-DD if printed on the sheet, else empty string.' },
+        totalWeeks: { type: 'number', description: 'Total number of weeks in the plan (the highest week number present).' },
+        entries: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              weekNumber: { type: 'number', description: '1-indexed week number.' },
+              dayOfWeek: { type: 'string', enum: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+              type: { type: 'string', enum: ['easy','long','speed','tempo','rest','cross','race','other'] },
+              label: { type: 'string', description: 'Short workout description as printed, e.g. "6 mi easy" or "Rest".' },
+              distanceMi: { type: 'number', description: 'Distance in miles. 0 for rest days or if not specified.' }
+            },
+            required: ['weekNumber', 'dayOfWeek', 'type', 'label', 'distanceMi']
+          }
+        }
+      },
+      required: ['readable', 'totalWeeks', 'entries']
+    }
+  };
+  const IMPORT_SYSTEM =
+    "You read photos of running/marathon training plans — tables or calendar grids showing weeks and daily workouts — "
+    + "and extract every single day. Always call the import_training_plan tool exactly once with your best reading. "
+    + "weekNumber is 1-indexed from the start of the plan. Distances should be converted to miles if shown in km "
+    + "(1 km = 0.621371 mi). Include rest days with type='rest' and distanceMi=0 — don't skip them. "
+    + "Only set readable=false if this clearly isn't a training plan.";
+
+  function downscaleImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        const MAX = 1568;
+        const scale = Math.min(1, MAX / Math.max(w, h || 1));
+        w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', 0.85);
+        resolve({ dataUrl, base64: dataUrl.split(',')[1] || '', mediaType: 'image/jpeg' });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read that image.")); };
+      img.src = url;
+    });
+  }
+  async function scanPlanImage(base64, mediaType) {
+    const res = await fetch('/api/vision-tool', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ system: IMPORT_SYSTEM, tool: IMPORT_TOOL, image: base64, mediaType, prompt: 'Read this training plan and record every day.' })
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that plan.'); throw e; }
+    return json;
+  }
+
+  let importExtracted = null;
+  function ibShow(el) { el.classList.remove('hidden'); }
+  function ibHide(el) { el.classList.add('hidden'); }
+  function resetImportOverlay() {
+    ibHide($('mtBusy')); ibHide($('mtImportError')); ibHide($('mtReview'));
+    importExtracted = null;
+  }
+  function showImportError(msg) {
+    ibHide($('mtBusy')); ibHide($('mtReview'));
+    $('mtImportError').textContent = '⚠ ' + msg; ibShow($('mtImportError'));
+  }
+  async function handleImportFile(file) {
+    if (!file || !/^image\//.test(file.type)) { showImportError('Please choose an image file.'); return; }
+    ibHide($('mtImportError')); ibHide($('mtReview'));
+    let img;
+    try { img = await downscaleImage(file); } catch (e) { showImportError(e.message); return; }
+    $('mtBusyThumb').src = img.dataUrl;
+    ibShow($('mtBusy'));
+    try {
+      const data = await scanPlanImage(img.base64, img.mediaType);
+      ibHide($('mtBusy'));
+      if (data.readable === false || !Array.isArray(data.entries) || !data.entries.length) {
+        showImportError("Couldn't find a training plan in that image. Try a clearer photo.");
+        return;
+      }
+      importExtracted = data;
+      showReview(data);
+    } catch (e) {
+      ibHide($('mtBusy'));
+      showImportError((e && e.message) || "Couldn't reach the plan reader — check your connection.");
+    }
+  }
+  function showReview(data) {
+    $('mtReviewRaceDate').value = /^\d{4}-\d{2}-\d{2}$/.test(data.raceDateOnSheet) ? data.raceDateOnSheet : (plan.raceDate || '');
+    const rows = data.entries.map((e, i) =>
+      '<div class="mt-review-row" data-i="' + i + '">'
+      + '<input type="number" class="mt-rev-week" value="' + (e.weekNumber || 1) + '" min="1">'
+      + '<input type="text" class="mt-rev-label" value="' + escapeHtml(e.label || '') + '">'
+      + '<input type="number" step="0.1" class="mt-rev-mi" value="' + (e.distanceMi || 0) + '">'
+      + '<button type="button" class="mt-rm" data-i="' + i + '">×</button>'
+      + '</div>'
+    ).join('');
+    $('mtReviewRows').innerHTML = rows;
+    $('mtReviewStatus').textContent = data.entries.length + ' days detected over ' + (data.totalWeeks || '?') + ' weeks. Fix the race date above, then review rows before saving.';
+    $('mtReviewRows').querySelectorAll('.mt-rm').forEach(b => b.addEventListener('click', () => {
+      const row = b.closest('.mt-review-row'); row.remove();
+    }));
+    ibShow($('mtReview'));
+  }
+  function saveImportedPlan() {
+    if (!importExtracted) return;
+    const raceDate = $('mtReviewRaceDate').value;
+    if (!raceDate) { $('mtReviewStatus').textContent = 'Race date is required to place each day on the calendar.'; $('mtReviewStatus').style.color = 'var(--bad)'; return; }
+    const rows = [...$('mtReviewRows').querySelectorAll('.mt-review-row')];
+    const totalWeeks = importExtracted.totalWeeks || Math.max.apply(null, importExtracted.entries.map(e => e.weekNumber || 1));
+    const race = parseKey(raceDate);
+    const raceDayIdx = isoDayIndex(race);
+    const dayIndexOf = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
+    const newEntries = rows.map((row, idx) => {
+      const orig = importExtracted.entries[Number(row.dataset.i)];
+      const weekNumber = parseInt(row.querySelector('.mt-rev-week').value, 10) || 1;
+      const label = row.querySelector('.mt-rev-label').value.trim();
+      const distanceMi = parseFloat(row.querySelector('.mt-rev-mi').value) || 0;
+      const dow = orig.dayOfWeek || 'Mon';
+      const entryDayIdx = dayIndexOf[dow] != null ? dayIndexOf[dow] : 0;
+      const offsetDays = (totalWeeks - weekNumber) * 7 + (raceDayIdx - entryDayIdx);
+      const d = new Date(race); d.setDate(d.getDate() - offsetDays);
+      return {
+        id: 'm_' + Date.now() + '_' + idx, date: dateKey(d), weekNumber, dayOfWeek: dow,
+        type: orig.type || 'other', label: label || orig.label || '', plannedDistanceMi: distanceMi,
+        completed: false, source: null, actualDistanceMi: null, actualDurationSec: null, actualPaceSecPerMi: null
+      };
+    });
+    // Replace the whole schedule with the freshly imported one (keeps any already-completed
+    // days for dates that don't appear in the new import, in case this is a partial re-import).
+    const newDates = new Set(newEntries.map(e => e.date));
+    plan.entries = plan.entries.filter(e => !newDates.has(e.date)).concat(newEntries).sort((a, b) => a.date.localeCompare(b.date));
+    plan.raceDate = raceDate;
+    savePlan();
+    populateGoalForm();
+    renderSchedule(); renderMileageChart(); renderPaceTrendChart(); renderProgress();
+    closeImportOverlay();
+  }
+
+  function openImportOverlay() { resetImportOverlay(); $('mtImportOverlay').classList.add('is-open'); document.body.style.overflow = 'hidden'; }
+  function closeImportOverlay() { $('mtImportOverlay').classList.remove('is-open'); document.body.style.overflow = ''; }
+  $('mtImportLink').addEventListener('click', openImportOverlay);
+  $('mtImportBack').addEventListener('click', closeImportOverlay);
+  $('mtTakePhotoBtn').addEventListener('click', () => $('mtFileCamera').click());
+  $('mtFileCamera').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportFile(f); e.target.value = ''; });
+  $('mtFromLibraryBtn').addEventListener('click', () => $('mtFileLibrary').click());
+  $('mtFileLibrary').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportFile(f); e.target.value = ''; });
+  $('mtReviewSave').addEventListener('click', saveImportedPlan);
+
+  /* ============================================================
+     BOOT
+     ============================================================ */
+  populateGoalForm();
+  renderStrava();
+  renderSchedule();
+  renderMileageChart();
+  renderPaceTrendChart();
+  renderProgress();
+  // If already connected, sync quietly on load so the page opens with fresh data.
+  if (loadJSON(STRAVA_KEY, null)) syncStrava();
+})();
+</script>
+</body>
+</html>

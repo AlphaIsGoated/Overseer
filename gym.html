@@ -4515,6 +4515,7 @@ img, video, canvas, svg { max-width: 100%; }
     <button class="nv-chip" data-q="How is my bodyweight trending and am I on track?">⚖️ Weight</button>
     <button class="nv-chip" data-q="Look at my recent workouts — am I progressing and what should I push next?">💪 Lifts</button>
     <button class="nv-chip" data-q="Look at my InBody scan history and segmental lean balance — how is my body composition trending, and which muscle groups are strong vs. lagging compared to how much I train them?">🧬 InBody</button>
+    <button class="nv-chip" data-q="How's my marathon training going — am I on pace for my goal time, and what should I focus on this week?">🏃 Marathon</button>
   </div>
   <div class="nv-foot">
     <input class="nv-input" id="nvInput" type="text" placeholder="Ask Nova…" autocomplete="off">
@@ -4560,12 +4561,18 @@ img, video, canvas, svg { max-width: 100%; }
     const photos = (Array.isArray(photosRaw)?photosRaw:[]).map(p=>({ date:p.dateKey||p.date||p.d, weight:p.weight||p.w }));
     const inbodyRaw = readLS('po_coach_inbody', []) || [];
     const inbody = (Array.isArray(inbodyRaw)?inbodyRaw:[]).map(s => sanitize(Object.assign({}, s, { imageDataUrl: undefined }), 0));
+    const marathonPlan = readLS('marathon_plan_v1', null);
+    const marathon = marathonPlan ? {
+      raceDate: marathonPlan.raceDate, distanceMi: marathonPlan.distanceMi, goalSec: marathonPlan.goalSec,
+      recentDays: sanitize((marathonPlan.entries || []).slice(-21), 0)
+    } : null;
     let ctx = {
       today: new Date().toDateString(),
       profile: { heightCm:prof.heightCm, weightKg:prof.weightKg, age:prof.age, sex:prof.sex, activityHrsPerWeek:prof.activityHrsPerWeek },
       weightLog: sanitize(readLS('po_coach_weights', []), 0),
       progressPhotos: { count: photos.length, timeline: photos.slice(-30) },
       inbodyScans: { count: inbody.length, history: inbody.slice(-12), note: 'segmentalLean is % of ideal lean mass per region (rightArm, leftArm, trunk, rightLeg, leftLeg); 100% = ideal.' },
+      marathonTraining: marathon,
       workouts: sanitize(readLS('po_coach_v1', null), 0),
       workoutsDone: sanitize(readLS('po_coach_workout_done', null), 0),
     };
@@ -4574,9 +4581,10 @@ img, video, canvas, svg { max-width: 100%; }
     return s;
   }
   const SYS = "You are Nova, the user's personal gym coach living inside their fitness dashboard. "
-    + "You can see their body profile, bodyweight log (entries have dateKey + weight), workout logs, progress-photo timeline (dates + bodyweight; images not included), and InBody scan history (full body-composition breakdown including segmental lean % per region — rightArm, leftArm, trunk, rightLeg, leftLeg). "
+    + "You can see their body profile, bodyweight log (entries have dateKey + weight), workout logs, progress-photo timeline (dates + bodyweight; images not included), InBody scan history (full body-composition breakdown including segmental lean % per region — rightArm, leftArm, trunk, rightLeg, leftLeg), and marathon training data if they have a plan (race date, goal time/distance, recent training days with planned vs actual distance/pace, some synced from Strava). "
     + "Coach concisely and specifically. For an overview, cover: bodyweight trend, training consistency, standout progress, and 1-2 concrete next steps. "
     + "When asked about InBody/body composition, reference real figures (body fat %, muscle mass, visceral fat, segmental lean balance) and note any region that's lagging vs. its training volume in their workout logs. "
+    + "When asked about marathon training, reference real numbers (recent pace vs. goal pace, weeks until race day, missed vs completed days) — never invent splits or paces that aren't in the data. "
     + "Use short markdown bullets, be encouraging but honest. Weights may be kg or lb per their profile. Keep replies under ~180 words. Their data as JSON: ";
 
   async function ask(text){
