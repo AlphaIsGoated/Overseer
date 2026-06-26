@@ -1,11 +1,15 @@
 // ============================================================
 // POST /api/ai-chat
-// Body: { system: "...", messages: [{role, content}] }
-// Reply: { text }
-// Generic Anthropic chat proxy shared by Nova (nova-lite.html and
-// the gym coach widget) — the API key stays server-side in
-// ANTHROPIC_API_KEY and is never sent to the browser, so every
-// device hits the same key automatically with nothing to paste.
+// Body: { system: "...", messages: [{role, content}], tool?: <schema> }
+// Reply: { text } — or, when `tool` is provided, that tool's parsed
+// input object directly (forced tool-use, for structured extraction
+// from plain text — e.g. reading a training plan out of a markdown
+// file, the text equivalent of /api/vision-tool for images).
+// Generic Anthropic chat proxy shared by Nova (nova-lite.html, the
+// gym coach widget) and the marathon module's text-plan importer —
+// the API key stays server-side in ANTHROPIC_API_KEY and is never
+// sent to the browser, so every device hits the same key automatically
+// with nothing to paste.
 // ============================================================
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,12 +22,23 @@ export default async function handler(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   const messages = Array.isArray(body && body.messages) ? body.messages : [];
   const system = (body && body.system) || '';
+  const tool = body && body.tool;
   if (!messages.length) return res.status(400).json({ error: 'messages required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
+    const payload = {
+      model: 'claude-opus-4-8',
+      max_tokens: tool ? 1536 : 1024,
+      system,
+      messages,
+    };
+    if (tool && tool.name) {
+      payload.tools = [tool];
+      payload.tool_choice = { type: 'tool', name: tool.name };
+    }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -31,17 +46,17 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'claude-opus-4-8',
-        max_tokens: 1024,
-        system,
-        messages,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = (data && data.error && data.error.message) || ('Anthropic API error (' + r.status + ')');
       return res.status(500).json({ error: msg });
+    }
+    if (tool && tool.name) {
+      const block = (data.content || []).find((b) => b && b.type === 'tool_use' && b.name === tool.name);
+      if (!block || !block.input) return res.status(502).json({ error: 'could not extract structured data' });
+      return res.status(200).json(block.input);
     }
     const text = (data.content || [])
       .filter((b) => b && b.type === 'text').map((b) => b.text).join('').trim() || '(no response)';

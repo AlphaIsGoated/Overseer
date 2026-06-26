@@ -122,6 +122,17 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 .mt-chart-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .mt-chart-legend-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
 .mt-chart-empty { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-4); }
+.mt-chart-svg [data-tip] { cursor: pointer; }
+.mt-tooltip {
+  position: fixed; z-index: 500; pointer-events: none;
+  background: #15151a; border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 10px; padding: 9px 11px; font-size: 11.5px; line-height: 1.45;
+  color: var(--text-1); max-width: 220px; white-space: pre-line;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+  transform: translate(-50%, -100%); margin-top: -12px;
+}
+.mt-tooltip.hidden { display: none; }
+.mt-tooltip-title { color: var(--accent); font-weight: 700; display: block; margin-bottom: 3px; }
 
 /* Import overlay */
 .mt-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 200; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
@@ -266,6 +277,18 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     <div class="mt-chart-empty hidden" id="mtMileageEmpty">Import a plan or log a run to see weekly mileage.</div>
   </div>
 
+  <!-- ===== COMPLETION RATE ===== -->
+  <div class="card">
+    <div class="card-h">
+      <span class="card-title">Weekly completion rate</span>
+      <span class="card-sub" id="mtCompletionMeta">—</span>
+    </div>
+    <div class="mt-chart-wrap">
+      <svg class="mt-chart-svg" id="mtCompletionSvg" viewBox="0 0 320 100" preserveAspectRatio="none"><g id="mtCompletionContent"></g></svg>
+    </div>
+    <div class="mt-chart-empty hidden" id="mtCompletionEmpty">Mark a few days complete to see your weekly completion rate.</div>
+  </div>
+
   <!-- ===== PACE TREND ===== -->
   <div class="card">
     <div class="card-h">
@@ -274,6 +297,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     </div>
     <div class="mt-chart-wrap">
       <svg class="mt-chart-svg" id="mtPaceTrendSvg" viewBox="0 0 320 140" preserveAspectRatio="none"><g id="mtPaceTrendContent"></g></svg>
+      <div class="mt-chart-legend" id="mtPaceTrendLegend"></div>
     </div>
     <div class="mt-chart-empty hidden" id="mtPaceTrendEmpty">Log or sync some runs to see your pace trend.</div>
   </div>
@@ -336,8 +360,10 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       <button class="mt-btn primary" id="mtTakePhotoBtn" type="button">Take Photo</button>
       <button class="mt-btn" id="mtFromLibraryBtn" type="button">From Library</button>
     </div>
+    <button class="mt-btn full" id="mtFromMdBtn" type="button" style="margin-bottom:18px">📄 Upload .md file</button>
     <input type="file" id="mtFileCamera" accept="image/*" capture="environment" class="hidden">
     <input type="file" id="mtFileLibrary" accept="image/*" class="hidden">
+    <input type="file" id="mtFileMd" accept=".md,.markdown,text/markdown,text/plain" class="hidden">
 
     <div class="mt-busy hidden" id="mtBusy">
       <img class="mt-busy-thumb" id="mtBusyThumb" alt="">
@@ -374,6 +400,34 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   function dateKey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function parseKey(k) { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); }
   function isoDayIndex(d) { return (d.getDay() + 6) % 7; } // Mon=0 ... Sun=6
+
+  /* ============================================================
+     CHART TOOLTIPS — a single floating tooltip shared by every
+     chart. Each hoverable SVG shape carries its tooltip text in a
+     data-tip attribute (plain text, newline-separated); one
+     delegated pointer listener per chart reads whatever shape is
+     under the cursor/finger, so charts can be re-rendered freely
+     without re-wiring listeners.
+     ============================================================ */
+  const tooltipEl = document.createElement('div');
+  tooltipEl.className = 'mt-tooltip hidden';
+  tooltipEl.id = 'mtTooltip';
+  document.body.appendChild(tooltipEl);
+  function attrTip(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+  function positionTooltip(evt) {
+    const t = evt.touches && evt.touches[0] ? evt.touches[0] : evt;
+    const x = Math.min(Math.max(t.clientX, 70), window.innerWidth - 70);
+    tooltipEl.style.left = x + 'px';
+    tooltipEl.style.top = Math.max(t.clientY, 70) + 'px';
+  }
+  function attachChartTooltips(svgEl) {
+    svgEl.addEventListener('pointermove', (e) => {
+      const t = e.target.closest('[data-tip]');
+      if (t) { tooltipEl.textContent = t.dataset.tip.replace(/\\n/g, '\n'); tooltipEl.classList.remove('hidden'); positionTooltip(e); }
+      else tooltipEl.classList.add('hidden');
+    });
+    svgEl.addEventListener('pointerleave', () => tooltipEl.classList.add('hidden'));
+  }
 
   function defaultPlan() {
     return { raceDate: null, distanceMi: 26.2188, goalSec: null, paceUnit: 'mi', entries: [] };
@@ -451,7 +505,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     const h = parseInt($('mtGoalH').value, 10) || 0, m = parseInt($('mtGoalM').value, 10) || 0, s = parseInt($('mtGoalS').value, 10) || 0;
     plan.goalSec = (h * 3600 + m * 60 + s) || null;
     savePlan();
-    renderCountdown(); renderPaceGrid(); renderProgress(); renderMileageChart(); renderPaceTrendChart(); renderSchedule();
+    renderCountdown(); renderPaceGrid(); renderProgress(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderSchedule();
     const st = $('mtGoalStatus'); st.textContent = 'Saved ✓'; setTimeout(() => st.textContent = '', 1800);
   });
 
@@ -534,7 +588,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       saveJSON(STRAVA_CACHE_KEY, runs);
       localStorage.setItem(STRAVA_SYNC_KEY, String(Date.now()));
       matchStravaToSchedule(runs);
-      renderStrava(); renderMileageChart(); renderPaceTrendChart(); renderProgress(); renderSchedule();
+      renderStrava(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderProgress(); renderSchedule();
     } catch (e) {
       stravaErr((e && e.message) || 'Could not reach Strava.');
       renderStrava();
@@ -609,7 +663,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     st.textContent = 'Logged ✓'; st.style.color = 'var(--good)';
     $('mtLogDist').value = ''; $('mtLogTime').value = '';
     setTimeout(() => st.textContent = '', 1800);
-    renderSchedule(); renderMileageChart(); renderPaceTrendChart(); renderProgress();
+    renderSchedule(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderProgress();
   });
 
   /* ============================================================
@@ -653,15 +707,27 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     const week = Math.ceil((((monday - jan1) / 86400000) + isoDayIndex(jan1) + 1) / 7);
     return monday.getFullYear() + '-W' + String(week).padStart(2, '0');
   }
-  function renderMileageChart() {
-    const svg = $('mtMileageContent'), empty = $('mtMileageEmpty'), meta = $('mtMileageMeta');
+  function weekOfLabel(mondayDate) {
+    return mondayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  function byWeekBuckets() {
     const byWeek = {};
     plan.entries.forEach(e => {
-      const wk = isoWeekKey(parseKey(e.date));
-      byWeek[wk] = byWeek[wk] || { planned: 0, actual: 0 };
+      const d = parseKey(e.date);
+      const wk = isoWeekKey(d);
+      if (!byWeek[wk]) {
+        const monday = new Date(d); monday.setDate(d.getDate() - isoDayIndex(d));
+        byWeek[wk] = { planned: 0, actual: 0, plannedDays: 0, completedDays: 0, monday };
+      }
       byWeek[wk].planned += Number(e.plannedDistanceMi) || 0;
-      if (e.completed) byWeek[wk].actual += Number(e.actualDistanceMi) || 0;
+      if (e.plannedDistanceMi != null && e.type !== 'rest') byWeek[wk].plannedDays++;
+      if (e.completed) { byWeek[wk].actual += Number(e.actualDistanceMi) || 0; byWeek[wk].completedDays++; }
     });
+    return byWeek;
+  }
+  function renderMileageChart() {
+    const svg = $('mtMileageContent'), empty = $('mtMileageEmpty'), meta = $('mtMileageMeta');
+    const byWeek = byWeekBuckets();
     const weeks = Object.keys(byWeek).sort().slice(-12);
     if (!weeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
     empty.classList.add('hidden');
@@ -671,21 +737,56 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     let html = '';
     weeks.forEach((w, i) => {
       const x = pad + i * bw;
-      const pH = (byWeek[w].planned / maxV) * (H - 24);
-      const aH = (byWeek[w].actual / maxV) * (H - 24);
+      const wd = byWeek[w];
+      const pH = (wd.planned / maxV) * (H - 24);
+      const aH = (wd.actual / maxV) * (H - 24);
       const barW = (bw - gap) / 2;
-      html += '<rect x="' + x.toFixed(1) + '" y="' + (H - 18 - pH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + pH.toFixed(1) + '" fill="#7DD3FC" rx="2"></rect>';
-      html += '<rect x="' + (x + barW).toFixed(1) + '" y="' + (H - 18 - aH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + aH.toFixed(1) + '" fill="#6ee7b7" rx="2"></rect>';
+      const wkLabel = weekOfLabel(wd.monday);
+      const pct = wd.planned > 0 ? Math.round((wd.actual / wd.planned) * 100) : null;
+      const plannedTip = attrTip('Week of ' + wkLabel + '\\nPlanned: ' + wd.planned.toFixed(1) + ' mi\\nTotal miles your plan calls for this week.');
+      const actualTip = attrTip('Week of ' + wkLabel + '\\nActual: ' + wd.actual.toFixed(1) + ' mi' + (pct != null ? ' (' + pct + '% of planned)' : '') + '\\nMiles you actually ran — manual logs + Strava-synced runs.');
+      html += '<rect data-tip="' + plannedTip + '" x="' + x.toFixed(1) + '" y="' + (H - 18 - pH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(pH, 1).toFixed(1) + '" fill="#7DD3FC" rx="2"></rect>';
+      html += '<rect data-tip="' + actualTip + '" x="' + (x + barW).toFixed(1) + '" y="' + (H - 18 - aH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(aH, 1).toFixed(1) + '" fill="#6ee7b7" rx="2"></rect>';
       html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + w.slice(6) + '</text>';
     });
     svg.innerHTML = html;
     const last = byWeek[weeks[weeks.length - 1]];
     meta.textContent = 'this week: ' + last.actual.toFixed(1) + ' / ' + last.planned.toFixed(1) + ' mi';
   }
+  function renderCompletionChart() {
+    const svg = $('mtCompletionContent'), empty = $('mtCompletionEmpty'), meta = $('mtCompletionMeta');
+    const byWeek = byWeekBuckets();
+    const weeks = Object.keys(byWeek).filter(w => byWeek[w].plannedDays > 0).sort().slice(-12);
+    if (!weeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
+    empty.classList.add('hidden');
+    const W = 320, H = 100, pad = 8, gap = 6;
+    const bw = (W - pad * 2) / weeks.length;
+    const barW = bw - gap;
+    let html = '<line x1="' + pad + '" y1="14" x2="' + (W - pad) + '" y2="14" stroke="rgba(255,255,255,0.08)" stroke-width="1"></line>';
+    weeks.forEach((w, i) => {
+      const wd = byWeek[w];
+      const pct = Math.min(100, Math.round((wd.completedDays / wd.plannedDays) * 100));
+      const h = (pct / 100) * (H - 30);
+      const x = pad + i * bw;
+      const color = pct >= 90 ? '#6BE3A4' : pct >= 60 ? '#F2C063' : '#FF8A8A';
+      const wkLabel = weekOfLabel(wd.monday);
+      const tip = attrTip('Week of ' + wkLabel + '\\n' + wd.completedDays + ' of ' + wd.plannedDays + ' planned days completed (' + pct + '%)\\nShare of that week\'s training days you actually got done.');
+      html += '<rect data-tip="' + tip + '" x="' + x.toFixed(1) + '" y="' + (H - 18 - h).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(h, 1).toFixed(1) + '" fill="' + color + '" rx="2"></rect>';
+      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + w.slice(6) + '</text>';
+    });
+    svg.innerHTML = html;
+    const last = byWeek[weeks[weeks.length - 1]];
+    meta.textContent = last.completedDays + '/' + last.plannedDays + ' this week';
+  }
+  const TYPE_COLOR = { easy: '#6ee7b7', long: '#7DD3FC', speed: '#FF8A8A', tempo: '#F2C063', rest: '#4D4B47', cross: '#C9B8FF', race: '#FFD166', other: '#9CA3AF' };
   function renderPaceTrendChart() {
-    const svg = $('mtPaceTrendContent'), empty = $('mtPaceTrendEmpty'), meta = $('mtPaceTrendMeta');
+    const svg = $('mtPaceTrendContent'), empty = $('mtPaceTrendEmpty'), meta = $('mtPaceTrendMeta'), legend = $('mtPaceTrendLegend');
     const pts = plan.entries.filter(e => e.completed && e.actualPaceSecPerMi).sort((a, b) => a.date.localeCompare(b.date)).slice(-16);
-    if (pts.length < 2) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = pts.length ? paceStr(pts[0].actualPaceSecPerMi) : '—'; return; }
+    if (pts.length < 2) {
+      svg.innerHTML = ''; legend.innerHTML = ''; empty.classList.remove('hidden');
+      meta.textContent = pts.length ? paceStr(pts[0].actualPaceSecPerMi) : '—';
+      return;
+    }
     empty.classList.add('hidden');
     const vals = pts.map(p => p.actualPaceSecPerMi);
     const gp = goalPaceSecPerMi();
@@ -699,15 +800,32 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     let html = '';
     if (gp) {
       const y = yFor(gp);
-      html += '<line x1="' + xPad + '" y1="' + y.toFixed(1) + '" x2="' + (W - xPad) + '" y2="' + y.toFixed(1) + '" stroke="#F2C063" stroke-width="1.5" stroke-dasharray="4 3"></line>';
-      html += '<text x="' + (W - xPad) + '" y="' + (y - 4).toFixed(1) + '" font-size="8" fill="#F2C063" text-anchor="end">goal</text>';
+      const goalTip = attrTip('Goal pace: ' + paceStr(gp) + '\\nThe pace you need to average to hit your goal finish time over ' + distanceMi.toFixed(1) + ' mi.');
+      html += '<line data-tip="' + goalTip + '" x1="' + xPad + '" y1="' + y.toFixed(1) + '" x2="' + (W - xPad) + '" y2="' + y.toFixed(1) + '" stroke="#F2C063" stroke-width="6" stroke-opacity="0.001"></line>';
+      html += '<line x1="' + xPad + '" y1="' + y.toFixed(1) + '" x2="' + (W - xPad) + '" y2="' + y.toFixed(1) + '" stroke="#F2C063" stroke-width="1.5" stroke-dasharray="4 3" pointer-events="none"></line>';
+      html += '<text x="' + (W - xPad) + '" y="' + (y - 4).toFixed(1) + '" font-size="8" fill="#F2C063" text-anchor="end" pointer-events="none">goal</text>';
     }
     let line = '';
     pts.forEach((p, i) => { const x = xFor(i), y = yFor(p.actualPaceSecPerMi); line += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' '; });
-    html += '<path d="' + line + '" fill="none" stroke="#6ee7b7" stroke-width="2"></path>';
-    pts.forEach((p, i) => { const x = xFor(i), y = yFor(p.actualPaceSecPerMi); html += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="#6ee7b7"></circle>'; });
+    html += '<path d="' + line + '" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="2" pointer-events="none"></path>';
+    pts.forEach((p, i) => {
+      const x = xFor(i), y = yFor(p.actualPaceSecPerMi);
+      const color = TYPE_COLOR[p.type] || TYPE_COLOR.other;
+      const d = parseKey(p.date);
+      const delta = gp ? p.actualPaceSecPerMi - gp : null;
+      const deltaLine = delta == null ? '' : ('\\n' + (delta <= 0 ? Math.abs(delta).toFixed(0) + 's/mi faster than goal' : delta.toFixed(0) + 's/mi slower than goal'));
+      const tip = attrTip(
+        d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + (p.label || p.type || 'Run') + '\\n'
+        + 'Pace: ' + paceStr(p.actualPaceSecPerMi) + deltaLine + '\\n'
+        + (p.actualDistanceMi ? p.actualDistanceMi.toFixed(1) + ' mi · ' + fmtSec(p.actualDurationSec) : '')
+      );
+      html += '<circle data-tip="' + tip + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="9" fill="transparent"></circle>';
+      html += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3.5" fill="' + color + '" pointer-events="none"></circle>';
+    });
     svg.innerHTML = html;
     meta.textContent = 'latest: ' + paceStr(vals[vals.length - 1]);
+    const typesUsed = [...new Set(pts.map(p => p.type || 'other'))];
+    legend.innerHTML = typesUsed.map(t => '<span class="mt-chart-legend-item"><span class="mt-chart-legend-dot" style="background:' + (TYPE_COLOR[t] || TYPE_COLOR.other) + '"></span>' + (TYPE_ICON[t] ? TYPE_ICON[t] + ' ' : '') + t + '</span>').join('');
   }
 
   /* ============================================================
@@ -742,7 +860,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     if (!e.completed) { e.actualDistanceMi = null; e.actualDurationSec = null; e.actualPaceSecPerMi = null; e.source = null; }
     else if (!e.actualDistanceMi && e.plannedDistanceMi) { e.actualDistanceMi = e.plannedDistanceMi; e.source = 'manual'; }
     savePlan();
-    renderSchedule(); renderMileageChart(); renderPaceTrendChart(); renderProgress();
+    renderSchedule(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderProgress();
   }
   function renderSchedule() {
     const sorted = plan.entries.slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -829,6 +947,15 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     + "weekNumber is 1-indexed from the start of the plan. Distances should be converted to miles if shown in km "
     + "(1 km = 0.621371 mi). Include rest days with type='rest' and distanceMi=0 — don't skip them. "
     + "Only set readable=false if this clearly isn't a training plan.";
+  const IMPORT_SYSTEM_MD =
+    "You read markdown (or plain text) documents that may contain a LOT more than just a running plan — strength "
+    + "training, nutrition notes, journal entries, other sports, whatever else the person tracks in the same file. "
+    + "Your job is to find and extract ONLY the running/marathon training plan portion and ignore everything else "
+    + "in the document. Always call the import_training_plan tool exactly once with your best reading of just that "
+    + "portion. weekNumber is 1-indexed from the start of the running plan specifically (not the whole document). "
+    + "Distances should be converted to miles if shown in km (1 km = 0.621371 mi). Include rest days with "
+    + "type='rest' and distanceMi=0 — don't skip them. Only set readable=false if the document contains no "
+    + "identifiable running/marathon training schedule at all.";
 
   function downscaleImage(file) {
     return new Promise((resolve, reject) => {
@@ -858,6 +985,19 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that plan.'); throw e; }
     return json;
   }
+  async function scanPlanMarkdown(text) {
+    const res = await fetch('/api/ai-chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        system: IMPORT_SYSTEM_MD,
+        tool: IMPORT_TOOL,
+        messages: [{ role: 'user', content: 'Extract just the running/marathon training plan from this document:\n\n' + text }]
+      })
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that file.'); throw e; }
+    return json;
+  }
 
   let importExtracted = null;
   function ibShow(el) { el.classList.remove('hidden'); }
@@ -875,6 +1015,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     ibHide($('mtImportError')); ibHide($('mtReview'));
     let img;
     try { img = await downscaleImage(file); } catch (e) { showImportError(e.message); return; }
+    $('mtBusyThumb').style.display = '';
     $('mtBusyThumb').src = img.dataUrl;
     ibShow($('mtBusy'));
     try {
@@ -882,6 +1023,38 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       ibHide($('mtBusy'));
       if (data.readable === false || !Array.isArray(data.entries) || !data.entries.length) {
         showImportError("Couldn't find a training plan in that image. Try a clearer photo.");
+        return;
+      }
+      importExtracted = data;
+      showReview(data);
+    } catch (e) {
+      ibHide($('mtBusy'));
+      showImportError((e && e.message) || "Couldn't reach the plan reader — check your connection.");
+    }
+  }
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error("Couldn't read that file."));
+      reader.readAsText(file);
+    });
+  }
+  async function handleImportMdFile(file) {
+    if (!file) return;
+    const looksLikeText = /\.(md|markdown|txt)$/i.test(file.name) || /^text\//.test(file.type) || file.type === '';
+    if (!looksLikeText) { showImportError('Please choose a .md or .txt file.'); return; }
+    ibHide($('mtImportError')); ibHide($('mtReview'));
+    let text;
+    try { text = await readFileAsText(file); } catch (e) { showImportError(e.message); return; }
+    if (!text.trim()) { showImportError('That file looks empty.'); return; }
+    $('mtBusyThumb').style.display = 'none';
+    ibShow($('mtBusy'));
+    try {
+      const data = await scanPlanMarkdown(text.slice(0, 60000));
+      ibHide($('mtBusy'));
+      if (data.readable === false || !Array.isArray(data.entries) || !data.entries.length) {
+        showImportError("Couldn't find a running/marathon plan in that file.");
         return;
       }
       importExtracted = data;
@@ -939,7 +1112,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     plan.raceDate = raceDate;
     savePlan();
     populateGoalForm();
-    renderSchedule(); renderMileageChart(); renderPaceTrendChart(); renderProgress();
+    renderSchedule(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderProgress();
     closeImportOverlay();
   }
 
@@ -951,6 +1124,8 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   $('mtFileCamera').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportFile(f); e.target.value = ''; });
   $('mtFromLibraryBtn').addEventListener('click', () => $('mtFileLibrary').click());
   $('mtFileLibrary').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportFile(f); e.target.value = ''; });
+  $('mtFromMdBtn').addEventListener('click', () => $('mtFileMd').click());
+  $('mtFileMd').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportMdFile(f); e.target.value = ''; });
   $('mtReviewSave').addEventListener('click', saveImportedPlan);
 
   /* ============================================================
@@ -960,7 +1135,11 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   renderStrava();
   renderSchedule();
   renderMileageChart();
+  renderCompletionChart();
   renderPaceTrendChart();
+  attachChartTooltips($('mtMileageSvg'));
+  attachChartTooltips($('mtCompletionSvg'));
+  attachChartTooltips($('mtPaceTrendSvg'));
   renderProgress();
   // If already connected, sync quietly on load so the page opens with fresh data.
   if (loadJSON(STRAVA_KEY, null)) syncStrava();
