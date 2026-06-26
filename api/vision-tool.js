@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-opus-4-8',
-        max_tokens: 1536,
+        max_tokens: 8192,
         system,
         tools: [tool],
         tool_choice: { type: 'tool', name: tool.name },
@@ -53,6 +53,9 @@ export default async function handler(req, res) {
     if (!r.ok) {
       const msg = (data && data.error && data.error.message) || ('Anthropic API error (' + r.status + ')');
       return res.status(500).json({ error: msg });
+    }
+    if (data.stop_reason === 'max_tokens') {
+      return res.status(502).json({ error: 'Response was too large and got cut off (max_tokens reached) — try a smaller/simpler image.' });
     }
     const block = (data.content || []).find((b) => b && b.type === 'tool_use' && b.name === tool.name);
     if (!block || !block.input) return res.status(502).json({ error: 'could not read that image' });

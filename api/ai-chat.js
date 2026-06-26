@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   try {
     const payload = {
       model: 'claude-opus-4-8',
-      max_tokens: tool ? 1536 : 1024,
+      max_tokens: tool ? 8192 : 1024,
       system,
       messages,
     };
@@ -54,6 +54,9 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: msg });
     }
     if (tool && tool.name) {
+      if (data.stop_reason === 'max_tokens') {
+        return res.status(502).json({ error: 'Response was too large and got cut off (max_tokens reached) — try a smaller document or fewer weeks.' });
+      }
       const block = (data.content || []).find((b) => b && b.type === 'tool_use' && b.name === tool.name);
       if (!block || !block.input) return res.status(502).json({ error: 'could not extract structured data' });
       return res.status(200).json(block.input);
