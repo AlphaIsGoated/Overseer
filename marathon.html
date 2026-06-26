@@ -944,13 +944,26 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       required: ['readable', 'notes', 'totalWeeks', 'entries']
     }
   };
+  const PLAN_TABLE_GUIDANCE =
+    "Many real plans use a wide table with ONE ROW PER WEEK and a SEPARATE COLUMN FOR EACH DAY (e.g. columns "
+    + "'Mon (Easy)', 'Tue (Quality)', 'Thu (Easy)', 'Sat (Long)'). Treat EACH day-column in EACH row as its own "
+    + "separate entry — never collapse a week's row into a single entry. Skip columns that describe the row "
+    + "itself rather than a single day's workout (week number, a date RANGE for the whole week, phase/block name, "
+    + "weekly total mileage) — those are not training days. If a separate 'weekly structure' or 'typical week' "
+    + "table also exists (e.g. listing Sun/Wed/Fri as rest or optional), you may use it to fill in rest days for "
+    + "days not itemized in the detailed week-by-week table, but don't invent specifics that aren't stated. "
+    + "If the week is given as a date RANGE ('Jun 22-28') rather than one exact date per day, do NOT guess which "
+    + "exact date a given weekday falls on — use weekNumber + dayOfWeek for those entries instead, and only use "
+    + "a direct date when one specific date is actually given for that specific day. If more than one candidate "
+    + "race date is mentioned (e.g. a primary date and an alternate/backup), use the one explicitly marked as "
+    + "primary/main for raceDateOnSheet.";
   const IMPORT_SYSTEM =
     "You read photos of running/marathon training plans — tables or calendar grids showing weeks and daily workouts — "
     + "and extract every single day. Always call the import_training_plan tool exactly once with your best reading. "
     + "Prefer real dates if the sheet shows any; otherwise use weekNumber (1-indexed) + dayOfWeek. Distances should be "
     + "converted to miles if shown in km (1 km = 0.621371 mi). Include rest days with type='rest' and distanceMi=0 — "
-    + "don't skip them. Always fill in `notes` with what you found. Only set readable=false if this clearly isn't a "
-    + "training plan at all.";
+    + "don't skip them. " + PLAN_TABLE_GUIDANCE + " Always fill in `notes` with what you found. Only set readable=false "
+    + "if this clearly isn't a training plan at all.";
   const IMPORT_SYSTEM_MD =
     "You read markdown or plain-text documents that may contain a LOT more than just a running plan — strength "
     + "training, nutrition notes, journal entries, other sports, whatever else the person tracks in the same file. "
@@ -958,11 +971,11 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     + "written — a markdown table, a bulleted list, a list of real dates ('2026-07-04: 6mi easy' or 'July 4: rest'), "
     + "prose ('On Mondays I do an easy 5'), or relative week/day labels ('Week 3, Tuesday: tempo run'). Read the "
     + "WHOLE document before deciding nothing is there. For each day found, use a real date if one is stated; only "
-    + "fall back to weekNumber+dayOfWeek if no real date is given anywhere for that entry. Always call the "
-    + "import_training_plan tool exactly once. Convert distances to miles if shown in km (1 km = 0.621371 mi). "
-    + "Include rest days with type='rest' and distanceMi=0 — don't skip them. Always fill in `notes` explaining "
-    + "what you found (or searched for and didn't find). Only set readable=false if there is truly no running/"
-    + "training schedule anywhere in the document — skim every section before concluding that.";
+    + "fall back to weekNumber+dayOfWeek if no real date is given anywhere for that entry. " + PLAN_TABLE_GUIDANCE + " "
+    + "Always call the import_training_plan tool exactly once. Convert distances to miles if shown in km "
+    + "(1 km = 0.621371 mi). Include rest days with type='rest' and distanceMi=0 — don't skip them. Always fill in "
+    + "`notes` explaining what you found (or searched for and didn't find). Only set readable=false if there is "
+    + "truly no running/training schedule anywhere in the document — skim every section before concluding that.";
 
   function downscaleImage(file) {
     return new Promise((resolve, reject) => {
