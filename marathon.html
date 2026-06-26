@@ -170,11 +170,13 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 .mt-week-h { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 4px 8px; }
 .mt-week-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); font-weight: 700; }
 .mt-week-vol { font-size: 11px; color: var(--text-4); font-family: var(--font-mono); }
+.mt-day-card { margin-bottom: 6px; }
 .mt-day-row {
   display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
-  padding: 10px 12px; background: rgba(255,255,255,0.025); border-radius: 10px; margin-bottom: 6px;
+  padding: 10px 12px; background: rgba(255,255,255,0.025); border-radius: 10px;
   border-left: 3px solid var(--text-4);
 }
+.mt-day-card:has(.mt-routine-toggle) .mt-day-row { border-radius: 10px 10px 0 0; }
 .mt-day-row.is-today { border-left-color: var(--accent); background: rgba(255,138,138,0.05); }
 .mt-day-row.is-done { border-left-color: var(--good); }
 .mt-day-row.is-race { border-left-color: var(--warn); background: rgba(242,192,99,0.06); }
@@ -191,6 +193,24 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .mt-day-check.on { background: var(--good); border-color: var(--good); color: #04140d; }
+.mt-routine-toggle {
+  display: block; width: 100%; text-align: left;
+  background: rgba(255,255,255,0.015); border: none; border-top: 1px solid var(--border);
+  color: var(--text-3); font-family: inherit; font-size: 10.5px; font-weight: 600;
+  padding: 6px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  border-radius: 0;
+}
+.mt-routine-toggle:hover { color: var(--text-1); }
+.mt-routine-detail {
+  background: rgba(255,255,255,0.015); border-top: 1px solid var(--border);
+  border-radius: 0 0 10px 10px; padding: 10px 12px;
+}
+.mt-routine-detail.hidden { display: none; }
+.mt-routine-step { font-size: 12px; color: var(--text-2); line-height: 1.5; padding: 2px 0; }
+.mt-routine-total { font-size: 11px; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); }
+.mt-routine-fuel { font-size: 11.5px; color: var(--text-2); line-height: 1.5; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.mt-routine-fuel b { color: var(--accent); }
+.mt-routine-supps { margin-top: 4px; color: var(--text-3); }
 .mt-empty-card { text-align: center; padding: 36px 20px; background: rgba(255,255,255,0.025); border-radius: 14px; border: 1px dashed var(--border); }
 .mt-empty-icon { font-size: 32px; margin-bottom: 8px; }
 .mt-empty-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
@@ -462,6 +482,23 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       const t = e.target.closest('[data-tip]');
       if (t) { tooltipEl.textContent = t.dataset.tip.replace(/\\n/g, '\n'); tooltipEl.classList.remove('hidden'); positionTooltip(e); }
       else tooltipEl.classList.add('hidden');
+    });
+  }
+  // One delegated listener handles every "Routine & fueling" toggle in the
+  // schedule, including rows added later by re-renders — the detail panel
+  // is built lazily on first expand rather than for every row up front.
+  function setupRoutineToggles() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mt-routine-toggle');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const entry = plan.entries.find(x => x.id === id);
+      const detail = document.getElementById('routine-' + id);
+      if (!entry || !detail) return;
+      const isOpen = !detail.classList.contains('hidden');
+      if (isOpen) { detail.classList.add('hidden'); btn.textContent = '▾ Routine & fueling'; return; }
+      if (!detail.dataset.built) { detail.innerHTML = routineDetailInnerHtml(entry); detail.dataset.built = '1'; }
+      detail.classList.remove('hidden'); btn.textContent = '▴ Routine & fueling';
     });
   }
 
@@ -982,16 +1019,148 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     }
     return bits.join(' · ');
   }
+  // ============================================================
+  // DAY ROUTINE BUILDER — turns a terse plan label (e.g. "6 mi: WU +
+  // 2x10 min T (8:45), 3 min jog btwn + CD") into an ordered, paced
+  // step list. Paces are anchored to the goal marathon pace using
+  // standard coaching offsets per zone, EXCEPT easy/recovery-effort
+  // segments, which also show your own recent actual pace (from
+  // completed runs — manual logs or Strava) as a real-world check
+  // against the formula. Best-effort text parsing; falls back to a
+  // single generic line if a label doesn't match a recognizable shape.
+  // ============================================================
+  const ZONE_OFFSET_SEC = { rec: 105, wu: 90, cd: 90, jog: 100, easy: 75, long: 55, gmp: 0, race: 0, tempo: -25, speed: -65 };
+  const ZONE_LABEL = { rec: 'Recovery', wu: 'Warm-up', cd: 'Cool-down', jog: 'Jog recovery', easy: 'Easy', long: 'Long', gmp: 'Goal pace', race: 'Race pace', tempo: 'Tempo', speed: 'Interval' };
+  const EASY_LIKE_ZONES = ['easy', 'wu', 'cd', 'jog', 'rec', 'long'];
+  function detectZone(text) {
+    const t = (text || '').toLowerCase();
+    if (/\bwu\b|warm.?up/.test(t)) return 'wu';
+    if (/\bcd\b|cool.?down/.test(t)) return 'cd';
+    if (/\bjog\b/.test(t)) return 'jog';
+    if (/\brec\b|recovery/.test(t)) return 'rec';
+    if (/\bgmp\b|goal pace|marathon pace/.test(t)) return 'gmp';
+    if (/\brace\b/.test(t)) return 'race';
+    if (/\bt\b|tempo|threshold/.test(t)) return 'tempo';
+    if (/\bi\b|interval/.test(t)) return 'speed';
+    if (/\bl\b|long/.test(t)) return 'long';
+    if (/\be\b|easy/.test(t)) return 'easy';
+    return null;
+  }
+  function zonePace(zone) {
+    const gp = goalPaceSecPerMi();
+    if (!gp || !zone || ZONE_OFFSET_SEC[zone] == null) return null;
+    return gp + ZONE_OFFSET_SEC[zone];
+  }
+  function recentActualPaceFor(zone) {
+    if (!EASY_LIKE_ZONES.includes(zone)) return null;
+    const runs = plan.entries.filter(en => en.completed && en.actualPaceSecPerMi && (en.type === 'easy' || en.type === 'other' || !en.type))
+      .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+    if (!runs.length) return null;
+    return runs.reduce((s, en) => s + en.actualPaceSecPerMi, 0) / runs.length;
+  }
+  function parseRoutineSegments(label) {
+    if (!label) return [];
+    const chunks = label.split(/\s*\+\s*/).flatMap(c => c.split(/,(?![^()]*\))/)).map(s => s.trim()).filter(Boolean);
+    return chunks.map(chunk => {
+      const zone = detectZone(chunk);
+      const repMatch = chunk.match(/(\d+)\s*[x×]\s*([\d.]+)\s*(min|mi|m|km)\b/i);
+      const minMatch = chunk.match(/([\d.]+)\s*min\b/i);
+      const distMatch = chunk.match(/([\d.]+)\s*(mi|km|m)\b/i);
+      const explicitPaceMatch = chunk.match(/\((\d{1,2}:\d{2})\)/);
+      let reps = 1, perRepVal = null, perRepUnit = null;
+      if (repMatch) { reps = parseInt(repMatch[1], 10) || 1; perRepVal = parseFloat(repMatch[2]); perRepUnit = repMatch[3].toLowerCase(); }
+      let explicitPaceSec = null;
+      if (explicitPaceMatch) { const parts = explicitPaceMatch[1].split(':').map(Number); explicitPaceSec = parts[0] * 60 + parts[1]; }
+      return { text: chunk, zone, reps, perRepVal, perRepUnit, minMatch: minMatch ? parseFloat(minMatch[1]) : null, distMatch: distMatch ? { val: parseFloat(distMatch[1]), unit: distMatch[2].toLowerCase() } : null, explicitPaceSec };
+    });
+  }
+  function distToMi(val, unit) {
+    if (unit === 'km') return val / MI_TO_KM;
+    if (unit === 'm') return val / 1609.344;
+    return val;
+  }
+  function buildDayRoutine(e) {
+    const segs = parseRoutineSegments(e.label);
+    if (segs.length < 2) return null; // not enough structure to bother — caller falls back to a single line
+    let totalMin = 0;
+    const lines = segs.map((seg, i) => {
+      const zone = seg.zone;
+      const recentPace = recentActualPaceFor(zone);
+      const targetPace = seg.explicitPaceSec || zonePace(zone) || recentPace;
+      let desc, segMin = 0;
+      if (seg.reps > 1 && seg.perRepVal) {
+        if (seg.perRepUnit === 'min') { segMin = seg.reps * seg.perRepVal; desc = seg.reps + '× ' + seg.perRepVal + ' min'; }
+        else { const mi = distToMi(seg.perRepVal, seg.perRepUnit); segMin = targetPace ? (mi * targetPace / 60) * seg.reps : 0; desc = seg.reps + '× ' + seg.perRepVal + seg.perRepUnit; }
+      } else if (seg.minMatch) { segMin = seg.minMatch; desc = seg.minMatch + ' min'; }
+      else if (seg.distMatch) { const mi = distToMi(seg.distMatch.val, seg.distMatch.unit); segMin = targetPace ? mi * targetPace / 60 : 0; desc = seg.distMatch.val + ' ' + seg.distMatch.unit; }
+      else { desc = seg.text; }
+      totalMin += segMin;
+      const zoneLabel = zone ? ZONE_LABEL[zone] : null;
+      let line = (i + 1) + '. ' + (zoneLabel ? zoneLabel + ' — ' : '') + desc;
+      if (targetPace) line += ' @ ' + paceStr(targetPace);
+      if (segMin > 0.4) line += ' (~' + Math.round(segMin) + ' min)';
+      if (recentPace && targetPace && Math.abs(recentPace - targetPace) > 5 && EASY_LIKE_ZONES.includes(zone)) {
+        line += ' · your recent avg: ' + paceStr(recentPace);
+      }
+      return line;
+    });
+    return { lines, totalMin: Math.round(totalMin) };
+  }
+  function estimateDayMinutes(e) {
+    const routine = buildDayRoutine(e);
+    if (routine && routine.totalMin) return routine.totalMin;
+    if (e.plannedDistanceMi) {
+      const zone = detectZone(e.label || '') || e.type;
+      const pace = zonePace(zone) || zonePace('easy');
+      if (pace) return Math.round(e.plannedDistanceMi * pace / 60);
+    }
+    return null;
+  }
+  function relevantSupplements() {
+    let items = [];
+    try { items = JSON.parse(localStorage.getItem('stack:items')) || []; } catch (e) {}
+    if (!Array.isArray(items)) return [];
+    return items.filter(it => /pre.?workout|workout|electrolyte|carb|energy|caffeine|endurance/i.test((it.name || '') + ' ' + (it.note || '') + ' ' + (it.tag || '')));
+  }
+  function routineDetailInnerHtml(e) {
+    const routine = buildDayRoutine(e);
+    let html = '';
+    if (routine) {
+      html += routine.lines.map(l => '<div class="mt-routine-step">' + glossarize(escapeHtml(l)) + '</div>').join('');
+      html += '<div class="mt-routine-total">Est. total: ~' + routine.totalMin + ' min' + (e.plannedDistanceMi ? ' · ' + e.plannedDistanceMi + ' mi' : '') + '</div>';
+    } else {
+      const zone = detectZone(e.label || '') || e.type;
+      const pace = zonePace(zone);
+      html += '<div class="mt-routine-step">' + glossarize(escapeHtml(e.label || e.type || 'Run')) + (pace ? ' @ ' + paceStr(pace) : '') + '</div>';
+    }
+    const mins = estimateDayMinutes(e);
+    if (mins && mins >= 60 && e.type !== 'rest') {
+      const gels = Math.max(1, Math.round(mins / 35));
+      const bits = [gels + ' gel' + (gels === 1 ? '' : 's') + ' (~1 every 30–40 min)', 'fluids throughout'];
+      if (mins >= 90) bits.push('electrolytes (~500–1000mg sodium/hr)');
+      html += '<div class="mt-routine-fuel"><b>Fueling</b> (~' + mins + ' min effort): ' + bits.join(', ') + '.';
+      const supps = relevantSupplements();
+      if (supps.length) {
+        html += '<div class="mt-routine-supps">Bring along: ' + supps.map(s => '<b>' + escapeHtml(s.name) + '</b>' + (s.dose ? ' (' + escapeHtml(s.dose) + ')' : '') + (s.window ? ' — ' + escapeHtml(s.window) : '')).join(' · ') + '</div>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
   function dayRowHtml(e, todayKey) {
     const d = parseKey(e.date);
     const cls = ['mt-day-row'];
     if (e.date === todayKey) cls.push('is-today');
     if (e.completed) cls.push('is-done');
     if (e.type === 'race') cls.push('is-race');
-    return '<div class="' + cls.join(' ') + '" data-id="' + e.id + '">'
+    const showRoutine = e.label && e.type !== 'rest';
+    return '<div class="mt-day-card">'
+      + '<div class="' + cls.join(' ') + '" data-id="' + e.id + '">'
       + '<div class="mt-day-date"><b>' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</b>' + (e.dayOfWeek || DAY_NAMES[isoDayIndex(d)]) + '</div>'
       + '<div class="mt-day-info"><div class="mt-day-label">' + (TYPE_ICON[e.type] || '') + ' ' + glossarize(escapeHtml(e.label || '')) + '</div><div class="mt-day-meta">' + dayMetaLine(e) + '</div></div>'
       + '<button class="mt-day-check' + (e.completed ? ' on' : '') + '" data-id="' + e.id + '" aria-label="Mark complete">✓</button>'
+      + '</div>'
+      + (showRoutine ? '<button type="button" class="mt-routine-toggle" data-id="' + e.id + '">▾ Routine &amp; fueling</button><div class="mt-routine-detail hidden" id="routine-' + e.id + '"></div>' : '')
       + '</div>';
   }
   function toggleComplete(id) {
@@ -1334,6 +1503,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   renderCompletionChart();
   renderPaceTrendChart();
   setupGlobalTooltips();
+  setupRoutineToggles();
   renderGlossaryCard();
   renderProgress();
   // If already connected, sync quietly on load so the page opens with fresh data.
