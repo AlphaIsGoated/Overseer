@@ -6,7 +6,12 @@
 // Reads ANY image with financial info (receipt, bill, bank
 // screenshot, balance, statement) via Claude vision. The
 // Anthropic key stays server-side — the browser never sees it.
+//
+// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// to a reasonable payload size regardless — this endpoint spends real
+// money per call, so it's deliberately not left wide open.
 // ============================================================
+import { requireAppSecret, rejectIfTooLarge } from './_security.js';
 const SCAN_TOOL = {
   name: 'read_finance_image',
   description: 'Record the financial figures read from an image: a receipt, bill, invoice, bank / fintech app screenshot, account balance, transaction list or statement.',
@@ -39,17 +44,18 @@ const SCAN_SYSTEM =
   + "- Only set readable=false if there is genuinely no monetary amount anywhere in the image.";
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+  if (!requireAppSecret(req, res)) return;
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   const image = body && body.image;
   const mediaType = (body && body.mediaType) || 'image/jpeg';
   if (!image) return res.status(400).json({ error: 'image required' });
+  if (rejectIfTooLarge(image, 9000000, res, 'image')) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });

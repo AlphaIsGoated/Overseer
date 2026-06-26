@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/api/config"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Nova Lite · AI Mentor</title>
@@ -144,7 +145,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     try {
       const res = await fetch('/api/ai-chat', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({
           system: SYS + JSON.stringify(dashboardData()),
           messages: [{ role: 'user', content: text }],

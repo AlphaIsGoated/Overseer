@@ -682,7 +682,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   async function stravaRefresh(t) {
     if (!t.refresh) return null;
     try {
-      const r = await fetch('/api/strava-refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: t.refresh }) });
+      const r = await fetch('/api/strava-refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': (window.DASH_APP_SECRET || '') }, body: JSON.stringify({ refresh_token: t.refresh }) });
       const j = await r.json();
       if (j.access_token) {
         const next = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: (j.expires_at ? j.expires_at * 1000 : Date.now() + 21600e3) };
@@ -694,7 +694,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   async function stravaFetch(path, t) {
     const [p, qs] = path.split('?');
     const params = new URLSearchParams(qs || ''); params.set('path', p);
-    const r = await fetch('/api/strava-data?' + params.toString(), { headers: { Authorization: 'Bearer ' + t.access, Accept: 'application/json' } });
+    const r = await fetch('/api/strava-data?' + params.toString(), { headers: { Authorization: 'Bearer ' + t.access, Accept: 'application/json', 'X-App-Secret': (window.DASH_APP_SECRET || '') } });
     if (r.status === 401) { const n = await stravaRefresh(t); if (n) return stravaFetch(path, n); throw new Error('unauthorized — reconnect'); }
     if (!r.ok) throw new Error('Strava ' + r.status);
     return r.json();
@@ -1312,7 +1312,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   }
   async function scanPlanImage(base64, mediaType) {
     const res = await fetch('/api/vision-tool', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
       body: JSON.stringify({ system: IMPORT_SYSTEM, tool: IMPORT_TOOL, image: base64, mediaType, prompt: 'Read this training plan and record every day.' })
     });
     const json = await res.json();
@@ -1321,7 +1321,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   }
   async function scanPlanMarkdown(text) {
     const res = await fetch('/api/ai-chat', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
       body: JSON.stringify({
         system: IMPORT_SYSTEM_MD,
         tool: IMPORT_TOOL,

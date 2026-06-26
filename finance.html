@@ -3833,7 +3833,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       try {
         const res = await fetch('/api/nova', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
           body: JSON.stringify({ messages: convo, finance: gatherFinance() })
         });
         const data = await res.json().catch(() => ({}));
@@ -4063,7 +4063,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       try {
         const res = await fetch('/api/scan', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
           body: JSON.stringify({ image: img.base64, mediaType: img.mediaType })
         });
         const data = await res.json().catch(() => ({}));

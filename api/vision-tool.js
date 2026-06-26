@@ -5,13 +5,19 @@
 // Generic forced-tool-use vision proxy — reads an image and returns
 // structured JSON via Claude's tool use, server-side. The Anthropic
 // key stays in ANTHROPIC_API_KEY and is never sent to the browser.
+//
+// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// to reasonable payload sizes regardless — this endpoint spends real
+// money per call, so it's deliberately not left wide open.
 // ============================================================
+import { requireAppSecret, rejectIfTooLarge } from './_security.js';
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+  if (!requireAppSecret(req, res)) return;
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
@@ -22,6 +28,11 @@ export default async function handler(req, res) {
   const prompt = (body && body.prompt) || 'Read this image and record its figures.';
   if (!image) return res.status(400).json({ error: 'image required' });
   if (!tool || !tool.name) return res.status(400).json({ error: 'tool schema required' });
+  // Base64 inflates size ~33%; 9M chars ≈ 6.75MB raw, comfortably above
+  // what the client-side downscale-to-1568px step ever produces (~1-2MB).
+  if (rejectIfTooLarge(image, 9000000, res, 'image')) return;
+  if (rejectIfTooLarge(tool, 20000, res, 'tool schema')) return;
+  if (rejectIfTooLarge(system, 50000, res, 'system prompt')) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });

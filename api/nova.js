@@ -4,7 +4,12 @@
 // Reply: { text }
 // Nova is the finance dashboard's money coach. The Anthropic key
 // stays server-side — the browser never sees it.
+//
+// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// to reasonable payload sizes regardless — this endpoint spends real
+// money per call, so it's deliberately not left wide open.
 // ============================================================
+import { requireAppSecret, rejectIfTooLarge } from './_security.js';
 const SYSTEM_PROMPT =
   "You are Nova, the built-in money coach for a personal net-worth dashboard. "
   + "A JSON snapshot of the user's own finances is included below — use it to give "
@@ -26,17 +31,20 @@ const SYSTEM_PROMPT =
   + "Finance snapshot (JSON):\n";
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+  if (!requireAppSecret(req, res)) return;
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   const messages = Array.isArray(body && body.messages) ? body.messages : [];
   const finance = (body && body.finance) || {};
   if (!messages.length) return res.status(400).json({ error: 'messages required' });
+  if (messages.length > 60) return res.status(400).json({ error: 'too many messages' });
+  if (rejectIfTooLarge(messages, 100000, res, 'messages')) return;
+  if (rejectIfTooLarge(finance, 200000, res, 'finance snapshot')) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });

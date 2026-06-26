@@ -4,13 +4,20 @@
 // Reply: { access_token, refresh_token, expires_in } from WHOOP
 // Keeps the user's refresh_token alive past the 1-hour access
 // token expiry by hitting WHOOP's refresh endpoint.
+//
+// Gated by APP_SECRET (see api/_security.js) if configured — this
+// endpoint uses OUR WHOOP client secret, so an attacker who somehow
+// got hold of someone else's refresh_token could otherwise use this
+// as a free token-refresh service.
 // ============================================================
+import { requireAppSecret } from './_security.js';
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+  if (!requireAppSecret(req, res)) return;
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }

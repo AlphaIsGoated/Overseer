@@ -3769,7 +3769,7 @@ img, video, canvas, svg { max-width: 100%; }
   async function ibScanImage(base64, mediaType) {
     const res = await fetch('/api/vision-tool', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
       body: JSON.stringify({
         system: IB_SYSTEM,
         tool: IB_TOOL,
@@ -4595,7 +4595,7 @@ img, video, canvas, svg { max-width: 100%; }
     try {
       const res = await fetch('/api/ai-chat', {
         method: 'POST',
-        headers: { 'content-type':'application/json' },
+        headers: { 'content-type':'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: SYS + gymContext(), messages:[{role:'user', content:text}] }),
       });
       const json = await res.json();

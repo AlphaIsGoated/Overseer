@@ -4,13 +4,20 @@
 // Reply: { access_token, refresh_token, expires_at } from Strava
 // Strava access tokens expire after 6 hours — this exchanges the
 // long-lived refresh_token for a new access_token.
+//
+// Gated by APP_SECRET (see api/_security.js) if configured — this
+// endpoint uses OUR Strava client secret, so an attacker who somehow
+// got hold of someone else's refresh_token could otherwise use this
+// as a free token-refresh service.
 // ============================================================
+import { requireAppSecret } from './_security.js';
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+  if (!requireAppSecret(req, res)) return;
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
