@@ -1,21 +1,21 @@
 // ============================================================
-// POST /api/ai-chat
+// POST /api/ai/ai-chat
 // Body: { system: "...", messages: [{role, content}], tool?: <schema> }
 // Reply: { text } — or, when `tool` is provided, that tool's parsed
 // input object directly (forced tool-use, for structured extraction
 // from plain text — e.g. reading a training plan out of a markdown
-// file, the text equivalent of /api/vision-tool for images).
+// file, the text equivalent of /api/ai/vision-tool for images).
 // Generic Anthropic chat proxy shared by Nova (nova-lite.html, the
 // gym coach widget) and the marathon module's text-plan importer —
 // the API key stays server-side in ANTHROPIC_API_KEY and is never
 // sent to the browser, so every device hits the same key automatically
 // with nothing to paste.
 //
-// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// Gated by APP_SECRET (see api/_lib/security.js) if configured, and capped
 // to reasonable payload sizes regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from './_security.js';
+import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

@@ -1,16 +1,16 @@
 // ============================================================
-// POST /api/vision-tool
+// POST /api/ai/vision-tool
 // Body: { system, tool: <Anthropic tool schema>, image: "<base64>", mediaType }
 // Reply: the named tool's parsed input object
 // Generic forced-tool-use vision proxy — reads an image and returns
 // structured JSON via Claude's tool use, server-side. The Anthropic
 // key stays in ANTHROPIC_API_KEY and is never sent to the browser.
 //
-// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// Gated by APP_SECRET (see api/_lib/security.js) if configured, and capped
 // to reasonable payload sizes regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from './_security.js';
+import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

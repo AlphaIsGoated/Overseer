@@ -1,15 +1,15 @@
 // ============================================================
-// POST /api/nova
+// POST /api/ai/nova
 // Body: { messages: [{ role, content }], finance: {...} }
 // Reply: { text }
 // Nova is the finance dashboard's money coach. The Anthropic key
 // stays server-side — the browser never sees it.
 //
-// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// Gated by APP_SECRET (see api/_lib/security.js) if configured, and capped
 // to reasonable payload sizes regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from './_security.js';
+import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
 const SYSTEM_PROMPT =
   "You are Nova, the built-in money coach for a personal net-worth dashboard. "
   + "A JSON snapshot of the user's own finances is included below — use it to give "

@@ -1,7 +1,8 @@
 // ============================================================
-// Shared security helpers for the AI proxy endpoints (ai-chat,
-// vision-tool, nova, scan). Not a route itself — Vercel ignores
-// files whose name starts with "_" in /api.
+// Shared security helpers used across api/ai/* and api/integrations/*.
+// Not a route itself — Vercel excludes any file or folder under /api
+// whose name starts with "_" (this whole _lib/ folder) from becoming
+// a Serverless Function.
 // ============================================================
 
 // Require a shared app token on every request, IF the operator has

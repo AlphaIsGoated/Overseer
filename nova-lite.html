@@ -10,7 +10,7 @@
  *
  * HOW IT WORKS:
  *   • Nova reads whatever the dashboard saved in localStorage for context.
- *   • Calls the serverless /api/ai-chat proxy, which holds the Anthropic
+ *   • Calls the serverless /api/ai/ai-chat proxy, which holds the Anthropic
  *     key server-side (ANTHROPIC_API_KEY in Vercel) — no key to paste,
  *     and it works the same on every device since nothing is per-browser.
  *
@@ -143,7 +143,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     setOrb('think');
     const loading = addCoach('<span class="dots"><i></i><i></i><i></i></span>');
     try {
-      const res = await fetch('/api/ai-chat', {
+      const res = await fetch('/api/ai/ai-chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({

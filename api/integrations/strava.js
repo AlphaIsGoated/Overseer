@@ -1,19 +1,19 @@
 // ============================================================
-// GET  /api/whoop?path=/recovery&limit=1   (Authorization: Bearer <access_token>)
-//      Proxies to https://api.prod.whoop.com/developer/v1|v2<path> — needed
-//      because WHOOP's API doesn't send CORS headers.
-// POST /api/whoop   { refresh_token }
-//      Exchanges a refresh_token for a new access_token via WHOOP's OAuth
-//      endpoint, keeping the session alive past the 1-hour access-token expiry.
+// GET  /api/integrations/strava?path=/athlete/activities&per_page=30   (Authorization: Bearer <access_token>)
+//      Proxies to https://www.strava.com/api/v3<path> — needed because
+//      Strava's API doesn't send CORS headers.
+// POST /api/integrations/strava   { refresh_token }
+//      Exchanges a refresh_token for a new access_token via Strava's OAuth
+//      endpoint (access tokens expire after 6 hours).
 //
-// Combined into one file (data-proxy + token-refresh both for WHOOP) to
+// Combined into one file (data-proxy + token-refresh both for Strava) to
 // stay under Vercel Hobby's 12-Serverless-Function-per-deployment cap.
 //
-// Gated by APP_SECRET (see api/_security.js) if configured — without it,
-// GET is an open relay to the WHOOP API for anyone with their own bearer
+// Gated by APP_SECRET (see api/_lib/security.js) if configured — without it,
+// GET is an open relay to the Strava API for anyone with their own bearer
 // token, and POST is a free token-refresh service using OUR client secret.
 // ============================================================
-import { requireAppSecret } from './_security.js';
+import { requireAppSecret } from '../_lib/security.js';
 
 async function handleData(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -28,11 +28,7 @@ async function handleData(req, res) {
     if (k !== 'path') fwd.set(k, String(v));
   }
   const qs = fwd.toString();
-  // WHOOP moved most endpoints to v2; cycle is still on v1.
-  const base = path.startsWith('/cycle')
-    ? 'https://api.prod.whoop.com/developer/v1'
-    : 'https://api.prod.whoop.com/developer/v2';
-  const url = base + path + (qs ? '?' + qs : '');
+  const url = 'https://www.strava.com/api/v3' + path + (qs ? '?' + qs : '');
 
   try {
     const r = await fetch(url, {
@@ -53,8 +49,8 @@ async function handleRefresh(req, res) {
   const refresh = body && body.refresh_token;
   if (!refresh) return res.status(400).json({ error: 'refresh_token required' });
 
-  const clientId     = process.env.WHOOP_CLIENT_ID;
-  const clientSecret = process.env.WHOOP_CLIENT_SECRET;
+  const clientId     = process.env.STRAVA_CLIENT_ID;
+  const clientSecret = process.env.STRAVA_CLIENT_SECRET;
   if (!clientId || !clientSecret) return res.status(500).json({ error: 'server not configured' });
 
   try {
@@ -63,9 +59,8 @@ async function handleRefresh(req, res) {
       refresh_token: refresh,
       client_id:     clientId,
       client_secret: clientSecret,
-      scope:         'offline',
     });
-    const r = await fetch('https://api.prod.whoop.com/oauth/oauth2/token', {
+    const r = await fetch('https://www.strava.com/oauth/token', {
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    form,
@@ -73,7 +68,7 @@ async function handleRefresh(req, res) {
     const text = await r.text();
     if (!r.ok) return res.status(500).json({ error: 'refresh failed: ' + text });
     try { return res.status(200).json(JSON.parse(text)); }
-    catch { return res.status(500).json({ error: 'non-JSON response from WHOOP' }); }
+    catch { return res.status(500).json({ error: 'non-JSON response from Strava' }); }
   } catch (e) {
     return res.status(500).json({ error: 'fetch error: ' + (e && e.message ? e.message : String(e)) });
   }

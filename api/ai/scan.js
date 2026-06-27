@@ -1,5 +1,5 @@
 // ============================================================
-// POST /api/scan
+// POST /api/ai/scan
 // Body: { image: "<base64>", mediaType: "image/jpeg" }
 // Reply: the read_finance_image tool's parsed input, e.g.
 //   { readable, kind, source, currency, amount, date, items }
@@ -7,11 +7,11 @@
 // screenshot, balance, statement) via Claude vision. The
 // Anthropic key stays server-side — the browser never sees it.
 //
-// Gated by APP_SECRET (see api/_security.js) if configured, and capped
+// Gated by APP_SECRET (see api/_lib/security.js) if configured, and capped
 // to a reasonable payload size regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from './_security.js';
+import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
 const SCAN_TOOL = {
   name: 'read_finance_image',
   description: 'Record the financial figures read from an image: a receipt, bill, invoice, bank / fintech app screenshot, account balance, transaction list or statement.',

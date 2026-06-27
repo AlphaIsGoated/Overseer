@@ -3622,7 +3622,7 @@ img, video, canvas, svg { max-width: 100%; }
   //     segmentalLean: { rightArm, leftArm, trunk, rightLeg, leftLeg } (% of ideal),
   //     segmentalFat:  { rightArm, leftArm, trunk, rightLeg, leftLeg } (lbs/kg) }]
   //
-  // Reads the image via the serverless /api/vision-tool proxy — the
+  // Reads the image via the serverless /api/ai/vision-tool proxy — the
   // Anthropic key lives in Vercel's ANTHROPIC_API_KEY env var, never
   // in the browser, so this works the same on every device.
   // ============================================================
@@ -3766,7 +3766,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   async function ibScanImage(base64, mediaType) {
-    const res = await fetch('/api/vision-tool', {
+    const res = await fetch('/api/ai/vision-tool', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
       body: JSON.stringify({
@@ -4592,7 +4592,7 @@ img, video, canvas, svg { max-width: 100%; }
     busy = true;
     const loading = addMsg('coach', '<span class="nv-dots"><i></i><i></i><i></i></span>');
     try {
-      const res = await fetch('/api/ai-chat', {
+      const res = await fetch('/api/ai/ai-chat', {
         method: 'POST',
         headers: { 'content-type':'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: SYS + gymContext(), messages:[{role:'user', content:text}] }),
