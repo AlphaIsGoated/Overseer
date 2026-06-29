@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Notes · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate;
+}
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 760px; margin: 0 auto; }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background 0.15s ease, color 0.15s ease;
+}
+.back-btn:hover, .back-btn:active { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+.notes-toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.notes-search { flex: 1; min-width: 140px; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.notes-search::placeholder { color: var(--text-tertiary); }
+.notes-search:focus { border-color: rgba(255,255,255,0.28); }
+.notes-new {
+  padding: 11px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%);
+  color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.35);
+}
+.notes-new:hover { filter: brightness(1.06); }
+
+.note-card { padding: 16px; margin-bottom: 10px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.note-card:hover { background: rgba(255,255,255,0.055); border-color: rgba(255,255,255,0.12); }
+.note-card.pinned { border-color: rgba(242,192,99,0.35); }
+.note-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.note-title { font-size: 15px; font-weight: 700; color: var(--text-primary); word-break: break-word; }
+.note-title:empty::before { content: 'Untitled note'; color: var(--text-tertiary); font-weight: 500; }
+.note-pin { border: 0; background: transparent; color: var(--text-tertiary); font-size: 15px; cursor: pointer; flex-shrink: 0; opacity: 0.5; }
+.note-pin.on { opacity: 1; color: var(--warning); }
+.note-snippet { font-size: 12.5px; color: var(--text-tertiary); line-height: 1.45; white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.note-meta { font-size: 10.5px; color: var(--text-tertiary); margin-top: 8px; letter-spacing: 0.03em; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 30px 0; }
+
+.note-modal-bg { position: fixed; inset: 0; z-index: 200; display: none; align-items: flex-start; justify-content: center; padding: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); }
+.note-modal-bg.show { display: flex; }
+.note-modal { width: 100%; max-width: 760px; min-height: 100vh; background: #0A0A0B; padding: max(20px, env(safe-area-inset-top)) 20px 40px; }
+.note-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+.note-modal-btn { border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 10px; }
+.note-modal-btn:hover { color: var(--text-primary); }
+.note-modal-btn.danger:hover { color: var(--danger); }
+.note-title-input { width: 100%; border: 0; background: transparent; color: var(--text-primary); font-family: inherit; font-size: 22px; font-weight: 700; outline: none; margin-bottom: 12px; }
+.note-title-input::placeholder { color: var(--text-tertiary); }
+.note-body-input { width: 100%; min-height: 60vh; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 15px; line-height: 1.6; outline: none; resize: none; }
+.note-body-input::placeholder { color: var(--text-tertiary); }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Notes</h1>
+
+  <div class="gm-card">
+    <div class="notes-toolbar">
+      <input class="notes-search" id="notesSearch" type="text" placeholder="Search notes…" autocomplete="off">
+      <button class="notes-new" id="notesNew" type="button">+ New note</button>
+    </div>
+    <div id="notesList"></div>
+  </div>
+
+</div>
+
+<!-- Editor (full-screen-ish, mobile-friendly) -->
+<div class="note-modal-bg" id="noteModalBg">
+  <div class="note-modal">
+    <div class="note-modal-head">
+      <button class="note-modal-btn" id="noteClose" type="button">‹ Close</button>
+      <div>
+        <button class="note-modal-btn" id="notePin" type="button">📌 Pin</button>
+        <button class="note-modal-btn danger" id="noteDelete" type="button">Delete</button>
+      </div>
+    </div>
+    <input class="note-title-input" id="noteTitleInput" type="text" placeholder="Title">
+    <textarea class="note-body-input" id="noteBodyInput" placeholder="Start typing…"></textarea>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const STORE_KEY = 'notes:items';
+
+  function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { return []; } }
+  function save(items) { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+
+  let activeId = null;
+  let saveT = null;
+
+  function fmtDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function render() {
+    const q = $('notesSearch').value.trim().toLowerCase();
+    let items = load();
+    items.sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
+    if (q) items = items.filter(n => (n.title || '').toLowerCase().includes(q) || (n.body || '').toLowerCase().includes(q));
+    const list = $('notesList');
+    if (!items.length) {
+      list.innerHTML = '<div class="empty-state">' + (q ? 'No notes match “' + escapeHtml(q) + '”.' : 'No notes yet — tap “+ New note” to start.') + '</div>';
+      return;
+    }
+    list.innerHTML = items.map(n =>
+      '<div class="note-card' + (n.pinned ? ' pinned' : '') + '" data-id="' + n.id + '">' +
+        '<div class="note-row-top"><div class="note-title">' + escapeHtml(n.title || '') + '</div>' +
+          (n.pinned ? '<span class="note-pin on">📌</span>' : '') +
+        '</div>' +
+        '<div class="note-snippet">' + escapeHtml((n.body || '').slice(0, 200)) + '</div>' +
+        '<div class="note-meta">' + fmtDate(n.updatedAt) + '</div>' +
+      '</div>'
+    ).join('');
+    list.querySelectorAll('.note-card').forEach(c => c.addEventListener('click', () => openNote(c.dataset.id)));
+  }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function openNote(id) {
+    const items = load();
+    const n = items.find(x => x.id === id);
+    if (!n) return;
+    activeId = id;
+    $('noteTitleInput').value = n.title || '';
+    $('noteBodyInput').value = n.body || '';
+    $('notePin').classList.toggle('on', !!n.pinned);
+    $('noteModalBg').classList.add('show');
+    setTimeout(() => $('noteTitleInput').focus(), 50);
+  }
+  function newNote() {
+    const items = load();
+    const n = { id: 'n_' + Date.now(), title: '', body: '', pinned: false, updatedAt: Date.now() };
+    items.unshift(n);
+    save(items);
+    openNote(n.id);
+  }
+  function persistActive() {
+    if (!activeId) return;
+    const items = load();
+    const n = items.find(x => x.id === activeId);
+    if (!n) return;
+    n.title = $('noteTitleInput').value;
+    n.body = $('noteBodyInput').value;
+    n.updatedAt = Date.now();
+    save(items);
+  }
+  function closeNote() {
+    persistActive();
+    // Drop completely empty notes instead of leaving clutter behind.
+    const items = load();
+    const n = items.find(x => x.id === activeId);
+    if (n && !n.title.trim() && !n.body.trim()) {
+      save(items.filter(x => x.id !== activeId));
+    }
+    activeId = null;
+    $('noteModalBg').classList.remove('show');
+    render();
+  }
+
+  $('notesNew').addEventListener('click', newNote);
+  $('notesSearch').addEventListener('input', render);
+  $('noteClose').addEventListener('click', closeNote);
+  $('notePin').addEventListener('click', () => {
+    const items = load();
+    const n = items.find(x => x.id === activeId);
+    if (!n) return;
+    n.pinned = !n.pinned; n.updatedAt = Date.now();
+    save(items);
+    $('notePin').classList.toggle('on', n.pinned);
+  });
+  $('noteDelete').addEventListener('click', () => {
+    if (!activeId) return;
+    save(load().filter(x => x.id !== activeId));
+    activeId = null;
+    $('noteModalBg').classList.remove('show');
+    render();
+  });
+  [$('noteTitleInput'), $('noteBodyInput')].forEach(el => {
+    el.addEventListener('input', () => {
+      clearTimeout(saveT);
+      saveT = setTimeout(persistActive, 400);
+    });
+  });
+
+  render();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY], onApplied: render });
+  }
+})();
+</script>
+</body>
+</html>
