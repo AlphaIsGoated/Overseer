@@ -514,6 +514,17 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 10px; font-weight: 700; letter-spacing: 0.10em;
   text-transform: uppercase; color: var(--text-3); margin-bottom: 6px;
 }
+.orm-pct-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.orm-pct-row:first-child { border-color: color-mix(in srgb, var(--accent, #6ee7b7) 35%, var(--border)); }
+.orm-pct-row .orm-pct-label { color: var(--text-3); font-weight: 700; }
+.orm-pct-row .orm-pct-val { font-weight: 600; }
 .po-stat-val {
   font-size: 22px; font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1717,9 +1728,14 @@ img, video, canvas, svg { max-width: 100%; }
 
   <div class="po-header">
     <h1 class="po-title" id="appTitle">Progressive Overload Coach</h1>
-    <button class="po-icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <button class="po-icon-btn" id="ormCalcBtn" title="1RM calculator" aria-label="1RM calculator">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="13" y1="10" x2="15" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="13" y1="14" x2="15" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="13" y1="18" x2="15" y2="18"/></svg>
+      </button>
+      <button class="po-icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
   </div>
 
   <div class="card">
@@ -1926,6 +1942,37 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="rotCancel">Cancel</button>
       <button class="po-btn-primary" id="rotSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- 1RM Calculator Modal -->
+<div class="po-modal-bg" id="ormModalBg">
+  <div class="po-modal">
+    <h3>1RM calculator</h3>
+    <p style="font-size:12px;color:var(--text-3);margin:-6px 0 14px;line-height:1.45;">
+      Estimate your one-rep max from any working set — doesn't need to be a logged exercise.
+    </p>
+    <div class="po-log-grid">
+      <div class="po-field">
+        <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Weight (<span id="ormUnitLabel">lb</span>)</label>
+        <input type="number" id="ormWeight" step="0.5" inputmode="decimal" placeholder="e.g. 185">
+      </div>
+      <div class="po-field">
+        <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Reps</label>
+        <input type="number" id="ormReps" step="1" min="1" max="20" inputmode="numeric" placeholder="e.g. 5">
+      </div>
+    </div>
+    <div class="po-stat-box" style="margin:4px 0 16px;text-align:center">
+      <div class="po-stat-label">Estimated 1RM</div>
+      <div class="po-stat-val" id="ormResult" style="font-size:28px">—<span class="po-unit" id="ormResultUnit">lb</span></div>
+    </div>
+    <div class="po-set-section">
+      <h4>Training percentages</h4>
+      <div style="display:flex;flex-direction:column;gap:6px" id="ormPctTable"></div>
+    </div>
+    <div class="po-modal-actions">
+      <button class="po-btn-secondary" id="ormModalClose">Close</button>
     </div>
   </div>
 </div>
@@ -2872,6 +2919,33 @@ img, video, canvas, svg { max-width: 100%; }
       });
     });
   }
+  // ---- 1RM calculator — standalone, not tied to a logged exercise ----
+  const ORM_PCTS = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50];
+  function renderOrmCalc() {
+    $('ormUnitLabel').textContent = unit();
+    $('ormResultUnit').textContent = unit();
+    const w = parseFloat($('ormWeight').value);
+    const r = parseFloat($('ormReps').value);
+    const pctWrap = $('ormPctTable');
+    if (!(w > 0) || !(r > 0)) {
+      $('ormResult').innerHTML = '—<span class="po-unit" id="ormResultUnit">' + unit() + '</span>';
+      pctWrap.innerHTML = '';
+      return;
+    }
+    const orm = estimate1RM(w, r);
+    $('ormResult').innerHTML = Math.round(orm) + '<span class="po-unit" id="ormResultUnit">' + unit() + '</span>';
+    pctWrap.innerHTML = ORM_PCTS.map(p =>
+      '<div class="orm-pct-row"><span class="orm-pct-label">' + p + '%</span><span class="orm-pct-val">' + Math.round(orm * p / 100) + ' ' + unit() + '</span></div>'
+    ).join('');
+  }
+  $('ormCalcBtn').addEventListener('click', () => {
+    renderOrmCalc();
+    $('ormModalBg').classList.add('show');
+  });
+  $('ormModalClose').addEventListener('click', () => $('ormModalBg').classList.remove('show'));
+  $('ormWeight').addEventListener('input', renderOrmCalc);
+  $('ormReps').addEventListener('input', renderOrmCalc);
+
   $('settingsBtn').addEventListener('click', () => {
     renderSettings();
     $('setModalBg').classList.add('show');
