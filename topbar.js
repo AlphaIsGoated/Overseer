@@ -132,6 +132,65 @@
 }
 .bottombar-tab:active .bottombar-tab-icon { transform: scale(0.92); }
 
+/* ===== Your Coach — JARVIS-styled floating widget, present on every
+   page. Same mint/cyan HUD palette as the boot animation, so it reads
+   as the same "system" everywhere rather than a generic chat bubble. ===== */
+.coach-fab {
+  position: fixed; z-index: 70;
+  right: 14px; bottom: calc(82px + env(safe-area-inset-bottom));
+  width: 54px; height: 54px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #0c1411 0%, #050706 70%);
+  border: 1.5px solid rgba(110,231,183,0.45);
+  box-shadow: 0 0 16px rgba(110,231,183,0.35), 0 6px 18px rgba(0,0,0,0.5);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  animation: coachPulse 2.6s ease-in-out infinite;
+}
+.coach-fab svg { width: 24px; height: 24px; color: #6EE7B7; filter: drop-shadow(0 0 4px rgba(110,231,183,0.7)); }
+.coach-fab.has-insight::after {
+  content: ''; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px;
+  border-radius: 50%; background: #67E8F9; box-shadow: 0 0 6px rgba(103,232,249,0.9);
+}
+@keyframes coachPulse { 0%,100% { box-shadow: 0 0 16px rgba(110,231,183,0.35), 0 6px 18px rgba(0,0,0,0.5); } 50% { box-shadow: 0 0 26px rgba(110,231,183,0.6), 0 6px 18px rgba(0,0,0,0.5); } }
+
+.coach-panel-bg { position: fixed; inset: 0; z-index: 80; display: none; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); }
+.coach-panel-bg.show { display: flex; }
+.coach-panel {
+  width: 100%; max-width: 480px; max-height: 78vh; min-height: 360px;
+  display: flex; flex-direction: column;
+  background: #06090a; border: 1px solid rgba(110,231,183,0.3);
+  border-bottom: none; border-radius: 20px 20px 0 0;
+  box-shadow: 0 -10px 50px rgba(0,0,0,0.6), 0 0 30px rgba(110,231,183,0.08);
+  padding: 14px 16px max(14px, env(safe-area-inset-bottom));
+}
+.coach-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(110,231,183,0.15); }
+.coach-ring { width: 26px; height: 26px; flex-shrink: 0; }
+.coach-ring circle { fill: none; stroke: #6EE7B7; }
+.coach-ring .cr-outer { stroke-width: 1.3; stroke-dasharray: 3 5; opacity: 0.6; animation: coachSpin 6s linear infinite; transform-origin: 13px 13px; }
+.coach-ring .cr-inner { stroke-width: 1.6; stroke: #67E8F9; opacity: 0.85; animation: coachSpin 3.5s linear infinite reverse; transform-origin: 13px 13px; }
+@keyframes coachSpin { to { transform: rotate(360deg); } }
+.coach-title { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #eafff6; text-shadow: 0 0 8px rgba(110,231,183,0.6); }
+.coach-sub { font-family: ui-monospace, monospace; font-size: 9.5px; letter-spacing: 0.08em; color: rgba(110,231,183,0.5); margin-top: 1px; }
+.coach-head-spacer { flex: 1; }
+.coach-voice-toggle, .coach-close { width: 30px; height: 30px; border-radius: 9px; border: 1px solid rgba(110,231,183,0.25); background: rgba(110,231,183,0.06); color: #8eeebf; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+.coach-voice-toggle.on { background: rgba(110,231,183,0.22); color: #eafff6; }
+.coach-feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 10px; }
+.coach-msg { max-width: 88%; font-size: 13.5px; line-height: 1.5; }
+.coach-msg.user { align-self: flex-end; color: #d8d6cf; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 9px 13px; }
+.coach-msg.coach { align-self: flex-start; color: #c9f7e3; background: rgba(110,231,183,0.05); border: 1px solid rgba(110,231,183,0.25); border-left: 3px solid #6EE7B7; border-radius: 0 12px 12px 12px; padding: 9px 13px; white-space: pre-wrap; }
+.coach-msg.coach.proactive { border-left-color: #67E8F9; border-color: rgba(103,232,249,0.3); }
+.coach-input-row { display: flex; gap: 8px; margin-top: 8px; }
+.coach-input { flex: 1; min-width: 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(110,231,183,0.2); color: #eafff6; border-radius: 11px; padding: 11px 13px; font-family: inherit; font-size: 13.5px; outline: none; }
+.coach-input:focus { border-color: rgba(110,231,183,0.5); }
+.coach-input::placeholder { color: rgba(255,255,255,0.3); }
+.coach-send, .coach-mic { width: 42px; flex-shrink: 0; border: 0; border-radius: 11px; cursor: pointer; font-size: 16px; }
+.coach-send { background: #6EE7B7; color: #04140d; }
+.coach-mic { background: rgba(110,231,183,0.08); color: #8eeebf; border: 1px solid rgba(110,231,183,0.2); }
+.coach-mic.listening { background: #67E8F9; color: #04140d; }
+.coach-dots { display: inline-flex; gap: 4px; } .coach-dots i { width: 5px; height: 5px; border-radius: 50%; background: #6EE7B7; opacity: 0.4; animation: coachDot 1.2s ease-in-out infinite; }
+.coach-dots i:nth-child(2) { animation-delay: 0.2s; } .coach-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes coachDot { 0%,100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } }
+
 /* Push page content above the fixed bottom bar */
 body.has-bottombar {
   padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
@@ -227,6 +286,32 @@ body.topbar-modal-open {
 </nav>
 `;
 
+  const coachHtml = `
+<button class="coach-fab" id="coachFab" aria-label="Open Your Coach" type="button">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+</button>
+<div class="coach-panel-bg" id="coachPanelBg">
+  <div class="coach-panel">
+    <div class="coach-head">
+      <svg class="coach-ring" viewBox="0 0 26 26"><circle class="cr-outer" cx="13" cy="13" r="11"/><circle class="cr-inner" cx="13" cy="13" r="7"/></svg>
+      <div>
+        <div class="coach-title">Your Coach</div>
+        <div class="coach-sub" id="coachSub">SYSTEMS NOMINAL</div>
+      </div>
+      <div class="coach-head-spacer"></div>
+      <button class="coach-voice-toggle" id="coachVoiceToggle" type="button" title="Read replies aloud" aria-label="Toggle spoken replies">🔊</button>
+      <button class="coach-close" id="coachClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="coach-feed" id="coachFeed"></div>
+    <div class="coach-input-row">
+      <input class="coach-input" id="coachInput" placeholder="Ask your coach…" autocomplete="off">
+      <button class="coach-mic" id="coachMic" type="button" aria-label="Speak">🎙️</button>
+      <button class="coach-send" id="coachSend" type="button" aria-label="Send">→</button>
+    </div>
+  </div>
+</div>
+`;
+
   // Pages where we suppress the app chrome: finance has its own internal
   // 4-tab bottom nav and self-contained back button.
   function isFinancePage() {
@@ -274,6 +359,14 @@ body.topbar-modal-open {
     // Reserve room above the fixed bottom bar so page content can scroll
     // past it without being hidden.
     document.body.classList.add('has-bottombar');
+
+    // Coach widget has two top-level fixed elements (fab + panel) — just
+    // append the container itself rather than unwrapping; both children
+    // are position:fixed so the wrapper has zero visual footprint.
+    const coachWrap = document.createElement('div');
+    coachWrap.innerHTML = coachHtml.trim();
+    document.body.appendChild(coachWrap);
+    initCoach();
   }
 
   // -------- Active-date helpers (match the goals page 6 AM rollover) --------
@@ -483,6 +576,167 @@ body.topbar-modal-open {
   };
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'apiusage', syncedKeys: [USAGE_KEY] });
+  }
+
+  // -------- Your Coach — JARVIS-styled, present on every page --------
+  // Present everywhere (this file is loaded on every page) rather than
+  // living on one dedicated page, since the point is an always-available
+  // assistant, not a destination you navigate to. Proactively surfaces
+  // something noteworthy on first open per browser session (cached in
+  // sessionStorage so re-opening on a different page doesn't re-spend
+  // an AI call), then behaves as an ordinary cross-module chat.
+  function initCoach() {
+    const fab = document.getElementById('coachFab');
+    const panelBg = document.getElementById('coachPanelBg');
+    const feed = document.getElementById('coachFeed');
+    const input = document.getElementById('coachInput');
+    if (!fab || !panelBg) return;
+
+    function dashboardData() {
+      const out = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        try { out[k] = JSON.parse(localStorage.getItem(k)); } catch (e) { out[k] = localStorage.getItem(k); }
+      }
+      return out;
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function addMsg(role, text, proactive) {
+      const el = document.createElement('div');
+      el.className = 'coach-msg ' + role + (proactive ? ' proactive' : '');
+      el.textContent = text;
+      feed.appendChild(el);
+      feed.scrollTop = feed.scrollHeight;
+      return el;
+    }
+    function addLoading() {
+      const el = document.createElement('div');
+      el.className = 'coach-msg coach';
+      el.innerHTML = '<span class="coach-dots"><i></i><i></i><i></i></span>';
+      feed.appendChild(el);
+      feed.scrollTop = feed.scrollHeight;
+      return el;
+    }
+
+    const CHAT_SYS =
+      "You are the user's personal coach embedded across their entire life-tracking dashboard — fitness, " +
+      "health, finance, marathon training, college, nutrition, skincare, and more. You can see all of their " +
+      "saved data below. Be direct, sharp, and concise — a few sentences or short bullets, never an essay. " +
+      "Ground every answer in their actual data; if you don't have what you'd need, say so and ask one " +
+      "focused question. Dashboard data as JSON:\n";
+    const PROACTIVE_SYS =
+      "You are the user's personal coach scanning their entire life-tracking dashboard for anything worth " +
+      "flagging right now — overdue or upcoming deadlines, missed daily targets, low supplies, schedule " +
+      "conflicts, anything time-sensitive across fitness/health/finance/college/marathon/etc. Pick the 1-3 " +
+      "MOST relevant things only — not a status report of everything. If genuinely nothing stands out, say a " +
+      "brief one-line all-clear instead of inventing concerns. Be direct and concise, a few short lines, no preamble.";
+
+    async function callAI(system, userText) {
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ system: system + JSON.stringify(dashboardData()), messages: [{ role: 'user', content: userText }] }),
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Something went wrong.');
+      return json.text || '(no response)';
+    }
+
+    let busy = false;
+    async function ask(text) {
+      text = (text || '').trim();
+      if (!text || busy) return;
+      busy = true;
+      addMsg('user', text);
+      input.value = '';
+      const loading = addLoading();
+      try {
+        const reply = await callAI(CHAT_SYS, text);
+        loading.textContent = reply;
+        speak(reply);
+      } catch (e) {
+        loading.textContent = '⚠ ' + (e.message || 'Could not reach your coach.');
+      }
+      busy = false;
+    }
+
+    async function runProactiveScan() {
+      const cached = sessionStorage.getItem('coach_proactive_text');
+      if (cached) { addMsg('coach', cached, true); return; }
+      const loading = addLoading();
+      try {
+        const text = await callAI(PROACTIVE_SYS, 'Scan everything and tell me what is most worth knowing right now.');
+        loading.textContent = text;
+        loading.classList.add('proactive');
+        sessionStorage.setItem('coach_proactive_text', text);
+      } catch (e) {
+        loading.remove();
+      }
+    }
+
+    function openPanel() {
+      panelBg.classList.add('show');
+      fab.classList.remove('has-insight');
+      if (!feed.childElementCount) {
+        if (!sessionStorage.getItem('coach_proactive_seen')) {
+          sessionStorage.setItem('coach_proactive_seen', '1');
+          runProactiveScan();
+        } else {
+          const cached = sessionStorage.getItem('coach_proactive_text');
+          if (cached) addMsg('coach', cached, true);
+        }
+      }
+      setTimeout(() => input.focus(), 80);
+    }
+    function closePanel() { panelBg.classList.remove('show'); }
+
+    fab.addEventListener('click', openPanel);
+    document.getElementById('coachClose').addEventListener('click', closePanel);
+    panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
+    document.getElementById('coachSend').addEventListener('click', () => ask(input.value));
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(input.value); });
+
+    // A subtle "something's worth a look" indicator before the panel's
+    // ever been opened this session — removed the instant it's opened.
+    if (!sessionStorage.getItem('coach_proactive_seen')) fab.classList.add('has-insight');
+
+    // ---- Voice: same pattern as Nova Lite (browser-native, free) ----
+    let voiceOn = false;
+    const voiceToggle = document.getElementById('coachVoiceToggle');
+    try { voiceOn = localStorage.getItem('coach_voice_on') === '1'; } catch (e) {}
+    voiceToggle.classList.toggle('on', voiceOn);
+    voiceToggle.addEventListener('click', () => {
+      voiceOn = !voiceOn;
+      voiceToggle.classList.toggle('on', voiceOn);
+      try { localStorage.setItem('coach_voice_on', voiceOn ? '1' : '0'); } catch (e) {}
+      if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+    });
+    function speak(text) {
+      if (!voiceOn || !window.speechSynthesis || !text) return;
+      const clean = text.replace(/\*\*/g, '').replace(/^[-•*]\s+/gm, '').trim();
+      if (!clean) return;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+    }
+
+    const micBtn = document.getElementById('coachMic');
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      micBtn.style.display = 'none';
+    } else {
+      const recognizer = new SR();
+      recognizer.lang = 'en-US'; recognizer.interimResults = false; recognizer.maxAlternatives = 1;
+      let listening = false;
+      recognizer.onresult = (e) => { const said = e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (said) input.value = said; };
+      recognizer.onend = () => { listening = false; micBtn.classList.remove('listening'); };
+      recognizer.onerror = () => { listening = false; micBtn.classList.remove('listening'); };
+      micBtn.addEventListener('click', () => {
+        if (listening) { recognizer.stop(); return; }
+        listening = true; micBtn.classList.add('listening');
+        try { recognizer.start(); } catch (e) { listening = false; micBtn.classList.remove('listening'); }
+      });
+    }
   }
 
   // -------- Boot --------
