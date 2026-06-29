@@ -1,0 +1,17 @@
+{
+  "name": "Shrey's Dashboard",
+  "short_name": "Overseer",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "share_target": {
+    "action": "/saved-links.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

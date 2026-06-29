@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Saved Links · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 700px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+.gm-input-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gm-input { flex: 1; min-width: 140px; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input.cat { max-width: 160px; }
+.gm-add { padding: 11px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-add:hover { filter: brightness(1.06); }
+.link-add-row { margin-bottom: 10px; }
+.link-add-row:last-child { margin-bottom: 0; }
+.link-hint { font-size: 11px; color: var(--text-tertiary); margin: 10px 0 0; }
+
+.cat-group { margin-bottom: 18px; }
+.cat-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+.link-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; text-decoration: none; }
+.link-row:hover { background: rgba(255,255,255,0.06); }
+.link-platform { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+.link-info { flex: 1; min-width: 0; }
+.link-title { font-size: 13.5px; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-url { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-delete { border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer; padding: 0 4px; opacity: 0.5; flex-shrink: 0; }
+.link-delete:hover { color: var(--danger); }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+.share-banner { padding: 10px 14px; border-radius: 10px; background: rgba(107,227,164,0.1); border: 1px solid rgba(107,227,164,0.3); color: var(--success); font-size: 12.5px; font-weight: 600; margin-bottom: 14px; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Saved Links</h1>
+
+  <div id="shareBanner"></div>
+
+  <div class="gm-card">
+    <div class="gm-input-wrap link-add-row">
+      <input class="gm-input" id="linkUrlInput" type="url" placeholder="Paste a link (TikTok, YouTube, article…)" autocomplete="off">
+    </div>
+    <div class="gm-input-wrap link-add-row">
+      <input class="gm-input" id="linkTitleInput" type="text" placeholder="Title (optional)" autocomplete="off">
+      <input class="gm-input cat" id="linkCatInput" type="text" placeholder="Category" autocomplete="off" list="linkCatOptions">
+      <datalist id="linkCatOptions"></datalist>
+      <button class="gm-add" id="linkAdd" type="button">Save</button>
+    </div>
+    <div class="link-hint">On iPhone: share a link to this app from the share sheet (if it shows up — iOS PWA share support is inconsistent) or just paste it above.</div>
+  </div>
+
+  <div id="linksByCategory" style="margin-top:18px"></div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const STORE_KEY = 'savedlinks:items';
+
+  function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { return []; } }
+  function save(items) { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  const PLATFORM_ICON = {
+    'tiktok.com': '🎵', 'youtube.com': '▶️', 'youtu.be': '▶️', 'instagram.com': '📷',
+    'twitter.com': '𝕏', 'x.com': '𝕏', 'reddit.com': '👽', 'pinterest.com': '📌',
+    'open.spotify.com': '🎧', 'spotify.com': '🎧',
+  };
+  function platformIcon(url) {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      return PLATFORM_ICON[host] || '🔗';
+    } catch (e) { return '🔗'; }
+  }
+  function guessTitle(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return url; }
+  }
+
+  function render() {
+    const items = load().slice().sort((a, b) => b.savedAt - a.savedAt);
+    const cats = {};
+    items.forEach(it => { const c = it.category || 'Uncategorized'; (cats[c] = cats[c] || []).push(it); });
+    const catNames = Object.keys(cats).sort((a, b) => a === 'Uncategorized' ? 1 : b === 'Uncategorized' ? -1 : a.localeCompare(b));
+
+    $('linkCatOptions').innerHTML = catNames.filter(c => c !== 'Uncategorized').map(c => '<option value="' + escapeHtml(c) + '">').join('');
+
+    const wrap = $('linksByCategory');
+    if (!items.length) {
+      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">No links saved yet — paste one above.</div></div>';
+      return;
+    }
+    wrap.innerHTML = catNames.map(cat => {
+      const rows = cats[cat].map(it =>
+        '<a class="link-row" href="' + escapeHtml(it.url) + '" target="_blank" rel="noopener" data-id="' + it.id + '">' +
+          '<span class="link-platform">' + platformIcon(it.url) + '</span>' +
+          '<div class="link-info"><div class="link-title">' + escapeHtml(it.title || guessTitle(it.url)) + '</div><div class="link-url">' + escapeHtml(it.url) + '</div></div>' +
+          '<button class="link-delete" type="button" data-id="' + it.id + '">×</button>' +
+        '</a>'
+      ).join('');
+      return '<div class="cat-group"><div class="cat-label">' + escapeHtml(cat) + '</div><div class="gm-card" style="padding:10px">' + rows + '</div></div>';
+    }).join('');
+    wrap.querySelectorAll('.link-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        save(load().filter(x => x.id !== btn.dataset.id));
+        render();
+      });
+    });
+  }
+
+  function addLink(url, title, category) {
+    url = (url || '').trim();
+    if (!url) return false;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const items = load();
+    items.push({ id: 'lk_' + Date.now(), url, title: (title || '').trim(), category: (category || '').trim(), savedAt: Date.now() });
+    save(items);
+    return true;
+  }
+
+  $('linkAdd').addEventListener('click', () => {
+    if (addLink($('linkUrlInput').value, $('linkTitleInput').value, $('linkCatInput').value)) {
+      $('linkUrlInput').value = ''; $('linkTitleInput').value = ''; $('linkCatInput').value = '';
+      render();
+    }
+  });
+  $('linkUrlInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('linkAdd').click(); });
+
+  // ---- Web Share Target receiver (best-effort — see manifest.json) ----
+  // iOS PWA support for share_target is inconsistent; this only fires
+  // when the OS actually routes a share here. The paste box above is
+  // the reliable path regardless of platform support.
+  (function handleSharedParams() {
+    const params = new URLSearchParams(location.search);
+    const sharedUrl = params.get('url') || (params.get('text') && /^https?:\/\//i.test(params.get('text')) ? params.get('text') : '');
+    const sharedTitle = params.get('title') || '';
+    if (sharedUrl) {
+      addLink(sharedUrl, sharedTitle, '');
+      $('shareBanner').innerHTML = '<div class="share-banner">Saved from share sheet ✓</div>';
+      history.replaceState(null, '', location.pathname);
+    }
+  })();
+
+  render();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({ appKey: 'savedlinks', syncedKeys: [STORE_KEY], onApplied: render });
+  }
+})();
+</script>
+</body>
+</html>
