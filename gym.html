@@ -1751,6 +1751,8 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
+    <button class="po-add-row-btn" id="planImportBtn" type="button" style="width:100%;margin-bottom:14px">📋 Import strength plan</button>
+
     <!-- Exercise -->
     <div class="po-sub-section">
       <div class="po-sub-title">Exercise</div>
@@ -1942,6 +1944,45 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="rotCancel">Cancel</button>
       <button class="po-btn-primary" id="rotSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Strength Plan Import Modal -->
+<div class="po-modal-bg" id="planImportModalBg">
+  <div class="po-modal">
+    <h3>Import strength plan</h3>
+
+    <div id="planImportChoice">
+      <p style="font-size:12px;color:var(--text-3);margin:-6px 0 14px;line-height:1.45;">
+        Photo of a written program, a screenshot, or pasted text — exercises get grouped by
+        training day and merged into your existing days (new days are created if needed).
+      </p>
+      <div class="po-modal-actions" style="margin-bottom:10px">
+        <button class="po-btn-secondary" id="planImportPhotoBtn" type="button">📷 Take photo</button>
+        <button class="po-btn-secondary" id="planImportLibraryBtn" type="button">🖼️ From library</button>
+      </div>
+      <textarea id="planImportText" rows="5" placeholder="…or paste the plan as text" style="width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:11px;background:rgba(0,0,0,0.3);color:var(--text-1);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+      <div class="po-modal-actions">
+        <button class="po-btn-secondary" id="planImportCancel1" type="button">Cancel</button>
+        <button class="po-btn-primary" id="planImportTextGo" type="button">Read plan</button>
+      </div>
+      <input type="file" id="planImportFileCamera" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="planImportFileLibrary" accept="image/*" style="display:none">
+    </div>
+
+    <div id="planImportBusy" class="hidden" style="text-align:center;padding:20px 0">
+      <div style="font-size:13px;color:var(--text-2)">Reading your plan…</div>
+    </div>
+
+    <div id="planImportErrorBox" class="hidden" style="font-size:13px;color:#FF8A8A;margin-bottom:14px"></div>
+
+    <div id="planImportReview" class="hidden">
+      <div id="planImportSummary" style="max-height:50vh;overflow-y:auto;margin-bottom:14px"></div>
+      <div class="po-modal-actions">
+        <button class="po-btn-secondary" id="planImportCancel2" type="button">Cancel</button>
+        <button class="po-btn-primary" id="planImportSave" type="button">Save to my plan</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3856,6 +3897,172 @@ img, video, canvas, svg { max-width: 100%; }
     if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that image.'); e.code = 'API'; throw e; }
     return json;
   }
+
+  // ============================================================
+  // STRENGTH PLAN IMPORT — photo / library / pasted text, grouped by
+  // training day, merged into state.days + state.exercises (new days
+  // are created as needed; existing exercises on a matching day+name
+  // are updated rather than duplicated).
+  // ============================================================
+  const PLAN_IMPORT_TOOL = {
+    name: 'import_strength_plan',
+    description: 'Record every exercise in this strength training plan/program, grouped by training day (e.g. Push/Pull/Legs, Upper/Lower, Day A/B/C).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        readable: { type: 'boolean', description: 'True if this is a recognizable strength training plan with exercises.' },
+        weightUnit: { type: 'string', enum: ['kg', 'lb'], description: 'Unit used for weights in this plan. Default lb if unclear.' },
+        days: {
+          type: 'array',
+          description: 'One entry per training day in the plan.',
+          items: {
+            type: 'object',
+            properties: {
+              dayName: { type: 'string', description: 'Name of this training day, e.g. "Push", "Pull", "Legs", "Upper Body", "Day A".' },
+              exercises: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string', description: 'Exercise name, e.g. "Barbell Bench Press".' },
+                    bodyweight: { type: 'boolean', description: 'true if this is reps-only with no external weight (e.g. pull-ups, push-ups).' },
+                    repMin: { type: 'number', description: 'Bottom of the target rep range. Best guess if only one number given.' },
+                    repMax: { type: 'number', description: 'Top of the target rep range. Same as repMin if only one number given.' },
+                    startWeight: { type: 'number', description: 'Starting/working weight in weightUnit if specified. 0 if not specified or bodyweight.' }
+                  },
+                  required: ['name', 'bodyweight', 'repMin', 'repMax', 'startWeight']
+                }
+              }
+            },
+            required: ['dayName', 'exercises']
+          }
+        }
+      },
+      required: ['readable', 'weightUnit', 'days']
+    }
+  };
+  const PLAN_IMPORT_SYSTEM =
+    "You read strength training programs — photos of handwritten/printed plans, app screenshots, or "
+    + "plain text — and extract every exercise, grouped by training day. "
+    + "Always call the import_strength_plan tool exactly once with your best reading. "
+    + "Group exercises under whatever day labels the program uses (Push/Pull/Legs, Upper/Lower, Day 1/2/3, "
+    + "specific muscle groups, etc.) — preserve the program's own day names rather than inventing new ones. "
+    + "If a rep range is given as a single number (e.g. \"10 reps\"), use it for both repMin and repMax. "
+    + "If sets are mentioned but not used by the schema, ignore them — only reps/weight/day/name matter here. "
+    + "Only set readable=false if this clearly isn't a strength training plan.";
+
+  function planImportShow(id) { ['planImportChoice', 'planImportBusy', 'planImportErrorBox', 'planImportReview'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
+  function planImportError(msg) { $('planImportErrorBox').textContent = '⚠ ' + msg; planImportShow('planImportErrorBox'); }
+
+  async function planImportRunImage(file) {
+    let img;
+    try { img = await ibDownscale(file); }
+    catch (e) { planImportError(e.message || "Couldn't read that image."); return; }
+    planImportShow('planImportBusy');
+    try {
+      const res = await fetch('/api/ai/vision-tool', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ system: PLAN_IMPORT_SYSTEM, tool: PLAN_IMPORT_TOOL, image: img.base64, mediaType: img.mediaType, prompt: 'Read this strength training plan and record every exercise, grouped by day.' })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      const data = await res.json();
+      if (!res.ok || data.error) { planImportError(data.error || 'Could not read that image.'); return; }
+      if (data.readable === false) { planImportError("Couldn't find a strength plan in that image. Try a clearer photo."); return; }
+      planImportShowReview(data);
+    } catch (e) {
+      planImportError((e && e.message) || "Couldn't reach the image reader — check your connection.");
+    }
+  }
+  async function planImportRunText(text) {
+    planImportShow('planImportBusy');
+    try {
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ system: PLAN_IMPORT_SYSTEM, tool: PLAN_IMPORT_TOOL, messages: [{ role: 'user', content: 'Extract the strength training plan from this text:\n\n' + text }] })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      const data = await res.json();
+      if (!res.ok || data.error) { planImportError(data.error || 'Could not read that text.'); return; }
+      if (data.readable === false) { planImportError("Couldn't find a strength plan in that text."); return; }
+      planImportShowReview(data);
+    } catch (e) {
+      planImportError((e && e.message) || "Couldn't reach the AI — check your connection.");
+    }
+  }
+
+  let planImportPending = null; // the raw tool output, pending Save
+  function planImportShowReview(data) {
+    planImportPending = data;
+    const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
+    let totalEx = 0;
+    const html = (data.days || []).map(d => {
+      totalEx += (d.exercises || []).length;
+      const rows = (d.exercises || []).map(ex => {
+        const w = ex.bodyweight ? 'bodyweight' : Math.round((ex.startWeight || 0) * unitConv) + ' ' + state.units;
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">'
+          + '<span>' + escapeHtmlGym(ex.name) + '</span>'
+          + '<span style="color:var(--text-3);flex-shrink:0">' + ex.repMin + '–' + ex.repMax + ' reps · ' + w + '</span>'
+          + '</div>';
+      }).join('');
+      return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px">' + escapeHtmlGym(d.dayName) + '</div>' + rows + '</div>';
+    }).join('');
+    $('planImportSummary').innerHTML = html || '<div style="color:var(--text-3);font-size:13px">No exercises found.</div>';
+    planImportShow('planImportReview');
+  }
+  function escapeHtmlGym(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function slugify(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'day'; }
+  function planImportSave() {
+    const data = planImportPending;
+    if (!data) return;
+    const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
+    (data.days || []).forEach(d => {
+      let day = state.days.find(x => x.name.toLowerCase() === (d.dayName || '').toLowerCase());
+      if (!day) {
+        day = { id: slugify(d.dayName), name: d.dayName || 'Day' };
+        // Avoid id collisions with an existing day under a different name.
+        let n = 1;
+        while (state.days.some(x => x.id === day.id)) { day = { id: slugify(d.dayName) + '-' + (++n), name: d.dayName || 'Day' }; }
+        state.days.push(day);
+      }
+      (d.exercises || []).forEach(ex => {
+        const isBw = !!ex.bodyweight;
+        const existing = state.exercises.find(e => e.day === day.id && e.name.toLowerCase() === (ex.name || '').toLowerCase());
+        const payload = {
+          name: ex.name, gym: 'both', day: day.id, bw: isBw,
+          startWeight: isBw ? 0 : Math.round((ex.startWeight || 0) * unitConv * 2) / 2,
+          repMin: ex.repMin || 6, repMax: ex.repMax || 8,
+          step: isBw ? 1 : 2.5
+        };
+        if (existing) Object.assign(existing, payload);
+        else state.exercises.push(Object.assign({ id: uid() }, payload));
+      });
+    });
+    saveState();
+    planImportPending = null;
+    $('planImportModalBg').classList.remove('show');
+    renderAll();
+  }
+
+  $('planImportBtn').addEventListener('click', () => {
+    $('planImportText').value = '';
+    planImportShow('planImportChoice');
+    $('planImportModalBg').classList.add('show');
+  });
+  $('planImportCancel1').addEventListener('click', () => $('planImportModalBg').classList.remove('show'));
+  $('planImportCancel2').addEventListener('click', () => $('planImportModalBg').classList.remove('show'));
+  $('planImportPhotoBtn').addEventListener('click', () => $('planImportFileCamera').click());
+  $('planImportLibraryBtn').addEventListener('click', () => $('planImportFileLibrary').click());
+  $('planImportFileCamera').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) planImportRunImage(f); e.target.value = ''; });
+  $('planImportFileLibrary').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) planImportRunImage(f); e.target.value = ''; });
+  $('planImportTextGo').addEventListener('click', () => {
+    const text = $('planImportText').value.trim();
+    if (!text) { planImportError('Paste some plan text first, or use a photo instead.'); return; }
+    planImportRunText(text);
+  });
+  $('planImportSave').addEventListener('click', planImportSave);
 
   // ---- UI state ----
   let ibPendingImage = null;   // { dataUrl, base64, mediaType } for the scan currently in the confirm card
