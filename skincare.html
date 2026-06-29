@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Skincare · Dashboard</title>
+<script src="/api/config"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 700px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+.routine-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; overflow: hidden; margin-bottom: 14px; }
+.routine-toggle button { padding: 9px 18px; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.routine-toggle button.on { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+
+.step-row { display: flex; gap: 12px; padding: 12px 14px; margin-bottom: 8px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.step-num { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-tertiary); flex-shrink: 0; width: 18px; padding-top: 2px; }
+.step-info { flex: 1; min-width: 0; }
+.step-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.step-name { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+.step-cat { font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.05); flex-shrink: 0; }
+.step-tip { font-size: 12px; color: var(--text-tertiary); line-height: 1.4; margin-top: 5px; }
+.step-delete { border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer; padding: 0 2px; opacity: 0.5; flex-shrink: 0; }
+.step-delete:hover { color: var(--danger); }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+
+.gm-input-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
+.gm-input { flex: 1; min-width: 120px; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-select { padding: 11px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 13px; outline: none; }
+.gm-add { padding: 11px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-add:hover { filter: brightness(1.06); }
+.gm-ghost { padding: 11px 18px; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.gm-ghost:hover { background: rgba(255,255,255,0.07); }
+
+.ai-review { margin-top: 14px; padding: 14px; border-radius: 12px; background: rgba(110,231,183,0.06); border: 1px solid rgba(110,231,183,0.25); font-size: 13px; line-height: 1.5; color: var(--text-secondary); white-space: pre-wrap; }
+.ai-review.hidden, .hidden { display: none !important; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Skincare</h1>
+
+  <div class="gm-card">
+    <div class="routine-toggle" id="routineToggle">
+      <button data-r="am">☀️ Morning</button>
+      <button data-r="pm">🌙 Night</button>
+    </div>
+    <div id="stepList"></div>
+
+    <div class="gm-input-wrap">
+      <input class="gm-input" id="stepName" type="text" placeholder="Product name" autocomplete="off">
+      <select class="gm-select" id="stepCat">
+        <option value="cleanser">Cleanser</option>
+        <option value="toner">Toner/Essence</option>
+        <option value="exfoliant">Exfoliant (AHA/BHA)</option>
+        <option value="vitaminC">Vitamin C</option>
+        <option value="retinol">Retinol/Retinoid</option>
+        <option value="serum">Serum/Treatment</option>
+        <option value="eyeCream">Eye cream</option>
+        <option value="moisturizer">Moisturizer</option>
+        <option value="oil">Face oil</option>
+        <option value="sunscreen">Sunscreen</option>
+      </select>
+      <button class="gm-add" id="stepAdd" type="button">Add step</button>
+    </div>
+  </div>
+
+  <div class="gm-card" style="margin-top:14px">
+    <button class="gm-ghost" id="aiReviewBtn" type="button">✨ AI routine check</button>
+    <div class="ai-review hidden" id="aiReviewBox"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const STORE_KEY = 'skincare_v1';
+  let activeRoutine = 'am';
+
+  // Static, zero-cost tips per category — the AI review below is for
+  // the full-routine combination check (ordering, conflicting actives),
+  // these are just always-true per-product usage notes.
+  const TIPS = {
+    cleanser: 'Apply to damp skin, massage 30-60s, rinse with lukewarm (not hot) water.',
+    toner: 'Pat onto clean skin with hands or a cotton pad — no need to rinse.',
+    exfoliant: 'Apply to dry skin. 2-3x/week max, not the same routine as retinol. Always follow with sunscreen the next morning.',
+    vitaminC: 'Apply to clean, dry skin, AM only, before moisturizer. Don\'t mix with retinol in the same routine.',
+    retinol: 'Apply to fully dry skin (reduces irritation) — PM only, never with vitamin C/exfoliants same night. Start 2-3x/week.',
+    serum: 'Apply to slightly damp skin, thinnest-to-thickest order relative to other steps.',
+    eyeCream: 'Dab gently with ring finger around the orbital bone, avoid pulling the skin.',
+    moisturizer: 'Apply to damp skin to help seal in hydration from earlier steps.',
+    oil: 'Always last step before sunscreen (or last step at night) — oils sit on top, nothing absorbs after them.',
+    sunscreen: 'Always the last AM step, even indoors/cloudy days. Reapply if outside 2+ hours.',
+  };
+  const CAT_LABEL = { cleanser:'Cleanser', toner:'Toner', exfoliant:'Exfoliant', vitaminC:'Vit C', retinol:'Retinol', serum:'Serum', eyeCream:'Eye cream', moisturizer:'Moisturizer', oil:'Oil', sunscreen:'SPF' };
+
+  function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
+  function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function load() { return Object.assign({ am: [], pm: [] }, loadJSON(STORE_KEY, {})); }
+  function save(s) { saveJSON(STORE_KEY, s); }
+  let state = load();
+
+  function render() {
+    $('routineToggle').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === activeRoutine));
+    const steps = state[activeRoutine] || [];
+    const list = $('stepList');
+    if (!steps.length) { list.innerHTML = '<div class="empty-state">No steps yet — add your first product below.</div>'; return; }
+    list.innerHTML = steps.map((s, i) =>
+      '<div class="step-row" data-id="' + s.id + '">' +
+        '<div class="step-num">' + (i + 1) + '</div>' +
+        '<div class="step-info"><div class="step-name-row"><span class="step-name">' + escapeHtml(s.name) + '</span><span class="step-cat">' + (CAT_LABEL[s.category] || s.category) + '</span></div>' +
+        '<div class="step-tip">' + (TIPS[s.category] || '') + '</div></div>' +
+        '<button class="step-delete" type="button">×</button>' +
+      '</div>'
+    ).join('');
+    list.querySelectorAll('.step-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('.step-row').dataset.id;
+        state[activeRoutine] = steps.filter(s => s.id !== id);
+        save(state); render();
+      });
+    });
+  }
+
+  $('routineToggle').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { activeRoutine = b.dataset.r; render(); }));
+
+  function addStep() {
+    const name = $('stepName').value.trim();
+    if (!name) return;
+    const category = $('stepCat').value;
+    state[activeRoutine] = (state[activeRoutine] || []).concat([{ id: 's_' + Date.now(), name, category }]);
+    save(state);
+    $('stepName').value = '';
+    render();
+  }
+  $('stepAdd').addEventListener('click', addStep);
+  $('stepName').addEventListener('keydown', (e) => { if (e.key === 'Enter') addStep(); });
+
+  // ---- AI routine check — full-combination review (ordering + conflicts) ----
+  const REVIEW_SYS =
+    "You are a skincare formulation expert reviewing someone's AM and PM routines for problems: wrong "
+    + "product ORDER (general rule: cleanse, thinnest-to-thickest texture, treatments/actives, moisturizer, "
+    + "sunscreen AM-only last), conflicting actives used the same routine (e.g. retinol + vitamin C + AHA/BHA "
+    + "all together is usually too much), and anything missing (e.g. no sunscreen in an AM routine that has "
+    + "actives). Be specific and concise — a few short bullet points, not an essay. If the routine looks fine, "
+    + "say so briefly rather than inventing problems.";
+  $('aiReviewBtn').addEventListener('click', async () => {
+    const btn = $('aiReviewBtn'), box = $('aiReviewBox');
+    const am = state.am || [], pm = state.pm || [];
+    if (!am.length && !pm.length) { box.textContent = 'Add some products to a routine first.'; box.classList.remove('hidden'); return; }
+    btn.disabled = true; btn.textContent = 'Checking…';
+    box.classList.remove('hidden'); box.textContent = 'Thinking…';
+    try {
+      const summary = 'AM routine: ' + (am.map(s => s.name + ' (' + s.category + ')').join(', ') || 'none') +
+        '\nPM routine: ' + (pm.map(s => s.name + ' (' + s.category + ')').join(', ') || 'none');
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ system: REVIEW_SYS, messages: [{ role: 'user', content: summary }] })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      const json = await res.json();
+      box.textContent = (!res.ok || json.error) ? (json.error || 'Something went wrong.') : (json.text || 'No feedback.');
+    } catch (e) {
+      box.textContent = "Couldn't reach the AI — check your connection.";
+    }
+    btn.disabled = false; btn.textContent = '✨ AI routine check';
+  });
+
+  window.addEventListener('storage', () => { state = load(); render(); });
+
+  render();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({ appKey: 'skincare', syncedKeys: [STORE_KEY], onApplied: () => { state = load(); render(); } });
+  }
+})();
+</script>
+</body>
+</html>
