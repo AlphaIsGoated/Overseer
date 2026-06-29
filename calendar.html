@@ -46,9 +46,17 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .day-group { margin-bottom: 16px; }
 .day-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
 .day-label.today { color: var(--success); }
-.event-row { display: flex; gap: 12px; padding: 10px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.event-row { display: flex; gap: 12px; align-items: center; padding: 10px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; text-decoration: none; }
+.event-row.done { opacity: 0.5; }
+.event-row.done .event-title { text-decoration: line-through; }
 .event-time { font-size: 12px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; flex-shrink: 0; width: 64px; }
-.event-title { font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.event-title { font-size: 13.5px; color: var(--text-primary); font-weight: 600; flex: 1; min-width: 0; }
+.event-src { font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap; }
+.event-src.google { background: rgba(107,227,164,0.12); color: var(--success); }
+.event-src.marathon { background: rgba(255,138,138,0.12); color: var(--danger); }
+.event-src.canvas { background: rgba(125,211,252,0.12); color: #7DD3FC; }
+.event-src.goal { background: rgba(242,192,99,0.12); color: var(--warning); }
+.legend-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 20px 0; }
 
 @media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
@@ -63,7 +71,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   </a>
 
   <h1 class="dash-title">Calendar</h1>
-  <p class="dash-sub">Your upcoming Google Calendar events, next 14 days. First step toward one master calendar across every module.</p>
+  <p class="dash-sub">Everything with a date, in one place — Google Calendar, marathon training, Canvas (College), and your daily goals.</p>
+  <div class="legend-row">
+    <span class="event-src google">Google</span>
+    <span class="event-src marathon">Marathon</span>
+    <span class="event-src canvas">Canvas</span>
+    <span class="event-src goal">Goal</span>
+  </div>
 
   <div class="gm-card">
     <div class="cal-status-row">
@@ -156,45 +170,99 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
-  function renderEvents(events) {
-    const todayKey = dateKeyLocal(new Date());
-    const groups = {};
-    events.forEach(ev => {
+  // ---- Other modules' own data, read read-only from localStorage —
+  // each already owns its own sync/storage, this just aggregates what's
+  // already there into one agenda. Nothing here writes back to those
+  // keys, so there's no risk of this view clobbering another module.
+  function gatherMarathonEntries() {
+    const plan = loadJSON('marathon_plan_v1', null);
+    if (!plan || !Array.isArray(plan.entries)) return [];
+    return plan.entries.filter(e => e.date && e.type !== 'rest').map(e => ({
+      dateKey: e.date, time: null, allDay: true,
+      title: (e.label || e.type || 'Run') + (e.plannedDistanceMi ? ' (' + e.plannedDistanceMi + ' mi)' : ''),
+      source: 'marathon', done: !!e.completed, href: 'marathon.html',
+    }));
+  }
+  function gatherCanvasTasks() {
+    const byCourse = loadJSON('canvas_tasks_v1', []);
+    const out = [];
+    (byCourse || []).forEach(group => (group.tasks || []).forEach(t => {
+      const d = new Date(t.dueAt);
+      out.push({ dateKey: dateKeyLocal(d), time: d, allDay: false, title: t.name + ' (' + group.course + ')', source: 'canvas', done: false, href: 'college.html' });
+    }));
+    return out;
+  }
+  function gatherGoals() {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf('goals:') !== 0) continue;
+      const dateKey = k.slice('goals:'.length);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
+      const goals = loadJSON(k, []);
+      (goals || []).forEach(g => out.push({ dateKey, time: null, allDay: true, title: g.text, source: 'goal', done: !!g.done, href: 'main.html' }));
+    }
+    return out;
+  }
+  function gatherGoogleEvents(events) {
+    return (events || []).map(ev => {
       const startRaw = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
-      if (!startRaw) return;
+      if (!startRaw) return null;
       const d = new Date(startRaw);
-      const key = dateKeyLocal(d);
-      (groups[key] = groups[key] || []).push({ d, ev, allDay: !ev.start.dateTime });
-    });
+      return { dateKey: dateKeyLocal(d), time: ev.start.dateTime ? d : null, allDay: !ev.start.dateTime, title: ev.summary || '(no title)', source: 'google', done: false, href: null };
+    }).filter(Boolean);
+  }
+
+  let lastGoogleItems = [];
+  const SRC_LABEL = { google: 'Google', marathon: 'Marathon', canvas: 'Canvas', goal: 'Goal' };
+  function renderAgenda() {
+    const todayKey = dateKeyLocal(new Date());
+    const horizon = dateKeyLocal(new Date(Date.now() + 14 * 86400000));
+    const all = gatherGoogleEvents(lastGoogleItems).concat(gatherMarathonEntries(), gatherCanvasTasks(), gatherGoals())
+      .filter(it => it.dateKey >= todayKey && it.dateKey <= horizon);
+
+    const groups = {};
+    all.forEach(it => (groups[it.dateKey] = groups[it.dateKey] || []).push(it));
     const keys = Object.keys(groups).sort();
     const wrap = $('calEvents');
     if (!keys.length) {
-      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">No upcoming events in the next 14 days, or not connected yet.</div></div>';
+      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">Nothing in the next 14 days yet — connect Google Calendar above, or check Marathon/College/Goals.</div></div>';
       return;
     }
     wrap.innerHTML = keys.map(key => {
-      const d0 = groups[key][0].d;
-      const rows = groups[key].map(({ d, ev, allDay }) =>
-        '<div class="event-row"><span class="event-time">' + (allDay ? 'All day' : fmtTime(d)) + '</span><span class="event-title">' + escapeHtml(ev.summary || '(no title)') + '</span></div>'
-      ).join('');
+      const items = groups[key].slice().sort((a, b) => {
+        if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+        return a.time && b.time ? a.time - b.time : 0;
+      });
+      const rows = items.map(it => {
+        const inner = '<span class="event-time">' + (it.allDay ? 'All day' : fmtTime(it.time)) + '</span>' +
+          '<span class="event-title">' + escapeHtml(it.title) + '</span>' +
+          '<span class="event-src ' + it.source + '">' + SRC_LABEL[it.source] + '</span>';
+        return it.href
+          ? '<a class="event-row' + (it.done ? ' done' : '') + '" href="' + it.href + '">' + inner + '</a>'
+          : '<div class="event-row' + (it.done ? ' done' : '') + '">' + inner + '</div>';
+      }).join('');
+      const d0 = new Date(key + 'T00:00');
       return '<div class="day-group"><div class="day-label' + (key === todayKey ? ' today' : '') + '">' + dayLabel(d0, todayKey) + '</div>' + rows + '</div>';
     }).join('');
   }
 
   async function syncCalendar() {
     let t = loadJSON(TOKEN_KEY, null);
-    if (!t || !t.access) return;
+    if (!t || !t.access) { renderAgenda(); return; } // still show marathon/canvas/goals even without Google
     calErr('');
     if (t.expires && Date.now() > t.expires - 60000) { const n = await googleRefresh(t); if (n) t = n; }
     try {
       const timeMin = new Date().toISOString();
       const timeMax = new Date(Date.now() + 14 * 86400000).toISOString();
       const data = await googleFetch('/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=' + encodeURIComponent(timeMin) + '&timeMax=' + encodeURIComponent(timeMax) + '&maxResults=50', t);
-      renderEvents(data.items || []);
+      lastGoogleItems = data.items || [];
+      renderAgenda();
       localStorage.setItem(SYNC_KEY, String(Date.now()));
       renderStatus();
     } catch (e) {
       calErr(e.message || 'Could not sync your calendar.');
+      renderAgenda();
       renderStatus();
     }
   }
@@ -215,6 +283,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   renderStatus();
   if (loadJSON(TOKEN_KEY, null)) syncCalendar();
+  else renderAgenda(); // show marathon/canvas/goals even before Google is connected
+  window.addEventListener('storage', renderAgenda);
 })();
 </script>
 </body>
