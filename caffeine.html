@@ -353,8 +353,10 @@ body::after {
   function readProfile() {
     const w = loadJSON('po_water_v1', null);
     if (w && w.profile && w.profile.weightKg) {
-      const kg = w.weightUnit === 'lb' ? w.profile.weightKg/2.20462 : w.profile.weightKg;
-      if (kg > 0) bodyKg = kg;
+      // profile.weightKg is always stored as true kilograms regardless of
+      // the display unit (see index.html's settings save()) — no further
+      // conversion needed here.
+      if (w.profile.weightKg > 0) bodyKg = w.profile.weightKg;
     }
   }
   function dailyLimit() { if (recovery!=null && recovery<34) return 200; if (recovery!=null && recovery<67) return 300; return FDA_MAX; }
@@ -644,6 +646,12 @@ body::after {
   renderAll();
   loadWhoop();
   setInterval(()=>{ if(scrubT==null) renderAll(); }, 60000);
+
+  // Body weight (po_water_v1) is synced under the 'health' appKey by
+  // index.html/health.html/po-water.html, not here — but pick up changes
+  // to it from another tab or another page's cloud-sync pull so dosing
+  // targets here don't go stale until a manual reload.
+  window.addEventListener('storage', () => { readProfile(); renderAll(); });
 
   /* ============ Cloud sync ============ */
   if(window.initCloudSync){

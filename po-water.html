@@ -753,8 +753,9 @@ html, body {
   // ============================================================
   function computeTargetMl() {
     const p = state.profile;
-    const wKg = state.weightUnit === 'lb' ? p.weightKg / 2.20462 : p.weightKg;
-    const base = wKg * 35;
+    // p.weightKg is always stored as true kilograms regardless of the
+    // display unit (state.weightUnit only controls how it's shown/entered).
+    const base = (p.weightKg || 0) * 35;
     const exercise = (p.activityHrsPerWeek || 0) / 7 * 500;
     const caffeine = Math.max(0, (state.caffeineMgPerDay || 0) - 200) * 1.5;
     const subs = (state.substances || []).reduce((s, x) => s + subExtraMl(x), 0);
@@ -842,7 +843,7 @@ html, body {
   function renderWhy(calc, targetUnits) {
     const wrap = $('whyBody');
     const u = state.weightUnit;
-    const wDisp = u === 'lb' ? (state.profile.weightKg).toFixed(0) : state.profile.weightKg.toFixed(0);
+    const wDisp = (u === 'lb' ? state.profile.weightKg * 2.20462 : state.profile.weightKg).toFixed(0);
     let html = '';
     html += '<div class="why-row"><span class="why-label">Base (' + wDisp + ' ' + u + ' × 35 ml)</span><span class="why-val">' + fmtMl(calc.base) + '</span></div>';
     if (calc.exercise > 0)
@@ -939,7 +940,9 @@ html, body {
   // SETTINGS
   // ============================================================
   function renderSettings() {
-    $('setWeight').value = state.profile.weightKg;
+    $('setWeight').value = state.weightUnit === 'lb'
+      ? Math.round(state.profile.weightKg * 2.20462)
+      : Math.round(state.profile.weightKg);
     $('setAge').value = state.profile.age;
     $('setActivity').value = state.profile.activityHrsPerWeek;
     $('setCaffeine').value = state.caffeineMgPerDay;
@@ -969,13 +972,13 @@ html, body {
     });
   }
   bindSeg('setUnit', 'u', (v) => { state.unit = v; saveState(); renderWater(); });
-  bindSeg('setWeightUnit', 'u', (v) => { state.weightUnit = v; saveState(); renderWater(); });
+  bindSeg('setWeightUnit', 'u', (v) => { state.weightUnit = v; saveState(); renderWater(); renderSettings(); });
   bindSeg('setSex', 's', (v) => { state.profile.sex = v; saveState(); renderWater(); });
 
   ['setWeight','setAge','setActivity','setCaffeine','setBottleMl','setGlassMl'].forEach(id => {
     $(id).addEventListener('input', () => {
       const v = parseFloat($(id).value);
-      if (id === 'setWeight') state.profile.weightKg = v || 0;
+      if (id === 'setWeight') state.profile.weightKg = state.weightUnit === 'lb' ? (v || 0) / 2.20462 : (v || 0);
       else if (id === 'setAge') state.profile.age = v || 0;
       else if (id === 'setActivity') state.profile.activityHrsPerWeek = v || 0;
       else if (id === 'setCaffeine') state.caffeineMgPerDay = v || 0;
@@ -1107,6 +1110,16 @@ html, body {
   function escape(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+
+  // Re-read state when a cloud-sync pull or another tab updates
+  // localStorage (sync.js dispatches a synthetic 'storage' event after
+  // applying remote changes; real cross-tab writes fire it natively),
+  // so this page never keeps showing stale weight/profile numbers.
+  window.addEventListener('storage', () => {
+    state = loadState();
+    renderAll();
+    renderSettings();
+  });
 
   // BOOT
   renderAll();
