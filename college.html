@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>College · Dashboard</title>
+<script src="/api/config"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 760px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.dash-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 18px; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.wip-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warning); background: rgba(242,192,99,0.12); border: 1px solid rgba(242,192,99,0.3); padding: 4px 10px; border-radius: 999px; margin-bottom: 14px; }
+
+.wip-modal-bg { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.wip-modal-bg.hidden { display: none; }
+.wip-modal { width: 100%; max-width: 380px; background: #0e0e10; border: 1px solid rgba(242,192,99,0.3); border-radius: 18px; padding: 24px; text-align: center; box-shadow: 0 24px 70px rgba(0,0,0,0.6); }
+.wip-modal-icon { font-size: 32px; margin-bottom: 10px; }
+.wip-modal-title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.wip-modal-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 18px; }
+.wip-modal-btn { width: 100%; padding: 12px; border: 0; border-radius: 11px; background: var(--warning); color: #2a1d00; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.wip-modal-btn:hover { filter: brightness(1.06); }
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 14px; }
+
+.cal-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cal-status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
+.cal-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); }
+.cal-status.on .dot { background: var(--success); box-shadow: 0 0 8px rgba(107,227,164,0.6); }
+.cal-sync { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+.cal-btn { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.cal-btn:hover { background: rgba(255,255,255,0.08); }
+.cal-err { font-size: 12px; color: var(--danger); margin-top: 8px; }
+.gm-input { width: 100%; padding: 11px 14px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.gm-input::placeholder { color: var(--text-tertiary); }
+.field-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 6px; display: block; }
+
+.gm-ghost { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.gm-ghost:hover { background: rgba(255,255,255,0.08); }
+.gm-ghost:disabled { opacity: 0.5; cursor: default; }
+
+.course-group { margin-bottom: 16px; }
+.course-label { font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.task-row { display: flex; gap: 12px; align-items: flex-start; padding: 11px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.task-row.overdue { border-color: rgba(255,107,107,0.35); }
+.task-info { flex: 1; min-width: 0; }
+.task-name { font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.task-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 3px; }
+.task-meta.overdue { color: var(--danger); font-weight: 700; }
+.task-effort { font-size: 10.5px; color: var(--text-tertiary); padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); flex-shrink: 0; white-space: nowrap; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 20px 0; }
+
+.order-row { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; margin-bottom: 6px; background: rgba(110,231,183,0.05); border: 1px solid rgba(110,231,183,0.2); border-radius: 12px; }
+.order-num { font-family: ui-monospace, monospace; font-size: 13px; color: var(--success); font-weight: 700; flex-shrink: 0; }
+.order-info { flex: 1; min-width: 0; }
+.order-name { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+.order-why { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="wip-modal-bg hidden" id="wipModalBg">
+  <div class="wip-modal">
+    <div class="wip-modal-icon">🚧</div>
+    <div class="wip-modal-title">Still under construction</div>
+    <div class="wip-modal-text">This module is a work in progress and hasn't been completed yet for use — it's not connected to Canvas yet, so nothing below will work properly until that's set up.</div>
+    <button class="wip-modal-btn" id="wipModalClose" type="button">Got it</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">College</h1>
+  <span class="wip-badge">🚧 Work in progress — Canvas token not set up yet</span>
+  <p class="dash-sub">Canvas assignments, quizzes, and events grouped by course — plus an AI-suggested order to clear everything fastest.</p>
+
+
+  <div class="gm-card">
+    <div class="cal-status-row">
+      <span class="cal-status" id="canvasStatus"><span class="dot"></span><span id="canvasStatusText">Not connected</span></span>
+      <button class="cal-btn" id="canvasAction" type="button">Connect</button>
+    </div>
+    <div class="cal-sync" id="canvasSync"></div>
+    <div class="cal-err hidden" id="canvasErr"></div>
+
+    <div id="canvasSetup" class="hidden" style="margin-top:14px">
+      <label class="field-label" for="canvasBase">Canvas URL</label>
+      <input class="gm-input" id="canvasBase" type="text" placeholder="https://canvas.case.edu" value="https://canvas.case.edu" autocomplete="off">
+      <label class="field-label" for="canvasToken">Personal Access Token</label>
+      <input class="gm-input" id="canvasToken" type="password" placeholder="Canvas → Account → Settings → New Access Token" autocomplete="off">
+      <button class="cal-btn" id="canvasSave" type="button">Save &amp; connect</button>
+    </div>
+  </div>
+
+  <div class="gm-card">
+    <button class="gm-ghost" id="orderBtn" type="button">✨ Suggest fastest order to clear everything</button>
+    <div id="orderResult" style="margin-top:14px"></div>
+  </div>
+
+  <div id="courseLists"></div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const CREDS_KEY = 'canvas_creds_v1'; // NOT synced across devices, like the other API tokens here
+  const SYNC_KEY = 'canvas_last_sync';
+
+  function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
+  function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function canvasErr(msg) { $('canvasErr').textContent = msg || ''; $('canvasErr').classList.toggle('hidden', !msg); }
+  function relTime(ts) {
+    if (!ts) return 'never';
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 60) return 'just now';
+    if (sec < 3600) return Math.floor(sec / 60) + ' min ago';
+    if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
+    return Math.floor(sec / 86400) + ' d ago';
+  }
+
+  function renderStatus() {
+    const creds = loadJSON(CREDS_KEY, null);
+    const statusEl = $('canvasStatus'), txt = $('canvasStatusText'), action = $('canvasAction');
+    if (!creds || !creds.token) {
+      statusEl.classList.remove('on'); txt.textContent = 'Not connected';
+      $('canvasSync').textContent = '';
+      action.textContent = 'Connect';
+      return;
+    }
+    statusEl.classList.add('on'); txt.textContent = 'Connected — ' + creds.base;
+    $('canvasSync').textContent = 'Last synced ' + relTime(Number(localStorage.getItem(SYNC_KEY)) || 0);
+    action.textContent = 'Sync now';
+  }
+
+  async function canvasFetch(path, params) {
+    const creds = loadJSON(CREDS_KEY, null);
+    if (!creds || !creds.token) throw new Error('not connected');
+    const qs = new URLSearchParams(Object.assign({ base: creds.base, path }, params || {}));
+    const r = await fetch('/api/integrations/canvas?' + qs.toString(), {
+      headers: { Authorization: 'Bearer ' + creds.token, Accept: 'application/json', 'X-App-Secret': (window.DASH_APP_SECRET || '') }
+    });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || ('Canvas ' + r.status)); }
+    return r.json();
+  }
+
+  // Pulls active courses, then per course: assignments (incl. quizzes,
+  // which Canvas exposes as assignments when graded) with submission
+  // status, plus dated calendar events — "do all" due-date sources.
+  async function syncCanvas() {
+    canvasErr('');
+    try {
+      const courses = await canvasFetch('/api/v1/courses', { enrollment_state: 'active', per_page: '50' });
+      const byCourse = [];
+      for (const course of courses) {
+        const assignments = await canvasFetch('/api/v1/courses/' + course.id + '/assignments', {
+          'include[]': 'submission', order_by: 'due_at', per_page: '100'
+        });
+        const pending = (assignments || []).filter(a => {
+          if (!a.due_at) return false;
+          const sub = a.submission;
+          const done = sub && (sub.workflow_state === 'submitted' || sub.workflow_state === 'graded');
+          return !done;
+        }).map(a => ({
+          id: 'a_' + a.id, course: course.name, courseId: course.id,
+          name: a.name, dueAt: a.due_at, type: a.is_quiz_assignment ? 'quiz' : 'assignment',
+          description: (a.description || '').replace(/<[^>]+>/g, ' ').slice(0, 300),
+        }));
+        let events = [];
+        try {
+          const calEvents = await canvasFetch('/api/v1/calendar_events', {
+            type: 'event', 'context_codes[]': 'course_' + course.id, per_page: '50'
+          });
+          events = (calEvents || []).filter(e => e.start_at).map(e => ({
+            id: 'e_' + e.id, course: course.name, courseId: course.id,
+            name: e.title, dueAt: e.start_at, type: 'event', description: (e.description || '').replace(/<[^>]+>/g, ' ').slice(0, 300),
+          }));
+        } catch (e) { /* calendar events are best-effort */ }
+        const tasks = pending.concat(events).sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+        if (tasks.length) byCourse.push({ course: course.name, courseId: course.id, tasks });
+      }
+      saveJSON('canvas_tasks_v1', byCourse);
+      localStorage.setItem(SYNC_KEY, String(Date.now()));
+      renderCourses(byCourse);
+      renderStatus();
+    } catch (e) {
+      canvasErr(e.message || 'Could not sync Canvas.');
+      renderStatus();
+    }
+  }
+
+  function fmtDue(iso) {
+    const d = new Date(iso);
+    const overdue = d.getTime() < Date.now();
+    return { text: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), overdue };
+  }
+  function renderCourses(byCourse) {
+    const wrap = $('courseLists');
+    if (!byCourse || !byCourse.length) {
+      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">No pending work found, or not connected yet.</div></div>';
+      return;
+    }
+    wrap.innerHTML = byCourse.map(group => {
+      const rows = group.tasks.map(t => {
+        const due = fmtDue(t.dueAt);
+        return '<div class="task-row' + (due.overdue ? ' overdue' : '') + '">' +
+          '<div class="task-info"><div class="task-name">' + escapeHtml(t.name) + '</div>' +
+          '<div class="task-meta' + (due.overdue ? ' overdue' : '') + '">' + (due.overdue ? 'OVERDUE — ' : 'Due ') + due.text + '</div></div>' +
+          '<span class="task-effort">' + (t.type === 'quiz' ? 'Quiz' : t.type === 'event' ? 'Event' : 'Assignment') + '</span>' +
+          '</div>';
+      }).join('');
+      return '<div class="course-group"><div class="course-label">' + escapeHtml(group.course) + '</div>' + rows + '</div>';
+    }).join('');
+  }
+
+  $('canvasAction').addEventListener('click', () => {
+    const creds = loadJSON(CREDS_KEY, null);
+    if (creds && creds.token) { syncCanvas(); return; }
+    $('canvasSetup').classList.toggle('hidden');
+  });
+  $('canvasSave').addEventListener('click', () => {
+    const base = $('canvasBase').value.trim().replace(/\/+$/, '');
+    const token = $('canvasToken').value.trim();
+    if (!base || !token) { canvasErr('Both fields are required.'); return; }
+    saveJSON(CREDS_KEY, { base, token });
+    $('canvasSetup').classList.add('hidden');
+    $('canvasToken').value = '';
+    renderStatus();
+    syncCanvas();
+  });
+
+  // ---- AI: fastest-to-total-completion ordering ----
+  // Canvas gives no effort estimate, so the AI infers one per task from
+  // its title/description/type (the agreed approach), then sequences
+  // everything to minimize total time-to-clear given due dates as hard
+  // constraints — not just a simple due-date sort.
+  const ORDER_TOOL = {
+    name: 'order_tasks',
+    description: 'Order these academic tasks to clear all of them in the least total time, given their due dates as hard deadlines.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        tasks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              estimatedMinutes: { type: 'integer', description: 'Best-guess effort to complete this task, from its title/description/type.' },
+              reasoning: { type: 'string', description: 'One short clause on why it is positioned here (e.g. "due soonest", "quick win", "blocks nothing else").' }
+            },
+            required: ['id', 'estimatedMinutes', 'reasoning']
+          }
+        }
+      },
+      required: ['tasks']
+    }
+  };
+  const ORDER_SYSTEM =
+    "You are a study-planning assistant. Given a list of academic tasks (assignment/quiz/event, course, due "
+    + "date, optional description), order them to clear ALL of them in the least total time — due dates are "
+    + "hard deadlines you must not miss, but within that constraint, sequence for efficiency (e.g. quick wins "
+    + "first when due dates allow, batch similar small tasks). Estimate effort in minutes for each from its "
+    + "title/description/type — quizzes are usually quick (15-45 min), essays/projects longer (60-240 min), "
+    + "reading responses short (15-30 min). Always call order_tasks exactly once, returning every task id given.";
+
+  $('orderBtn').addEventListener('click', async () => {
+    const byCourse = loadJSON('canvas_tasks_v1', []);
+    const allTasks = byCourse.flatMap(g => g.tasks);
+    const resultEl = $('orderResult'), btn = $('orderBtn');
+    if (!allTasks.length) { resultEl.innerHTML = '<div class="empty-state">No pending tasks to order — sync Canvas first.</div>'; return; }
+    btn.disabled = true; btn.textContent = 'Thinking…';
+    resultEl.innerHTML = '<div class="empty-state">Working out the fastest order…</div>';
+    try {
+      const payload = allTasks.map(t => ({ id: t.id, course: t.course, name: t.name, dueAt: t.dueAt, type: t.type, description: t.description }));
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ system: ORDER_SYSTEM, tool: ORDER_TOOL, messages: [{ role: 'user', content: JSON.stringify(payload) }] })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      const data = await res.json();
+      if (!res.ok || data.error) { resultEl.innerHTML = '<div class="empty-state">' + escapeHtml(data.error || 'Something went wrong.') + '</div>'; return; }
+      const byId = {}; allTasks.forEach(t => byId[t.id] = t);
+      resultEl.innerHTML = (data.tasks || []).map((ord, i) => {
+        const t = byId[ord.id];
+        if (!t) return '';
+        return '<div class="order-row"><span class="order-num">' + (i + 1) + '</span>' +
+          '<div class="order-info"><div class="order-name">' + escapeHtml(t.name) + ' <span style="color:var(--text-tertiary);font-weight:500">(' + escapeHtml(t.course) + ')</span></div>' +
+          '<div class="order-why">~' + ord.estimatedMinutes + ' min — ' + escapeHtml(ord.reasoning || '') + '</div></div></div>';
+      }).join('');
+    } catch (e) {
+      resultEl.innerHTML = '<div class="empty-state">Could not reach the AI.</div>';
+    }
+    btn.disabled = false; btn.textContent = '✨ Suggest fastest order to clear everything';
+  });
+
+  // This module isn't finished — no Canvas token configured yet, so
+  // nothing functional works. Surface that clearly rather than letting
+  // someone think a sync failure or empty list means something's broken.
+  if (!sessionStorage.getItem('college_wip_seen')) {
+    $('wipModalBg').classList.remove('hidden');
+    sessionStorage.setItem('college_wip_seen', '1');
+  }
+  $('wipModalClose').addEventListener('click', () => $('wipModalBg').classList.add('hidden'));
+
+  renderStatus();
+  renderCourses(loadJSON('canvas_tasks_v1', []));
+  if (loadJSON(CREDS_KEY, null)) syncCanvas(); // auto-refresh, per agreed setup
+})();
+</script>
+</body>
+</html>
