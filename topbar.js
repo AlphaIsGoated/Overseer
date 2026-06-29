@@ -319,8 +319,10 @@ body.topbar-modal-open {
     const todayKey = calendarDateKey();
     const done = (state.logs || {})[todayKey] || 0;
     const p = state.profile || { weightKg: 75 };
-    const wKg = state.weightUnit === 'lb' ? (p.weightKg || 0) / 2.20462 : (p.weightKg || 0);
-    const base = wKg * 35;
+    // p.weightKg is always stored as true kilograms regardless of the
+    // display unit (see po-water.html's computeTargetMl) — no further
+    // conversion needed here.
+    const base = (p.weightKg || 0) * 35;
     const exercise = (p.activityHrsPerWeek || 0) / 7 * 500;
     const caffeine = Math.max(0, (state.caffeineMgPerDay || 0) - 200) * 1.5;
     const subs = (state.substances || []).reduce((s, x) => {
