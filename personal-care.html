@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Personal Care · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 700px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+.pc-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.pc-row.done { opacity: 0.45; }
+.pc-row.done .pc-name { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+.pc-row.low { border-color: rgba(255,107,107,0.4); background: rgba(255,107,107,0.05); }
+.pc-check { appearance: none; -webkit-appearance: none; width: 22px; height: 22px; flex-shrink: 0; margin: 0; border: 1.5px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.28); border-radius: 7px; position: relative; cursor: pointer; }
+.pc-check:checked { background: var(--success); border-color: var(--success); box-shadow: 0 0 12px rgba(107,227,164,0.40); }
+.pc-check:checked::after { content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 11px; border: solid #0A0A0B; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.pc-info { flex: 1; min-width: 0; }
+.pc-name { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+.pc-sub { font-size: 11.5px; color: var(--text-tertiary); margin-top: 2px; }
+.pc-sub.low { color: var(--danger); font-weight: 700; }
+.pc-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,0.05); flex-shrink: 0; }
+.pc-btn-mini { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-secondary); font-family: inherit; font-size: 11px; font-weight: 700; padding: 7px 10px; border-radius: 9px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.pc-btn-mini:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.pc-delete { border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer; padding: 0 2px; opacity: 0.5; flex-shrink: 0; }
+.pc-delete:hover { color: var(--danger); }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+
+.gm-input-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gm-input { flex: 1; min-width: 120px; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input.num { max-width: 110px; }
+.gm-seg { display: inline-flex; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; overflow: hidden; flex-shrink: 0; }
+.gm-seg button { padding: 11px 12px; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.gm-seg button.on { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+.gm-add { padding: 11px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-add:hover { filter: brightness(1.06); }
+.pc-add-row { margin-bottom: 10px; }
+.pc-add-row:last-child { margin-bottom: 0; }
+.pc-hint { font-size: 11px; color: var(--text-tertiary); margin: -4px 0 10px; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Personal Care</h1>
+
+  <div class="section-title">Daily check-offs</div>
+  <div class="gm-card">
+    <div id="dailyList"></div>
+    <div class="gm-input-wrap" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.06)">
+      <input class="gm-input" id="dailyNameInput" type="text" placeholder="e.g. Contact lenses, Moisturize, Shave" autocomplete="off">
+      <button class="gm-add" id="dailyAdd" type="button">Add</button>
+    </div>
+  </div>
+
+  <div class="section-title">Supplies — low-stock reminders</div>
+  <div class="gm-card">
+    <div id="supplyList"></div>
+    <div class="pc-hint" style="margin-top:14px">Tell it roughly how many days a bottle/unit lasts you — it'll flag it when it's about to run out.</div>
+    <div class="gm-input-wrap pc-add-row">
+      <input class="gm-input" id="supplyNameInput" type="text" placeholder="e.g. Shampoo, Conditioner, Sunscreen" autocomplete="off">
+    </div>
+    <div class="gm-input-wrap pc-add-row">
+      <input class="gm-input num" id="supplyDaysInput" type="number" min="1" placeholder="Days per bottle" inputmode="numeric">
+      <button class="gm-add" id="supplyAdd" type="button">Add</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const STORE_KEY = 'personalcare:items';
+
+  function dateKey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
+  const today = dateKey(new Date());
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+
+  function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { return []; } }
+  function save(items) { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function daysRemaining(item) {
+    const opened = new Date(item.openedDate + 'T00:00');
+    const used = daysBetween(opened, todayDate);
+    return Math.max(0, item.daysPerUnit - used);
+  }
+
+  function dailyRowHtml(item) {
+    const done = item.lastDoneKey === today;
+    return '<div class="pc-row' + (done ? ' done' : '') + '" data-id="' + item.id + '">' +
+      '<input type="checkbox" class="pc-check" ' + (done ? 'checked' : '') + '>' +
+      '<div class="pc-info"><div class="pc-name">' + escapeHtml(item.name) + '</div></div>' +
+      '<button class="pc-delete" type="button">×</button>' +
+      '</div>';
+  }
+  function supplyRowHtml(item) {
+    const left = daysRemaining(item);
+    const low = left <= Math.max(3, Math.round(item.daysPerUnit * 0.15));
+    return '<div class="pc-row' + (low ? ' low' : '') + '" data-id="' + item.id + '">' +
+      '<div class="pc-info"><div class="pc-name">' + escapeHtml(item.name) + '</div>' +
+        '<div class="pc-sub' + (low ? ' low' : '') + '">' + (left <= 0 ? 'Should be empty — restock now' : left + ' day' + (left === 1 ? '' : 's') + ' left' + (low ? ' — buy soon' : '')) + '</div></div>' +
+      '<button class="pc-btn-mini" data-action="restock" type="button">Opened new one</button>' +
+      '<button class="pc-delete" type="button">×</button>' +
+      '</div>';
+  }
+
+  function render() {
+    const items = load();
+    const daily = items.filter(i => i.kind === 'daily');
+    const supply = items.filter(i => i.kind === 'supply');
+
+    const dailyEl = $('dailyList');
+    if (!daily.length) dailyEl.innerHTML = '<div class="empty-state">Nothing tracked yet — add one below.</div>';
+    else {
+      const pending = daily.filter(i => i.lastDoneKey !== today);
+      const done = daily.filter(i => i.lastDoneKey === today);
+      dailyEl.innerHTML = pending.concat(done).map(dailyRowHtml).join('');
+      dailyEl.querySelectorAll('.pc-row').forEach(el => {
+        const id = el.dataset.id;
+        el.querySelector('.pc-check').addEventListener('change', (e) => {
+          const it = items.find(x => x.id === id);
+          it.lastDoneKey = e.target.checked ? today : null;
+          save(items); render();
+        });
+        el.querySelector('.pc-delete').addEventListener('click', () => { save(items.filter(x => x.id !== id)); render(); });
+      });
+    }
+
+    const supplyEl = $('supplyList');
+    if (!supply.length) supplyEl.innerHTML = '<div class="empty-state">Nothing tracked yet — add one below.</div>';
+    else {
+      const sorted = supply.slice().sort((a, b) => daysRemaining(a) - daysRemaining(b));
+      supplyEl.innerHTML = sorted.map(supplyRowHtml).join('');
+      supplyEl.querySelectorAll('.pc-row').forEach(el => {
+        const id = el.dataset.id;
+        const restockBtn = el.querySelector('[data-action="restock"]');
+        if (restockBtn) restockBtn.addEventListener('click', () => {
+          const it = items.find(x => x.id === id);
+          it.openedDate = today;
+          save(items); render();
+        });
+        el.querySelector('.pc-delete').addEventListener('click', () => { save(items.filter(x => x.id !== id)); render(); });
+      });
+    }
+  }
+
+  function addDaily() {
+    const name = $('dailyNameInput').value.trim();
+    if (!name) return;
+    const items = load();
+    items.push({ id: 'pc_' + Date.now(), kind: 'daily', name, lastDoneKey: null });
+    save(items);
+    $('dailyNameInput').value = '';
+    render();
+  }
+  $('dailyAdd').addEventListener('click', addDaily);
+  $('dailyNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addDaily(); });
+
+  function addSupply() {
+    const name = $('supplyNameInput').value.trim();
+    const days = parseInt($('supplyDaysInput').value, 10);
+    if (!name || !(days > 0)) return;
+    const items = load();
+    items.push({ id: 'pc_' + Date.now(), kind: 'supply', name, daysPerUnit: days, openedDate: today });
+    save(items);
+    $('supplyNameInput').value = ''; $('supplyDaysInput').value = '';
+    render();
+  }
+  $('supplyAdd').addEventListener('click', addSupply);
+
+  render();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({ appKey: 'personalcare', syncedKeys: [STORE_KEY], onApplied: render });
+  }
+})();
+</script>
+</body>
+</html>
