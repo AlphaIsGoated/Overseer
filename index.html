@@ -152,6 +152,44 @@ body::after {
 .gear-btn:active { transform: scale(0.94) rotate(35deg); }
 .gear-btn svg { width: 22px; height: 22px; }
 
+/* ===== Today card (weather + news) ===== */
+.today-card {
+  position: relative; overflow: hidden;
+  display: grid; grid-template-columns: auto 1fr; gap: 18px;
+  padding: 18px 20px; margin-bottom: 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.today-card::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 8% 12%, rgba(125,211,252,0.14), transparent 55%);
+}
+.today-weather { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 76px; }
+.today-weather-icon { font-size: 32px; line-height: 1; filter: drop-shadow(0 0 10px rgba(125,211,252,0.4)); }
+.today-weather-temp { font-size: 20px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.today-weather-cond { font-size: 10.5px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+.today-right { min-width: 0; }
+.today-run-tip {
+  font-size: 12px; line-height: 1.4; color: var(--text-secondary);
+  padding: 8px 11px; margin-bottom: 12px; border-radius: 10px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06);
+}
+.today-run-tip b { color: var(--text-primary); }
+.today-news { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.today-news-col { min-width: 0; }
+.today-news-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 5px; }
+.today-news-item { display: block; font-size: 11.5px; line-height: 1.35; color: var(--text-secondary); text-decoration: none; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-news-item:hover { color: var(--text-primary); text-decoration: underline; }
+.today-loc-link { font-size: 10px; color: var(--text-tertiary); text-decoration: underline; cursor: pointer; background: none; border: 0; padding: 0; font-family: inherit; }
+.today-empty { font-size: 11.5px; color: var(--text-tertiary); font-style: italic; }
+@media (max-width: 480px) {
+  .today-card { grid-template-columns: 1fr; }
+  .today-weather { flex-direction: row; justify-content: flex-start; gap: 10px; }
+}
+
 /* ===== Settings modal ===== */
 .modal-bg {
   position: fixed; inset: 0; z-index: 120; display: none;
@@ -279,6 +317,22 @@ body::after {
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </button>
+  </div>
+
+  <div class="today-card" id="todayCard">
+    <div class="today-weather" id="todayWeather">
+      <span class="today-weather-icon">—</span>
+      <span class="today-weather-temp">—</span>
+      <span class="today-weather-cond">Loading…</span>
+    </div>
+    <div class="today-right">
+      <div class="today-run-tip" id="todayRunTip">—</div>
+      <div class="today-news" id="todayNews">
+        <div class="today-news-col"><div class="today-news-label">World</div><div class="today-empty">Loading…</div></div>
+        <div class="today-news-col"><div class="today-news-label">US</div></div>
+        <div class="today-news-col"><div class="today-news-label">Business</div></div>
+      </div>
+    </div>
   </div>
 
   <div class="bento">
@@ -847,6 +901,90 @@ body::after {
   window.addEventListener('storage', () => {
     if ($('settingsBg').classList.contains('show')) populate();
   });
+
+  /* ============================================================
+     TODAY CARD — weather (Open-Meteo, no key, called directly from
+     the browser) + a marathon-training recommendation derived from
+     it, + news headlines (server-proxied RSS, see api/integrations/news.js).
+     ============================================================ */
+  const LOC_KEY = 'home_location_v1';
+  // WMO weather codes -> a simple emoji + label. Covers the common cases;
+  // anything unmapped just shows a generic cloud rather than failing.
+  const WMO_ICONS = {
+    0: ['☀️', 'Clear'], 1: ['🌤️', 'Mostly clear'], 2: ['⛅', 'Partly cloudy'], 3: ['☁️', 'Overcast'],
+    45: ['🌫️', 'Fog'], 48: ['🌫️', 'Fog'],
+    51: ['🌦️', 'Light drizzle'], 53: ['🌦️', 'Drizzle'], 55: ['🌧️', 'Heavy drizzle'],
+    61: ['🌦️', 'Light rain'], 63: ['🌧️', 'Rain'], 65: ['🌧️', 'Heavy rain'],
+    71: ['🌨️', 'Light snow'], 73: ['🌨️', 'Snow'], 75: ['❄️', 'Heavy snow'],
+    80: ['🌦️', 'Rain showers'], 81: ['🌧️', 'Rain showers'], 82: ['⛈️', 'Violent showers'],
+    95: ['⛈️', 'Thunderstorm'], 96: ['⛈️', 'Thunderstorm'], 99: ['⛈️', 'Severe thunderstorm'],
+  };
+  function weatherIcon(code) { return WMO_ICONS[code] || ['☁️', 'Cloudy']; }
+
+  function runTip(tempF, precip, code) {
+    const isRain = precip > 0.3 || [51,53,55,61,63,65,80,81,82,95,96,99].includes(code);
+    const isSnowIce = [71,73,75].includes(code);
+    if (isSnowIce) return '❄️ <b>Snow/ice</b> — treadmill day, or watch footing closely if running outside.';
+    if (isRain) return '🌧️ <b>Rain expected</b> — bring layers, or shift today\'s run to a treadmill.';
+    if (tempF >= 88) return '🥵 <b>High heat</b> — push your run early morning/evening, or treadmill with AC.';
+    if (tempF <= 25) return '🥶 <b>Very cold</b> — dress in layers, warm up indoors first.';
+    if (tempF >= 75) return '☀️ Warm — hydrate well before and during your run.';
+    return '✅ Good conditions for an outdoor run today.';
+  }
+
+  async function loadWeather(lat, lon) {
+    try {
+      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon
+        + '&current=temperature_2m,precipitation,weather_code&temperature_unit=fahrenheit&timezone=auto';
+      const r = await fetch(url);
+      const j = await r.json();
+      const cur = j.current || {};
+      const [icon, label] = weatherIcon(cur.weather_code);
+      const temp = Math.round(cur.temperature_2m);
+      $('todayWeather').innerHTML =
+        '<span class="today-weather-icon">' + icon + '</span>' +
+        '<span class="today-weather-temp">' + temp + '°F</span>' +
+        '<span class="today-weather-cond">' + label + '</span>';
+      $('todayRunTip').innerHTML = runTip(temp, cur.precipitation || 0, cur.weather_code);
+    } catch (e) {
+      $('todayWeather').innerHTML = '<span class="today-weather-icon">⚠️</span><span class="today-weather-cond">Weather unavailable</span>';
+      $('todayRunTip').textContent = '';
+    }
+  }
+  function initWeather() {
+    const saved = loadJSON(LOC_KEY, null);
+    if (saved && saved.lat != null) { loadWeather(saved.lat, saved.lon); return; }
+    if (!navigator.geolocation) { $('todayWeather').innerHTML = '<span class="today-weather-cond">Location unavailable</span>'; return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: +pos.coords.latitude.toFixed(3), lon: +pos.coords.longitude.toFixed(3) };
+        saveJSON(LOC_KEY, loc);
+        loadWeather(loc.lat, loc.lon);
+      },
+      () => { $('todayWeather').innerHTML = '<span class="today-weather-cond">Location denied</span>'; },
+      { timeout: 8000 }
+    );
+  }
+
+  async function loadNews() {
+    try {
+      const res = await fetch('/api/integrations/news', { headers: { 'X-App-Secret': (window.DASH_APP_SECRET || '') } });
+      const data = await res.json();
+      const cols = [['World', data.world], ['US', data.us], ['Business', data.business]];
+      $('todayNews').innerHTML = cols.map(([label, items]) =>
+        '<div class="today-news-col"><div class="today-news-label">' + label + '</div>' +
+        ((items && items.length)
+          ? items.map(it => '<a class="today-news-item" href="' + (it.link || '#') + '" target="_blank" rel="noopener" title="' + (it.title || '').replace(/"/g,'&quot;') + '">' + (it.title || '') + '</a>').join('')
+          : '<div class="today-empty">No headlines</div>') +
+        '</div>'
+      ).join('');
+    } catch (e) {
+      $('todayNews').innerHTML = '<div class="today-empty">News unavailable</div>';
+    }
+  }
+
+  initWeather();
+  loadNews();
 })();
 </script>
 
