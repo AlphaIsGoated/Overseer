@@ -715,7 +715,30 @@ body::after {
     if (!t || !t.access) { window.location.href = 'health.html'; return; }
     $('whAction').textContent = 'Syncing…'; syncWhoop();
   });
+
+  // Re-populate the settings form if a remote profile change (cloud sync,
+  // or another tab) lands while it's open, so it never shows stale values.
+  window.addEventListener('storage', () => {
+    if ($('settingsBg').classList.contains('show')) populate();
+  });
 })();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof initCloudSync !== 'function') return;
+  // Mirrors the same 'health'/po_water_v1 row that health.html and
+  // po-water.html sync, so profile edits made here (weight/height/
+  // birthday/sex/activity) reach every device and every module that
+  // reads that profile, instead of staying local-only.
+  initCloudSync({
+    appKey: 'health',
+    syncedKeys: ['po_water_v1'],
+    onApplied: function () {
+      window.dispatchEvent(new Event('storage'));
+    }
+  });
+});
 </script>
 </body>
 </html>
