@@ -348,6 +348,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 
   <!-- ===== IMPORT PLAN BUTTON ===== -->
   <button class="mt-btn full" id="mtImportLink" type="button" style="margin-bottom:14px">📋 Import training plan</button>
+  <button class="mt-btn full" id="mtRestDayBtn" type="button" style="margin-bottom:14px">😴 Take a rest day (today)</button>
 
   <!-- ===== SCHEDULE ===== -->
   <div class="card-h" style="margin:0 4px 8px">
@@ -780,6 +781,34 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
     return null;
   }
+  // ---- Take a rest day — converts (or creates) today's entry to a rest
+  // day and marks it done, so a planned hard day doesn't sit there
+  // looking "missed" when skipping it was the actual plan. manualOverride
+  // keeps a later Strava sync from overwriting the choice.
+  $('mtRestDayBtn').addEventListener('click', () => {
+    const today = dateKey(new Date());
+    let entry = plan.entries.find(e => e.date === today);
+    if (!entry) {
+      entry = { id: 'm_' + Date.now(), date: today, weekNumber: null, dayOfWeek: DAY_NAMES[isoDayIndex(parseKey(today))], type: 'rest', label: 'Rest', plannedDistanceMi: null };
+      plan.entries.push(entry);
+      plan.entries.sort((a, b) => a.date.localeCompare(b.date));
+    } else {
+      entry.type = 'rest';
+      entry.label = 'Rest';
+      entry.plannedDistanceMi = null;
+    }
+    entry.completed = true;
+    entry.manualOverride = true;
+    entry.actualDistanceMi = null; entry.actualDurationSec = null; entry.actualPaceSecPerMi = null;
+    entry.source = 'manual';
+    savePlan();
+    renderSchedule(); renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderProgress();
+    const btn = $('mtRestDayBtn');
+    const orig = btn.textContent;
+    btn.textContent = 'Rest day logged ✓';
+    setTimeout(() => { btn.textContent = orig; }, 1800);
+  });
+
   $('mtLogSave').addEventListener('click', () => {
     const date = $('mtLogDate').value;
     const dist = parseFloat($('mtLogDist').value);
