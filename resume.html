@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Resume Review · Dashboard</title>
+<script src="/api/config"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 720px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.dash-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 18px; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+.drop-zone { border: 2px dashed rgba(255,255,255,0.12); border-radius: 14px; padding: 36px 20px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.drop-zone:hover, .drop-zone.drag { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.02); }
+.drop-zone-icon { font-size: 32px; margin-bottom: 10px; }
+.drop-zone-text { font-size: 14px; color: var(--text-primary); font-weight: 600; margin-bottom: 4px; }
+.drop-zone-sub { font-size: 12px; color: var(--text-tertiary); }
+.gm-add { padding: 11px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-add:hover { filter: brightness(1.06); }
+
+.busy-box { text-align: center; padding: 24px 0; font-size: 13px; color: var(--text-secondary); }
+.busy-dots span { animation: blink 1.4s infinite; opacity: 0.2; }
+.busy-dots span:nth-child(2) { animation-delay: 0.2s; } .busy-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,100%{opacity:0.2} 50%{opacity:1} }
+.error-box { font-size: 13px; color: var(--danger); padding: 10px 0; }
+
+.score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+.score-num { font-size: 44px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.03em; line-height: 1; }
+.score-total { font-size: 18px; color: var(--text-tertiary); }
+.score-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.summary-text { font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 4px; }
+
+.review-section { margin-top: 16px; }
+.review-h { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+.review-h.good { color: var(--success); } .review-h.bad { color: var(--danger); } .review-h.tip { color: var(--warning); }
+.review-list { list-style: none; margin: 0 0 4px; padding: 0; }
+.review-list li { font-size: 13.5px; color: var(--text-secondary); line-height: 1.45; padding: 6px 0 6px 18px; position: relative; }
+.review-list li::before { content: '—'; position: absolute; left: 0; color: var(--text-tertiary); }
+
+.resume-new { background: transparent; border: 1px solid rgba(255,255,255,0.10); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 10px; cursor: pointer; margin-top: 14px; }
+.resume-new:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Resume Review</h1>
+  <p class="dash-sub">Upload a resume (PDF or photo/screenshot) for an AI read on strengths, weaknesses, and concrete ways to improve it.</p>
+
+  <div class="gm-card">
+    <div id="uploadStage">
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-icon">📄</div>
+        <div class="drop-zone-text">Tap to choose a file</div>
+        <div class="drop-zone-sub">PDF, JPG, or PNG</div>
+      </div>
+      <input type="file" id="fileInput" accept="application/pdf,image/*" style="display:none">
+    </div>
+
+    <div id="busyStage" class="busy-box hidden">
+      Reading your resume<span class="busy-dots"><span>.</span><span>.</span><span>.</span></span>
+    </div>
+
+    <div id="errorStage" class="error-box hidden"></div>
+
+    <div id="resultStage" class="hidden">
+      <div class="score-row">
+        <span class="score-num" id="resScore">—</span>
+        <span class="score-total">/ 10</span>
+        <span class="score-label">overall</span>
+      </div>
+      <div class="summary-text" id="resSummary"></div>
+
+      <div class="review-section">
+        <div class="review-h good">Strengths</div>
+        <ul class="review-list" id="resStrengths"></ul>
+      </div>
+      <div class="review-section">
+        <div class="review-h bad">Weaknesses</div>
+        <ul class="review-list" id="resWeaknesses"></ul>
+      </div>
+      <div class="review-section">
+        <div class="review-h tip">Suggested improvements</div>
+        <ul class="review-list" id="resSuggestions"></ul>
+      </div>
+
+      <button class="resume-new" id="resumeAgainBtn" type="button">Review another resume</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  const RESUME_TOOL = {
+    name: 'review_resume',
+    description: 'Record a structured review of this resume/CV: an overall score, a short summary, and concrete strengths, weaknesses, and improvement suggestions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        readable: { type: 'boolean', description: 'True if this is clearly a resume/CV.' },
+        overallScore: { type: 'integer', description: '1-10 overall quality score, judged against general professional resume standards (clarity, impact, quantified results, formatting, relevance).' },
+        summary: { type: 'string', description: 'A 2-3 sentence overall impression.' },
+        strengths: { type: 'array', items: { type: 'string' }, description: '3-5 specific, concrete things this resume does well.' },
+        weaknesses: { type: 'array', items: { type: 'string' }, description: '3-5 specific, concrete problems with this resume.' },
+        suggestions: { type: 'array', items: { type: 'string' }, description: '3-6 specific, actionable ways to improve it — concrete rewording/restructuring advice, not generic platitudes.' }
+      },
+      required: ['readable', 'overallScore', 'summary', 'strengths', 'weaknesses', 'suggestions']
+    }
+  };
+  const RESUME_SYSTEM =
+    "You are an experienced technical recruiter and resume coach. Review the attached resume/CV "
+    + "critically but constructively, as if advising a friend before they submit it. "
+    + "Always call the review_resume tool exactly once. "
+    + "Be specific — reference actual content from the resume (sections, phrasing, specific bullets) rather "
+    + "than generic advice. Favor quantified impact (numbers, scope, outcomes) over vague responsibility "
+    + "statements. Flag formatting/clarity issues, weak verbs, missing metrics, and irrelevant content. "
+    + "Only set readable=false if this clearly isn't a resume/CV.";
+
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function show(id) { ['uploadStage', 'busyStage', 'errorStage', 'resultStage'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
+  function showError(msg) { $('errorStage').textContent = '⚠ ' + msg; show('errorStage'); }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error("Couldn't read that file."));
+      reader.readAsDataURL(file);
+    });
+  }
+  function downscaleImage(file, maxDim) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        const scale = Math.min(1, maxDim / Math.max(w, h || 1));
+        w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', 0.85).split(',')[1] || '');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read that image.")); };
+      img.src = url;
+    });
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    const isPdf = file.type === 'application/pdf';
+    const isImage = /^image\//.test(file.type);
+    if (!isPdf && !isImage) { showError('Please choose a PDF, JPG, or PNG.'); return; }
+    show('busyStage');
+    try {
+      const body = { system: RESUME_SYSTEM, tool: RESUME_TOOL, prompt: 'Review this resume and record your assessment.' };
+      if (isPdf) { body.document = await fileToBase64(file); body.mediaType = 'application/pdf'; }
+      else { body.image = await downscaleImage(file, 1568); body.mediaType = 'image/jpeg'; }
+
+      const res = await fetch('/api/ai/vision-tool', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify(body)
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      const data = await res.json();
+      if (!res.ok || data.error) { showError(data.error || 'Could not read that file.'); return; }
+      if (data.readable === false) { showError("That didn't look like a resume — try a different file."); return; }
+      renderResult(data);
+    } catch (e) {
+      showError((e && e.message) || "Couldn't reach the AI — check your connection.");
+    }
+  }
+
+  function renderResult(data) {
+    $('resScore').textContent = data.overallScore != null ? data.overallScore : '—';
+    $('resSummary').textContent = data.summary || '';
+    $('resStrengths').innerHTML = (data.strengths || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') || '<li>—</li>';
+    $('resWeaknesses').innerHTML = (data.weaknesses || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') || '<li>—</li>';
+    $('resSuggestions').innerHTML = (data.suggestions || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') || '<li>—</li>';
+    show('resultStage');
+  }
+
+  $('dropZone').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleFile(f); e.target.value = ''; });
+  ['dragover', 'dragenter'].forEach(ev => $('dropZone').addEventListener(ev, (e) => { e.preventDefault(); $('dropZone').classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev => $('dropZone').addEventListener(ev, (e) => { e.preventDefault(); $('dropZone').classList.remove('drag'); }));
+  $('dropZone').addEventListener('drop', (e) => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); });
+  $('resumeAgainBtn').addEventListener('click', () => show('uploadStage'));
+
+  show('uploadStage');
+})();
+</script>
+</body>
+</html>
