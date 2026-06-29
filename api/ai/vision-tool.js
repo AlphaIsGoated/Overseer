@@ -10,7 +10,7 @@
 // to reasonable payload sizes regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
+import { requireAppSecret, rejectIfTooLarge, setUsageHeaders } from '../_lib/security.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -68,6 +68,7 @@ export default async function handler(req, res) {
     if (data.stop_reason === 'max_tokens') {
       return res.status(502).json({ error: 'Response was too large and got cut off (max_tokens reached) — try a smaller/simpler image.' });
     }
+    setUsageHeaders(res, data, 'claude-opus-4-8');
     const block = (data.content || []).find((b) => b && b.type === 'tool_use' && b.name === tool.name);
     if (!block || !block.input) return res.status(502).json({ error: 'could not read that image' });
     return res.status(200).json(block.input);

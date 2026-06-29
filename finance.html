@@ -3835,6 +3835,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
           body: JSON.stringify({ messages: convo, finance: gatherFinance() })
         });
+        if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
         const data = await res.json().catch(() => ({}));
         pending.classList.remove('nova-msg-loading');
         if (!res.ok) {
@@ -4065,6 +4066,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
           body: JSON.stringify({ image: img.base64, mediaType: img.mediaType })
         });
+        if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           showError((data && data.error) || 'Could not read that image.');

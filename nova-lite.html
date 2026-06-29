@@ -151,6 +151,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
           messages: [{ role: 'user', content: text }],
         }),
       });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
       const json = await res.json();
       if (!res.ok || json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error || 'Something went wrong.')); setOrb(''); busy = false; return; }
       loading.querySelector('div:last-child').innerHTML = render(json.text || 'Hmm, no reply.');

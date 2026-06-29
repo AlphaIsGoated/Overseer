@@ -468,6 +468,21 @@ body::after {
       </div>
       <button class="whoop-btn" id="whAction" type="button">Sync now</button>
     </div>
+
+    <div class="section-divider"></div>
+
+    <label class="field-label">API usage (estimated)</label>
+    <div class="whoop-box">
+      <div class="whoop-stats" style="display:grid">
+        <div class="whoop-stat"><div class="v" id="apiUsageMonth">—</div><div class="l">This month</div></div>
+        <div class="whoop-stat"><div class="v" id="apiUsageTotal">—</div><div class="l">All time</div></div>
+        <div class="whoop-stat"><div class="v" id="apiUsageCalls">—</div><div class="l">Calls logged</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-top:10px;line-height:1.4">
+        Estimated from Claude's own per-call token counts at published API pricing — not a real Anthropic invoice. Covers Nova/AI features across the dashboard (gym, marathon, finance, Nova Lite).
+      </div>
+      <button class="whoop-btn" id="apiUsageReset" type="button" style="margin-top:10px">Reset log</button>
+    </div>
   </div>
 </div>
 
@@ -625,7 +640,7 @@ body::after {
   }
 
   /* ---------- open / close ---------- */
-  function open() { populate(); renderWhoop(); $('settingsBg').classList.add('show'); syncWhoop(); }
+  function open() { populate(); renderWhoop(); renderApiUsage(); $('settingsBg').classList.add('show'); syncWhoop(); }
   function close() { $('settingsBg').classList.remove('show'); }
   $('settingsOpen').addEventListener('click', open);
   $('settingsClose').addEventListener('click', close);
@@ -715,6 +730,32 @@ body::after {
     const t = loadJSON(WHOOP_KEY, null);
     if (!t || !t.access) { window.location.href = 'health.html'; return; }
     $('whAction').textContent = 'Syncing…'; syncWhoop();
+  });
+
+  /* ---------- API usage / spend estimate ---------- */
+  // Published per-million-token pricing (input/output) — update if
+  // Anthropic's pricing changes. claude-opus-4-8 is the only model this
+  // dashboard currently calls.
+  const MODEL_PRICING = { 'claude-opus-4-8': { in: 5, out: 25 } };
+  function estCostUsd(entry) {
+    const p = MODEL_PRICING[entry.model] || MODEL_PRICING['claude-opus-4-8'];
+    return (entry.inputTokens / 1e6) * p.in + (entry.outputTokens / 1e6) * p.out;
+  }
+  function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 3 : 2); }
+  function renderApiUsage() {
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem('apiusage:log')) || []; } catch (e) {}
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const thisMonth = log.filter(e => e.ts >= monthStart);
+    $('apiUsageMonth').innerHTML = fmtUsd(thisMonth.reduce((s, e) => s + estCostUsd(e), 0));
+    $('apiUsageTotal').innerHTML = fmtUsd(log.reduce((s, e) => s + estCostUsd(e), 0));
+    $('apiUsageCalls').innerHTML = String(log.length);
+  }
+  $('apiUsageReset').addEventListener('click', () => {
+    if (!confirm('Clear the logged API usage history? This only resets the on-device estimate, not anything billed by Anthropic.')) return;
+    localStorage.setItem('apiusage:log', '[]');
+    renderApiUsage();
   });
 
   // Re-populate the settings form if a remote profile change (cloud sync,

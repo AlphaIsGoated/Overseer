@@ -9,7 +9,7 @@
 // to reasonable payload sizes regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
+import { requireAppSecret, rejectIfTooLarge, setUsageHeaders } from '../_lib/security.js';
 const SYSTEM_PROMPT =
   "You are Nova, the built-in money coach for a personal net-worth dashboard. "
   + "A JSON snapshot of the user's own finances is included below — use it to give "
@@ -69,6 +69,7 @@ export default async function handler(req, res) {
       const msg = (data && data.error && data.error.message) || ('Anthropic API error (' + r.status + ')');
       return res.status(500).json({ error: msg });
     }
+    setUsageHeaders(res, data, 'claude-opus-4-8');
     const text = (data.content || [])
       .filter((b) => b && b.type === 'text').map((b) => b.text).join('').trim() || '(no response)';
     return res.status(200).json({ text });

@@ -464,6 +464,27 @@ body.topbar-modal-open {
     sync();
   }
 
+  // -------- API usage/spend logging --------
+  // Every AI proxy endpoint (ai-chat, vision-tool, nova, scan) returns its
+  // Anthropic token usage as response headers (see api/_lib/security.js
+  // setUsageHeaders) without changing their JSON body contracts. Pages
+  // that call those endpoints read those headers and call this to log an
+  // entry here, so spend can be estimated in one place (the index.html
+  // settings panel) regardless of which module made the call.
+  const USAGE_KEY = 'apiusage:log';
+  window.logApiUsage = function (inputTokens, outputTokens, model) {
+    if (!inputTokens && !outputTokens) return;
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem(USAGE_KEY)) || []; } catch (e) {}
+    log.push({ ts: Date.now(), model: model || 'claude-opus-4-8', inputTokens: Number(inputTokens) || 0, outputTokens: Number(outputTokens) || 0 });
+    // Cap history so this can't grow unbounded over months of use.
+    if (log.length > 2000) log = log.slice(log.length - 2000);
+    localStorage.setItem(USAGE_KEY, JSON.stringify(log));
+  };
+  if (window.initCloudSync) {
+    window.initCloudSync({ appKey: 'apiusage', syncedKeys: [USAGE_KEY] });
+  }
+
   // -------- Boot --------
   function boot() {
     injectStyleAndHTML();

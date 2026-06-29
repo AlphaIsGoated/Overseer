@@ -15,7 +15,7 @@
 // to reasonable payload sizes regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
+import { requireAppSecret, rejectIfTooLarge, setUsageHeaders } from '../_lib/security.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -63,6 +63,7 @@ export default async function handler(req, res) {
       const msg = (data && data.error && data.error.message) || ('Anthropic API error (' + r.status + ')');
       return res.status(500).json({ error: msg });
     }
+    setUsageHeaders(res, data, payload.model);
     if (tool && tool.name) {
       if (data.stop_reason === 'max_tokens') {
         return res.status(502).json({ error: 'Response was too large and got cut off (max_tokens reached) — try a smaller document or fewer weeks.' });

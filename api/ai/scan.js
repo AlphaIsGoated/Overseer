@@ -11,7 +11,7 @@
 // to a reasonable payload size regardless — this endpoint spends real
 // money per call, so it's deliberately not left wide open.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
+import { requireAppSecret, rejectIfTooLarge, setUsageHeaders } from '../_lib/security.js';
 const SCAN_TOOL = {
   name: 'read_finance_image',
   description: 'Record the financial figures read from an image: a receipt, bill, invoice, bank / fintech app screenshot, account balance, transaction list or statement.',
@@ -88,6 +88,7 @@ export default async function handler(req, res) {
       const msg = (data && data.error && data.error.message) || ('Anthropic API error (' + r.status + ')');
       return res.status(500).json({ error: msg });
     }
+    setUsageHeaders(res, data, 'claude-opus-4-8');
     const block = (data.content || []).find((b) => b && b.type === 'tool_use' && b.name === 'read_finance_image');
     if (!block || !block.input) return res.status(502).json({ error: 'could not read that image' });
     return res.status(200).json(block.input);
