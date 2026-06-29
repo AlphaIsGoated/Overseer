@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Calendar · Dashboard</title>
+<script src="/api/config"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 700px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.dash-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 18px; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+.cal-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+.cal-status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
+.cal-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); }
+.cal-status.on .dot { background: var(--success); box-shadow: 0 0 8px rgba(107,227,164,0.6); }
+.cal-sync { font-size: 11px; color: var(--text-tertiary); }
+.cal-btn { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.cal-btn:hover { background: rgba(255,255,255,0.08); }
+.cal-btn:disabled { opacity: 0.4; cursor: default; }
+.cal-err { font-size: 12px; color: var(--danger); margin-top: 8px; }
+
+.day-group { margin-bottom: 16px; }
+.day-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+.day-label.today { color: var(--success); }
+.event-row { display: flex; gap: 12px; padding: 10px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.event-time { font-size: 12px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; flex-shrink: 0; width: 64px; }
+.event-title { font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 20px 0; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Calendar</h1>
+  <p class="dash-sub">Your upcoming Google Calendar events, next 14 days. First step toward one master calendar across every module.</p>
+
+  <div class="gm-card">
+    <div class="cal-status-row">
+      <span class="cal-status" id="calStatus"><span class="dot"></span><span id="calStatusText">Not connected</span></span>
+      <button class="cal-btn" id="calAction" type="button">Connect Google Calendar</button>
+    </div>
+    <div class="cal-sync" id="calSync"></div>
+    <div class="cal-err hidden" id="calErr"></div>
+  </div>
+
+  <div id="calEvents"></div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const TOKEN_KEY = 'google_tokens_v1';
+  const SYNC_KEY = 'google_last_sync';
+  const GOOGLE_CLIENT_ID = window.DASH_GOOGLE_CLIENT_ID || '';
+  const GOOGLE_REDIRECT = window.location.origin + '/api/google-callback';
+  const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+
+  function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
+  function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // Tokens land in the URL hash after the OAuth round-trip — never sent
+  // to the server, read here client-side only (same pattern as WHOOP/Strava).
+  if (location.hash && location.hash.indexOf('google_access') !== -1) {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const access = h.get('google_access'), refresh = h.get('google_refresh');
+    const expires = Number(h.get('google_expires')) || Date.now() + 3500e3;
+    if (access) { saveJSON(TOKEN_KEY, { access, refresh, expires }); history.replaceState(null, '', location.pathname + location.search); }
+  }
+
+  function calErr(msg) { $('calErr').textContent = msg || ''; $('calErr').classList.toggle('hidden', !msg); }
+  function relTime(ts) {
+    if (!ts) return 'never';
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 60) return 'just now';
+    if (sec < 3600) return Math.floor(sec / 60) + ' min ago';
+    if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
+    return Math.floor(sec / 86400) + ' d ago';
+  }
+  function renderStatus() {
+    const t = loadJSON(TOKEN_KEY, null);
+    const statusEl = $('calStatus'), txt = $('calStatusText'), action = $('calAction');
+    if (!t || !t.access) {
+      statusEl.classList.remove('on'); txt.textContent = 'Not connected';
+      $('calSync').textContent = '';
+      action.textContent = GOOGLE_CLIENT_ID ? 'Connect Google Calendar' : 'Set GOOGLE_CLIENT_ID in Vercel first';
+      action.disabled = !GOOGLE_CLIENT_ID;
+      return;
+    }
+    statusEl.classList.add('on'); txt.textContent = 'Connected';
+    $('calSync').textContent = 'Last synced ' + relTime(Number(localStorage.getItem(SYNC_KEY)) || 0);
+    action.textContent = 'Sync now'; action.disabled = false;
+  }
+
+  async function googleRefresh(t) {
+    if (!t.refresh) return null;
+    try {
+      const r = await fetch('/api/integrations/google', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': (window.DASH_APP_SECRET || '') }, body: JSON.stringify({ refresh_token: t.refresh }) });
+      const j = await r.json();
+      if (j.access_token) {
+        const next = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: Date.now() + (j.expires_in || 3500) * 1000 };
+        saveJSON(TOKEN_KEY, next); return next;
+      }
+    } catch (e) {}
+    return null;
+  }
+  async function googleFetch(path, t) {
+    const [p, qs] = path.split('?');
+    const params = new URLSearchParams(qs || ''); params.set('path', p);
+    const r = await fetch('/api/integrations/google?' + params.toString(), { headers: { Authorization: 'Bearer ' + t.access, Accept: 'application/json', 'X-App-Secret': (window.DASH_APP_SECRET || '') } });
+    if (r.status === 401) { const n = await googleRefresh(t); if (n) return googleFetch(path, n); throw new Error('unauthorized — reconnect'); }
+    if (!r.ok) throw new Error('Google ' + r.status);
+    return r.json();
+  }
+
+  function dateKeyLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function fmtTime(d) { return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+  function dayLabel(d, todayKey) {
+    const key = dateKeyLocal(d);
+    if (key === todayKey) return 'Today';
+    const tmrw = new Date(); tmrw.setDate(tmrw.getDate() + 1);
+    if (key === dateKeyLocal(tmrw)) return 'Tomorrow';
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function renderEvents(events) {
+    const todayKey = dateKeyLocal(new Date());
+    const groups = {};
+    events.forEach(ev => {
+      const startRaw = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
+      if (!startRaw) return;
+      const d = new Date(startRaw);
+      const key = dateKeyLocal(d);
+      (groups[key] = groups[key] || []).push({ d, ev, allDay: !ev.start.dateTime });
+    });
+    const keys = Object.keys(groups).sort();
+    const wrap = $('calEvents');
+    if (!keys.length) {
+      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">No upcoming events in the next 14 days, or not connected yet.</div></div>';
+      return;
+    }
+    wrap.innerHTML = keys.map(key => {
+      const d0 = groups[key][0].d;
+      const rows = groups[key].map(({ d, ev, allDay }) =>
+        '<div class="event-row"><span class="event-time">' + (allDay ? 'All day' : fmtTime(d)) + '</span><span class="event-title">' + escapeHtml(ev.summary || '(no title)') + '</span></div>'
+      ).join('');
+      return '<div class="day-group"><div class="day-label' + (key === todayKey ? ' today' : '') + '">' + dayLabel(d0, todayKey) + '</div>' + rows + '</div>';
+    }).join('');
+  }
+
+  async function syncCalendar() {
+    let t = loadJSON(TOKEN_KEY, null);
+    if (!t || !t.access) return;
+    calErr('');
+    if (t.expires && Date.now() > t.expires - 60000) { const n = await googleRefresh(t); if (n) t = n; }
+    try {
+      const timeMin = new Date().toISOString();
+      const timeMax = new Date(Date.now() + 14 * 86400000).toISOString();
+      const data = await googleFetch('/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=' + encodeURIComponent(timeMin) + '&timeMax=' + encodeURIComponent(timeMax) + '&maxResults=50', t);
+      renderEvents(data.items || []);
+      localStorage.setItem(SYNC_KEY, String(Date.now()));
+      renderStatus();
+    } catch (e) {
+      calErr(e.message || 'Could not sync your calendar.');
+      renderStatus();
+    }
+  }
+
+  $('calAction').addEventListener('click', () => {
+    const t = loadJSON(TOKEN_KEY, null);
+    if (t && t.access) { $('calAction').textContent = 'Syncing…'; syncCalendar(); return; }
+    if (!GOOGLE_CLIENT_ID) return;
+    const url = 'https://accounts.google.com/o/oauth2/v2/auth'
+      + '?client_id=' + encodeURIComponent(GOOGLE_CLIENT_ID)
+      + '&redirect_uri=' + encodeURIComponent(GOOGLE_REDIRECT)
+      + '&response_type=code'
+      + '&scope=' + encodeURIComponent(SCOPE)
+      + '&access_type=offline'
+      + '&prompt=consent';
+    window.location.href = url;
+  });
+
+  renderStatus();
+  if (loadJSON(TOKEN_KEY, null)) syncCalendar();
+})();
+</script>
+</body>
+</html>
