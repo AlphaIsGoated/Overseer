@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Help &amp; Instructions · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 760px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.dash-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 18px; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 22px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.search-box { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; margin-bottom: 16px; }
+.search-box::placeholder { color: var(--text-tertiary); }
+
+details.help-card { background: rgba(255,255,255,0.04); border-radius: 14px; margin-bottom: 8px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); border: 1px solid rgba(255,255,255,0.06); overflow: hidden; }
+details.help-card[open] { border-color: rgba(255,255,255,0.12); }
+summary.help-summary { padding: 14px 18px; cursor: pointer; display: flex; align-items: center; gap: 12px; list-style: none; -webkit-tap-highlight-color: transparent; }
+summary.help-summary::-webkit-details-marker { display: none; }
+summary.help-summary::after { content: '▾'; margin-left: auto; color: var(--text-tertiary); transition: transform 0.15s; }
+details[open] summary.help-summary::after { transform: rotate(180deg); }
+.help-emoji { font-size: 18px; }
+.help-name { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
+.help-tag { font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warning); background: rgba(242,192,99,0.12); padding: 2px 7px; border-radius: 999px; margin-left: 6px; }
+.help-body { padding: 0 18px 16px; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.help-body p { margin: 0 0 10px; }
+.help-body ul { margin: 0 0 10px; padding-left: 18px; }
+.help-body li { margin-bottom: 5px; }
+.help-body b { color: var(--text-primary); }
+.help-body code { font-family: ui-monospace, monospace; font-size: 12px; background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; color: var(--success); }
+.help-setup { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2); font-size: 12px; }
+.help-setup b { color: #7DD3FC; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+  <h1 class="dash-title">Help &amp; Instructions</h1>
+  <p class="dash-sub">What every part of the app does, and how to use it. Tap a section to expand.</p>
+
+  <input class="search-box" id="searchBox" type="text" placeholder="Search features…" autocomplete="off">
+
+  <div class="section-title" style="margin-top:0">Core &amp; tracking</div>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🏠</span><span class="help-name">Main</span></summary>
+    <div class="help-body">
+      <p>Your daily goals list, rolling over at <b>6 AM</b> each day (not midnight) so a late night doesn't reset "today" early. Goals you add for tomorrow carry over automatically.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">💪</span><span class="help-name">Fitness</span></summary>
+    <div class="help-body">
+      <p>Tracks lifts by training day (Push/Pull/Legs by default, fully customizable in its own Settings). Logs your top set per exercise and tells you when to add weight based on your rep target.</p>
+      <ul>
+        <li><b>1RM calculator</b> — tap the calculator icon next to the gear; estimates your one-rep max from any weight/reps pair using the Epley formula, plus a training-percentage table.</li>
+        <li><b>Import strength plan</b> — photo, library image, or pasted text; AI reads it and merges exercises into your existing days by name match.</li>
+        <li><b>Weight tracking + InBody scans</b> — log body weight, or photograph an InBody body-composition printout for full metrics (body fat %, muscle mass, segmental balance).</li>
+        <li><b>Nova</b> (the chat icon) — an AI coach with context on your whole training history.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">💊</span><span class="help-name">Health</span></summary>
+    <div class="help-body">
+      <p>Supplement stack tracker (daily check-offs, low-stock awareness) and the embedded Water tracker. WHOOP recovery/sleep/resting-heart-rate connects here.</p>
+      <div class="help-setup"><b>Setup needed:</b> <code>WHOOP_CLIENT_ID</code> / <code>WHOOP_CLIENT_SECRET</code> in Vercel, from a WHOOP developer app.</div>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">💧</span><span class="help-name">Water</span></summary>
+    <div class="help-body">
+      <p>Daily water target computed from your weight, activity level, sex, age, and any logged caffeine/substances (NAM/IOM formula: ~35ml per kg of body weight, plus adjustments). The number in the top-right pill on every page reflects this target.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">☕</span><span class="help-name">Caffeine</span></summary>
+    <div class="help-body">
+      <p>Tracks intake against your recovery-adjusted daily limit (lower on poor-recovery WHOOP days) and shows a decay curve so you can time your last cup before it affects sleep.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">📊</span><span class="help-name">Finance</span></summary>
+    <div class="help-body">
+      <p>Net worth, spending, subscriptions, and orders. Base currency is USD internally regardless of your display currency. <b>Nova</b> here is a money coach with your financial snapshot as context; the receipt scanner reads photos of receipts/bank screenshots and logs the figures automatically.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🏃</span><span class="help-name">Marathon</span></summary>
+    <div class="help-body">
+      <p>Full training-plan tracker: import a plan (photo/text), sync actual runs from Strava, track weekly mileage/pace/completion-rate against your goal pace, and get a per-day routine with fueling reminders pulled from your supplement stack.</p>
+      <ul>
+        <li><b>Take a rest day</b> button converts today into a completed rest day in one tap.</li>
+        <li>Hover any chart point or glossary term (GMP, tempo, etc.) for an explanation.</li>
+        <li>Checking off a day manually sticks — a later Strava sync won't silently flip it back.</li>
+      </ul>
+      <div class="help-setup"><b>Setup needed:</b> <code>STRAVA_CLIENT_ID</code> / <code>STRAVA_CLIENT_SECRET</code> in Vercel, from a Strava API application.</div>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🧠</span><span class="help-name">Nova Lite</span></summary>
+    <div class="help-body">
+      <p>A standalone AI mentor with visibility into everything saved across the dashboard. Has a mic button (speech-to-text) and a speaker toggle (spoken replies) — upgrades to ElevenLabs automatically if configured, otherwise uses the free browser voice.</p>
+    </div>
+  </details>
+
+  <div class="section-title">Personal organization</div>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">📝</span><span class="help-name">Notes</span></summary>
+    <div class="help-body"><p>Simple notes with search, pinning, and a full-screen editor. Empty notes are dropped automatically when you close them.</p></div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">✅</span><span class="help-name">Chores</span></summary>
+    <div class="help-body"><p>One-off or recurring (daily/weekly) tasks. Recurring items reset themselves automatically each new day/week — no cron job needed, it's computed from the date each time you open the page.</p></div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🧴</span><span class="help-name">Personal Care</span></summary>
+    <div class="help-body"><p>Two halves: daily check-offs (contacts, shaving, moisturizer — anything you do every day) and supply tracking (shampoo, sunscreen — anything that runs out), which warns you when a product is about to run low based on how many days you said it typically lasts.</p></div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🔗</span><span class="help-name">Saved Links</span></summary>
+    <div class="help-body">
+      <p>Paste any URL (TikTok, YouTube, articles) to save it, organized by category you choose. On iPhone, sharing a link from another app to this one (via the share sheet) may save it directly — support varies by iOS version, so pasting is the reliable fallback.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">📄</span><span class="help-name">Resume Review</span></summary>
+    <div class="help-body"><p>Upload a resume as a PDF or photo — AI gives a 1-10 score, strengths, weaknesses, and concrete rewrite suggestions. PDFs are read with full visual understanding (tables, formatting), not just raw text extraction.</p></div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">📅</span><span class="help-name">Calendar</span></summary>
+    <div class="help-body">
+      <p>The master calendar — aggregates Google Calendar, your marathon training schedule, Canvas assignments, and daily goals into one agenda grouped by day, 14 days out.</p>
+      <div class="help-setup"><b>Setup needed:</b> <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code> in Vercel, from a Google Cloud OAuth client (Calendar API enabled).</div>
+    </div>
+  </details>
+
+  <div class="section-title">Health &amp; lifestyle</div>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🥗</span><span class="help-name">Nutrition</span></summary>
+    <div class="help-body"><p>Calorie and macro targets computed from your weight/height/age/sex/activity (Mifflin-St Jeor formula) with a cut/maintain/bulk goal toggle. Log food manually against the targets.</p></div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🧖</span><span class="help-name">Skincare</span></summary>
+    <div class="help-body"><p>Build an AM/PM routine — each product gets a usage tip (wet vs dry skin, ordering, frequency) automatically. The "AI routine check" reviews your full combination for ordering mistakes or conflicting actives (e.g. retinol + vitamin C same night).</p></div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🛍️</span><span class="help-name">Shopping<span class="help-tag">no live links</span></span></summary>
+    <div class="help-body"><p>Pick your style(s), get AI-suggested brands and specific pieces to search for yourself — the AI has no live shopping access, so it never invents a real product URL or claims current pricing/stock. Scan receipts to build a purchase log, which the AI uses to avoid suggesting near-duplicates.</p></div>
+  </details>
+
+  <div class="section-title">College &amp; career</div>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🎓</span><span class="help-name">College<span class="help-tag">WIP</span></span></summary>
+    <div class="help-body">
+      <p>Pulls Canvas assignments, quizzes, and calendar events, grouped by course, filtered to what's not yet submitted. An AI button suggests the fastest order to clear everything, estimating effort per task since Canvas doesn't provide that.</p>
+      <div class="help-setup"><b>Setup needed:</b> a Canvas Personal Access Token — self-serve, no admin needed. On <code>canvas.case.edu</code>: Account → Settings → "+ New Access Token."</div>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">💼</span><span class="help-name">Internships<span class="help-tag">manual send</span></span></summary>
+    <div class="help-body"><p>Add opportunities, paste your resume/bio once, and get an AI-drafted personalized email per opportunity. You review, edit, and send yourself (copy to clipboard or open your email client) — there's no automated sending, by design.</p></div>
+  </details>
+
+  <div class="section-title">System</div>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">✨</span><span class="help-name">Your Coach</span></summary>
+    <div class="help-body">
+      <p>The floating button in the bottom-right corner of every page (except Finance, which has its own nav). Opens a chat with full visibility into every module's data. The first time you open it each browser session, it proactively scans everything and tells you the 1-3 most relevant things worth knowing — you don't have to ask. Has voice input/output like Nova Lite.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">⚙️</span><span class="help-name">Settings</span></summary>
+    <div class="help-body">
+      <p>Gear icon on the homepage opens quick personal-data fields (height/weight/birthday/sex/activity — used across Water, Nutrition, Caffeine). The "Advanced settings" link there opens the full settings page: API spend analysis, model picker, conservation mode, budget alerts, themes, data import/export, and version history.</p>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🔔</span><span class="help-name">Notifications</span></summary>
+    <div class="help-body">
+      <p>A daily reminder push notification. Only works once the app is added to your phone's home screen (iOS 16.4+). Enable from Settings → Notifications.</p>
+      <div class="help-setup"><b>Setup needed:</b> <code>VAPID_PUBLIC_KEY</code> / <code>VAPID_PRIVATE_KEY</code> / <code>VAPID_SUBJECT</code> in Vercel.</div>
+    </div>
+  </details>
+
+  <details class="help-card">
+    <summary class="help-summary"><span class="help-emoji">🔒</span><span class="help-name">Site login</span></summary>
+    <div class="help-body"><p>The whole site is gated behind a password (separate from any module's own login). Sessions last 180 days once you sign in. If you ever need to log everyone out instantly, change <code>SITE_PASSWORD</code> in Vercel — it invalidates every existing session immediately.</p></div>
+  </details>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const search = document.getElementById('searchBox');
+  const cards = Array.from(document.querySelectorAll('.help-card'));
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    cards.forEach(card => {
+      const match = !q || card.textContent.toLowerCase().includes(q);
+      card.style.display = match ? '' : 'none';
+      if (q && match) card.open = true;
+    });
+  });
+})();
+</script>
+</body>
+</html>
