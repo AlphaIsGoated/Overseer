@@ -677,6 +677,17 @@ body::after {
       </div>
       <button class="whoop-btn" id="apiUsageReset" type="button" style="margin-top:10px">Reset log</button>
     </div>
+
+    <div class="section-divider"></div>
+
+    <label class="field-label">Notifications</label>
+    <div class="whoop-box">
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.45;margin-bottom:10px">
+        Sends a daily reminder at 9 am ET so you remember to check in. Only works when the app is added to your home screen.
+      </div>
+      <div id="pushStatus" style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">—</div>
+      <button class="whoop-btn" id="pushEnableBtn" type="button">Enable notifications</button>
+    </div>
   </div>
 </div>
 
@@ -834,7 +845,7 @@ body::after {
   }
 
   /* ---------- open / close ---------- */
-  function open() { populate(); renderWhoop(); renderApiUsage(); $('settingsBg').classList.add('show'); syncWhoop(); }
+  function open() { populate(); renderWhoop(); renderApiUsage(); renderPushStatus(); $('settingsBg').classList.add('show'); syncWhoop(); }
   function close() { $('settingsBg').classList.remove('show'); }
   $('settingsOpen').addEventListener('click', open);
   $('settingsClose').addEventListener('click', close);
@@ -950,6 +961,29 @@ body::after {
     if (!confirm('Clear the logged API usage history? This only resets the on-device estimate, not anything billed by Anthropic.')) return;
     localStorage.setItem('apiusage:log', '[]');
     renderApiUsage();
+  });
+
+  /* ---------- Push notifications ---------- */
+  function renderPushStatus() {
+    const st = $('pushStatus');
+    const btn = $('pushEnableBtn');
+    if (!('Notification' in window)) { st.textContent = 'Not supported in this browser.'; btn.disabled = true; return; }
+    if (!window.DASH_VAPID_PUBLIC_KEY) { st.textContent = 'Not yet configured — add VAPID keys to Vercel first.'; btn.disabled = true; return; }
+    const p = Notification.permission;
+    if (p === 'granted') { st.textContent = 'Enabled ✓ — daily reminder is active.'; btn.textContent = 'Re-subscribe'; }
+    else if (p === 'denied') { st.textContent = 'Blocked — allow notifications for this site in your browser settings.'; btn.disabled = true; }
+    else { st.textContent = 'Tap to turn on daily reminders.'; }
+  }
+  $('pushEnableBtn').addEventListener('click', async () => {
+    const btn = $('pushEnableBtn');
+    btn.disabled = true; btn.textContent = 'Setting up…';
+    try {
+      if (window.requestPushPermission) await window.requestPushPermission();
+    } catch (e) {
+      $('pushStatus').textContent = e.message || 'Could not enable notifications.';
+    }
+    btn.disabled = false; btn.textContent = 'Enable notifications';
+    renderPushStatus();
   });
 
   // Re-populate the settings form if a remote profile change (cloud sync,

@@ -31,6 +31,7 @@ export default function handler(req, res) {
   const key = process.env.SUPABASE_ANON_KEY || '';
   const stravaClientId = process.env.STRAVA_CLIENT_ID || '';
   const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+  const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
   const appSecret = process.env.APP_SECRET || '';
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
@@ -39,6 +40,7 @@ export default function handler(req, res) {
     'window.DASH_SUPABASE_KEY=' + JSON.stringify(key) + ';' +
     'window.DASH_STRAVA_CLIENT_ID=' + JSON.stringify(stravaClientId) + ';' +
     'window.DASH_GOOGLE_CLIENT_ID=' + JSON.stringify(googleClientId) + ';' +
+    'window.DASH_VAPID_PUBLIC_KEY=' + JSON.stringify(vapidPublicKey) + ';' +
     'window.DASH_APP_SECRET=' + JSON.stringify(appSecret) + ';'
   );
 }

@@ -756,7 +756,53 @@ body.topbar-modal-open {
 
     // Periodic refresh so counts stay current after midnight rollover etc.
     setInterval(render, 30 * 1000);
+
+    // ---- Push-notification registration (silently, no permission prompt
+    // unless the user has already granted Notification permission) ----
+    // Only runs once per page session, only when the VAPID public key is
+    // configured. Doesn't ask for permission itself — permission prompts are
+    // triggered by an explicit user action (a "Enable notifications" button
+    // in the settings panel), which stores the user's choice separately.
+    // Here we just register the service worker unconditionally (needed for
+    // offline-support basics too) and subscribe to push if permission is
+    // already 'granted', or if the user just granted it.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).then((reg) => {
+        const vapidPublicKey = window.DASH_VAPID_PUBLIC_KEY;
+        if (!vapidPublicKey || Notification.permission !== 'granted') return;
+        reg.pushManager.getSubscription().then((existing) => {
+          if (existing) return; // already subscribed on this device
+          reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidPublicKey }).then((sub) => {
+            fetch('/api/push-subscribe', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+              body: JSON.stringify({ subscription: sub.toJSON() }),
+            }).catch(() => {});
+          }).catch(() => {});
+        });
+      }).catch(() => {});
+    }
   }
+
+  // ---- Expose helper for requesting push permission (used by settings panel) ----
+  window.requestPushPermission = function () {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return Promise.reject(new Error('Push notifications not supported in this browser.'));
+    }
+    const vapidPublicKey = window.DASH_VAPID_PUBLIC_KEY;
+    if (!vapidPublicKey) {
+      return Promise.reject(new Error('VAPID_PUBLIC_KEY not configured in Vercel env vars yet.'));
+    }
+    return Notification.requestPermission().then((permission) => {
+      if (permission !== 'granted') throw new Error('Permission denied.');
+      return navigator.serviceWorker.ready;
+    }).then((reg) => reg.pushManager.getSubscription().then((existing) => existing || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidPublicKey })))
+      .then((sub) => fetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      })).then((r) => r.json());
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true });

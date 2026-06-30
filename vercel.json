@@ -7,6 +7,19 @@
         { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Service-Worker-Allowed", "value": "/" },
+        { "key": "Cache-Control", "value": "no-store, no-cache" }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/push-send?cron=1",
+      "schedule": "0 13 * * *"
     }
   ]
 }

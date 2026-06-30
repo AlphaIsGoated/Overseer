@@ -31,7 +31,7 @@ export const config = {
   matcher: '/(.*)',
 };
 
-const PUBLIC_PATHS = ['/login.html', '/api/auth'];
+const PUBLIC_PATHS = ['/login.html', '/api/auth', '/sw.js', '/manifest.json'];
 
 export default async function middleware(req) {
   const { pathname } = new URL(req.url);
