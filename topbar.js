@@ -713,9 +713,29 @@ body.topbar-modal-open {
       if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
     });
     function speak(text) {
-      if (!voiceOn || !window.speechSynthesis || !text) return;
+      if (!voiceOn || !text) return;
       const clean = text.replace(/\*\*/g, '').replace(/^[-•*]\s+/gm, '').trim();
       if (!clean) return;
+      // Prefer ElevenLabs when configured — much higher quality than the
+      // browser's built-in synthesis and suits the JARVIS aesthetic better.
+      // Falls back to Web Speech if ELEVENLABS_API_KEY isn't set in Vercel.
+      if (window.DASH_ELEVENLABS_ENABLED) {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        fetch('/api/elevenlabs-tts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+          body: JSON.stringify({ text: clean }),
+        }).then(r => r.ok ? r.arrayBuffer() : null).then(buf => {
+          if (!buf || !voiceOn) return;
+          const blob = new Blob([buf], { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.onended = () => URL.revokeObjectURL(url);
+          audio.play().catch(() => {});
+        }).catch(() => {});
+        return;
+      }
+      if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
     }
