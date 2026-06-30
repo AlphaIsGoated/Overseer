@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Second Brain · Dashboard</title>
+<script src="/api/config"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #020304; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; height: 100%; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 0 60px; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(110,231,183,0.04) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; z-index: 0; }
+
+.page { max-width: 760px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.dash-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 18px; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+/* Graph canvas — takes most of the screen height */
+.brain-canvas-wrap { position: relative; width: 100%; height: min(55vh, 480px); border-radius: 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(110,231,183,0.12); overflow: hidden; cursor: grab; }
+.brain-canvas-wrap:active { cursor: grabbing; }
+#brainCanvas { display: block; width: 100%; height: 100%; }
+.brain-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-tertiary); margin-top: 8px; padding-left: 4px; flex-wrap: wrap; }
+.brain-legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+/* Obsidian connect panel */
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 14px; margin-top: 14px; }
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.field-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 6px; display: block; }
+.gm-input { width: 100%; padding: 11px 14px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-add { padding: 10px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-ghost { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; margin-right: 8px; }
+.obs-status { font-size: 12px; margin-top: 10px; color: var(--text-tertiary); }
+.obs-status.ok { color: var(--success); }
+.obs-status.err { color: var(--danger); }
+.hint { font-size: 11.5px; color: var(--text-tertiary); line-height: 1.45; margin-top: 8px; }
+
+/* Selected node detail panel */
+.node-detail { position: absolute; bottom: 12px; left: 12px; right: 12px; padding: 12px 16px; border-radius: 12px; background: rgba(10,12,14,0.88); border: 1px solid rgba(110,231,183,0.3); font-size: 13px; color: var(--text-primary); display: none; pointer-events: none; }
+.node-detail.show { display: block; }
+.node-detail-title { font-weight: 700; margin-bottom: 3px; }
+.node-detail-sub { font-size: 11px; color: var(--text-tertiary); }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 0 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+
+  <h1 class="dash-title">Second Brain</h1>
+  <p class="dash-sub">Your notes as a living knowledge graph. Connect Obsidian on the same Mac to merge your vaults.</p>
+
+  <div class="brain-canvas-wrap">
+    <canvas id="brainCanvas"></canvas>
+    <div class="node-detail" id="nodeDetail">
+      <div class="node-detail-title" id="nodeTitle">—</div>
+      <div class="node-detail-sub" id="nodeSub">—</div>
+    </div>
+  </div>
+  <div class="brain-legend">
+    <span><span class="brain-legend-dot" style="background:#6EE7B7"></span>Overseer note</span>
+    <span><span class="brain-legend-dot" style="background:#A78BFA"></span>Obsidian note</span>
+    <span><span class="brain-legend-dot" style="background:rgba(255,255,255,0.2)"></span>Weak link</span>
+    <span><span class="brain-legend-dot" style="background:#67E8F9"></span>Strong link</span>
+  </div>
+
+  <div class="section-title">Obsidian vault sync</div>
+  <div class="gm-card">
+    <label class="field-label">Local REST API URL</label>
+    <input class="gm-input" id="obsUrl" type="text" placeholder="http://localhost:27124" autocomplete="off">
+    <label class="field-label">API key</label>
+    <input class="gm-input" id="obsKey" type="password" placeholder="From Obsidian → Local REST API settings" autocomplete="off">
+    <div>
+      <button class="gm-add" id="obsSave" type="button">Connect</button>
+      <button class="gm-ghost" id="obsSync" type="button">Sync now</button>
+    </div>
+    <div class="obs-status" id="obsStatus"></div>
+    <div class="hint">
+      Install the <b>Local REST API</b> community plugin in Obsidian (Settings → Community plugins → Browse), then enter the URL and key it shows. Only works on the same Mac where Obsidian is running. On iPhone, the graph still shows your Overseer notes.
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const OBS_CREDS_KEY = 'brain:obs_creds';
+  const OBS_NOTES_KEY = 'brain:obs_notes'; // cached Obsidian note metadata
+  const NOTES_KEY = 'notes:items';
+
+  function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
+  function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+  // ---- Load credentials ----
+  const creds = loadJSON(OBS_CREDS_KEY, { url: '', key: '' });
+  if (creds.url) { document.getElementById('obsUrl').value = creds.url; }
+
+  // ---- Gather note data from both sources ----
+  function gatherNodes() {
+    const nodes = [];
+    // Overseer notes (from the Notes module's localStorage)
+    const overseers = loadJSON(NOTES_KEY, []);
+    overseers.forEach(n => {
+      nodes.push({ id: 'o_' + n.id, label: n.title || 'Untitled', body: n.body || '', source: 'overseer', pinned: n.pinned });
+    });
+    // Obsidian notes (cached metadata from last sync)
+    const obsNotes = loadJSON(OBS_NOTES_KEY, []);
+    obsNotes.forEach(n => {
+      nodes.push({ id: 'obs_' + n.path, label: n.path.replace(/\.md$/, '').split('/').pop(), body: n.body || '', source: 'obsidian' });
+    });
+    return nodes;
+  }
+
+  // Build edges: connect notes that share meaningful words.
+  // This is a simple but effective approach — real graph software uses
+  // [[wikilinks]] for explicit connections, but keyword co-occurrence
+  // gives a reasonable approximation for notes that weren't explicitly linked.
+  function buildEdges(nodes) {
+    const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so']);
+    function keywords(text) {
+      return new Set((text || '').toLowerCase().match(/\b[a-z]{4,}\b/g)?.filter(w => !STOPWORDS.has(w)) || []);
+    }
+    const kws = nodes.map(n => keywords(n.label + ' ' + n.body));
+    const edges = [];
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const shared = [...kws[i]].filter(w => kws[j].has(w));
+        if (shared.length >= 1) {
+          edges.push({ a: i, b: j, weight: Math.min(shared.length, 5) });
+        }
+      }
+    }
+    return edges;
+  }
+
+  // ---- Force-directed layout (custom, no D3 needed) ----
+  // Each node has position + velocity. Three forces run each tick:
+  //   1. Repulsion — all nodes push each other apart (like magnets)
+  //   2. Attraction — connected nodes pull toward each other (spring)
+  //   3. Center gravity — slowly pulls everything back to canvas center
+  // After a few hundred ticks it settles; we keep running slowly for a
+  // gentle "breathing" effect that makes the graph feel alive.
+  function createLayout(nodes, edges, W, H) {
+    const n = nodes.length;
+    const cx = W / 2, cy = H / 2;
+    const px = nodes.map(() => cx + (Math.random() - 0.5) * W * 0.5);
+    const py = nodes.map(() => cy + (Math.random() - 0.5) * H * 0.5);
+    const vx = new Float64Array(n);
+    const vy = new Float64Array(n);
+
+    function tick(cooling) {
+      const fx = new Float64Array(n);
+      const fy = new Float64Array(n);
+      const K = 1000; // repulsion strength
+      const L = Math.min(W, H) / (Math.sqrt(n) + 1) * 1.4; // rest edge length
+      const G = 0.02; // gravity
+
+      // Repulsion
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          let dx = px[i] - px[j], dy = py[i] - py[j];
+          const d2 = dx * dx + dy * dy + 1;
+          const f = K / d2;
+          const inv = 1 / Math.sqrt(d2);
+          fx[i] += f * dx * inv; fy[i] += f * dy * inv;
+          fx[j] -= f * dx * inv; fy[j] -= f * dy * inv;
+        }
+      }
+      // Attraction (edges)
+      edges.forEach(e => {
+        let dx = px[e.b] - px[e.a], dy = py[e.b] - py[e.a];
+        const d = Math.max(Math.sqrt(dx * dx + dy * dy), 0.1);
+        const f = (d - L * 0.8) * 0.04 * e.weight;
+        const inv = 1 / d;
+        fx[e.a] += f * dx * inv; fy[e.a] += f * dy * inv;
+        fx[e.b] -= f * dx * inv; fy[e.b] -= f * dy * inv;
+      });
+      // Gravity + velocity update
+      for (let i = 0; i < n; i++) {
+        fx[i] += (cx - px[i]) * G;
+        fy[i] += (cy - py[i]) * G;
+        vx[i] = (vx[i] + fx[i]) * 0.72 * cooling;
+        vy[i] = (vy[i] + fy[i]) * 0.72 * cooling;
+        px[i] += vx[i];
+        py[i] += vy[i];
+        // Keep within bounds
+        px[i] = Math.max(20, Math.min(W - 20, px[i]));
+        py[i] = Math.max(20, Math.min(H - 20, py[i]));
+      }
+    }
+
+    return { px, py, tick };
+  }
+
+  // ---- Canvas rendering ----
+  const canvas = document.getElementById('brainCanvas');
+  const ctx = canvas.getContext('2d');
+  const detail = document.getElementById('nodeDetail');
+  const nodeTitle = document.getElementById('nodeTitle');
+  const nodeSub = document.getElementById('nodeSub');
+  let nodes = [], edges = [], layout = null;
+  let W = 0, H = 0, tick = 0, hovered = -1, selected = -1;
+
+  const SOURCE_COLOR = { overseer: '#6EE7B7', obsidian: '#A78BFA' };
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    canvas.width = W * devicePixelRatio;
+    canvas.height = H * devicePixelRatio;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+  }
+
+  function nodeRadius(n) { return n.source === 'obsidian' ? 7 : 8; }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    if (!nodes.length) {
+      ctx.fillStyle = 'rgba(110,231,183,0.3)';
+      ctx.font = '13px ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Add notes to see your knowledge graph.', W / 2, H / 2);
+      return;
+    }
+    const { px, py } = layout;
+    // Edges
+    edges.forEach(e => {
+      const str = Math.min(e.weight / 5, 1);
+      ctx.beginPath();
+      ctx.moveTo(px[e.a], py[e.a]);
+      ctx.lineTo(px[e.b], py[e.b]);
+      ctx.strokeStyle = e.weight >= 3 ? `rgba(103,232,249,${0.12 + str * 0.25})` : `rgba(255,255,255,${0.05 + str * 0.1})`;
+      ctx.lineWidth = e.weight >= 3 ? 1.5 : 0.8;
+      ctx.stroke();
+    });
+    // Nodes
+    nodes.forEach((n, i) => {
+      const x = px[i], y = py[i], r = nodeRadius(n);
+      const isHov = i === hovered || i === selected;
+      const col = SOURCE_COLOR[n.source] || '#6EE7B7';
+      // glow
+      ctx.beginPath();
+      ctx.arc(x, y, r + (isHov ? 8 : 5), 0, Math.PI * 2);
+      const grd = ctx.createRadialGradient(x, y, r * 0.5, x, y, r + (isHov ? 8 : 5));
+      grd.addColorStop(0, col.replace('#', 'rgba(').replace(/([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i, (_, r, g, b) => `${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},${isHov?0.4:0.18})`));
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.fill();
+      // circle
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#020304'; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = isHov ? 2 : 1.2; ctx.stroke();
+      // label
+      ctx.fillStyle = isHov ? '#FAFAFA' : 'rgba(255,255,255,0.55)';
+      ctx.font = `${isHov ? 'bold ' : ''}10px -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      const label = n.label.length > 16 ? n.label.slice(0, 14) + '…' : n.label;
+      ctx.fillText(label, x, y + r + 11);
+    });
+  }
+
+  function rebuild() {
+    nodes = gatherNodes();
+    edges = buildEdges(nodes);
+    resize();
+    if (!nodes.length) { draw(); return; }
+    layout = createLayout(nodes, edges, W, H);
+    tick = 0;
+  }
+
+  // Run layout + redraw at 60fps. Cooling slows the simulation after
+  // ~120 frames so it settles, then very slow "breathing" updates continue.
+  function animate() {
+    if (layout) {
+      const cooling = tick < 80 ? 1 : tick < 160 ? 0.4 : 0.05;
+      layout.tick(cooling);
+      tick++;
+    }
+    draw();
+    requestAnimationFrame(animate);
+  }
+
+  // ---- Mouse / touch interaction ----
+  function getHitNode(ex, ey) {
+    if (!layout) return -1;
+    const { px, py } = layout;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const dx = ex - px[i], dy = ey - py[i];
+      if (dx * dx + dy * dy <= (nodeRadius(nodes[i]) + 4) ** 2) return i;
+    }
+    return -1;
+  }
+  function canvasCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return [touch.clientX - rect.left, touch.clientY - rect.top];
+  }
+  canvas.addEventListener('mousemove', (e) => {
+    const [ex, ey] = canvasCoords(e);
+    hovered = getHitNode(ex, ey);
+    canvas.style.cursor = hovered >= 0 ? 'pointer' : 'grab';
+  });
+  canvas.addEventListener('click', (e) => {
+    const [ex, ey] = canvasCoords(e);
+    selected = getHitNode(ex, ey);
+    if (selected >= 0) {
+      const n = nodes[selected];
+      nodeTitle.textContent = n.label;
+      nodeSub.textContent = (n.source === 'obsidian' ? 'Obsidian · ' : 'Overseer · ') + (n.body || '').slice(0, 80) + (n.body.length > 80 ? '…' : '');
+      detail.classList.add('show');
+    } else {
+      detail.classList.remove('show');
+    }
+  });
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); });
+  canvas.addEventListener('touchend', (e) => {
+    const [ex, ey] = canvasCoords(e.changedTouches[0] || e);
+    selected = getHitNode(ex, ey);
+    if (selected >= 0) {
+      const n = nodes[selected];
+      nodeTitle.textContent = n.label;
+      nodeSub.textContent = (n.source === 'obsidian' ? 'Obsidian · ' : 'Overseer · ') + (n.body || '').slice(0, 80);
+      detail.classList.add('show');
+    } else {
+      detail.classList.remove('show');
+    }
+  });
+  window.addEventListener('resize', () => { resize(); if (layout) { layout.px; } });
+
+  // ---- Obsidian Local REST API ----
+  async function syncObsidian() {
+    const url = document.getElementById('obsUrl').value.trim().replace(/\/+$/, '');
+    const key = document.getElementById('obsKey').value.trim();
+    if (!url || !key) { setStatus('Enter URL and API key first.', 'err'); return; }
+    saveJSON(OBS_CREDS_KEY, { url, key });
+    setStatus('Connecting to Obsidian…', '');
+    try {
+      const headers = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' };
+      const listRes = await fetch(url + '/vault/', { headers });
+      if (!listRes.ok) { setStatus('Could not reach Obsidian (is it open and the plugin running?)', 'err'); return; }
+      const files = await listRes.json();
+      const mdFiles = (files.files || []).filter(f => f.endsWith('.md')).slice(0, 100);
+      const notes = [];
+      for (const path of mdFiles) {
+        try {
+          const r = await fetch(url + '/vault/' + encodeURIComponent(path), { headers: { ...headers, Accept: 'text/plain' } });
+          const body = r.ok ? (await r.text()).slice(0, 1000) : '';
+          notes.push({ path, body });
+        } catch (e) { notes.push({ path, body: '' }); }
+      }
+      saveJSON(OBS_NOTES_KEY, notes);
+      setStatus('Synced ' + notes.length + ' Obsidian notes ✓', 'ok');
+      rebuild();
+    } catch (e) {
+      setStatus('Error: ' + (e.message || String(e)), 'err');
+    }
+  }
+
+  function setStatus(msg, cls) {
+    const el = document.getElementById('obsStatus');
+    el.textContent = msg; el.className = 'obs-status' + (cls ? ' ' + cls : '');
+  }
+
+  document.getElementById('obsSave').addEventListener('click', syncObsidian);
+  document.getElementById('obsSync').addEventListener('click', syncObsidian);
+
+  // Kick off
+  resize();
+  rebuild();
+  animate();
+
+  // Rebuild if Overseer notes change in another tab
+  window.addEventListener('storage', (e) => { if (e.key === NOTES_KEY) rebuild(); });
+})();
+</script>
+</body>
+</html>
