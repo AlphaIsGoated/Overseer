@@ -823,21 +823,63 @@ body.topbar-modal-open {
     }
 
     const micBtn = document.getElementById('coachMic');
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      micBtn.style.display = 'none';
-    } else {
-      const recognizer = new SR();
-      recognizer.lang = 'en-US'; recognizer.interimResults = false; recognizer.maxAlternatives = 1;
-      let listening = false;
-      recognizer.onresult = (e) => { const said = e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (said) input.value = said; };
-      recognizer.onend = () => { listening = false; micBtn.classList.remove('listening'); };
-      recognizer.onerror = () => { listening = false; micBtn.classList.remove('listening'); };
-      micBtn.addEventListener('click', () => {
-        if (listening) { recognizer.stop(); return; }
-        listening = true; micBtn.classList.add('listening');
-        try { recognizer.start(); } catch (e) { listening = false; micBtn.classList.remove('listening'); }
+    // Whisper (OpenAI) transcription via MediaRecorder is significantly more
+    // accurate than the browser's SpeechRecognition and also works on iOS
+    // (which doesn't support SpeechRecognition at all). We prefer it when
+    // OPENAI_API_KEY is configured, fall back to SpeechRecognition otherwise.
+    if (window.DASH_OPENAI_ENABLED && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      let recorder = null, chunks = [];
+      micBtn.addEventListener('click', async () => {
+        if (recorder && recorder.state === 'recording') {
+          recorder.stop(); return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          chunks = [];
+          recorder = new MediaRecorder(stream);
+          recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+          recorder.onstop = async () => {
+            micBtn.classList.remove('listening');
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const base64 = reader.result.split(',')[1];
+              micBtn.textContent = '⟳'; // transcribing indicator
+              try {
+                const res = await fetch('/api/whisper-transcribe', {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+                  body: JSON.stringify({ audio: base64, mimeType: blob.type }),
+                });
+                const json = await res.json();
+                if (json.text) { input.value = json.text; input.focus(); }
+              } catch (e) {}
+              micBtn.textContent = '🎙️';
+            };
+            reader.readAsDataURL(blob);
+          };
+          recorder.start();
+          micBtn.classList.add('listening');
+        } catch (e) { micBtn.classList.remove('listening'); }
       });
+    } else {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        micBtn.style.display = 'none';
+      } else {
+        const recognizer = new SR();
+        recognizer.lang = 'en-US'; recognizer.interimResults = false; recognizer.maxAlternatives = 1;
+        let listening = false;
+        recognizer.onresult = (e) => { const said = e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (said) input.value = said; };
+        recognizer.onend = () => { listening = false; micBtn.classList.remove('listening'); };
+        recognizer.onerror = () => { listening = false; micBtn.classList.remove('listening'); };
+        micBtn.addEventListener('click', () => {
+          if (listening) { recognizer.stop(); return; }
+          listening = true; micBtn.classList.add('listening');
+          try { recognizer.start(); } catch (e) { listening = false; micBtn.classList.remove('listening'); }
+        });
+      }
     }
   }
 
