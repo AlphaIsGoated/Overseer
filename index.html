@@ -452,7 +452,13 @@ body::after {
   </div>
   <div class="jarvis-skip">tap anywhere to skip</div>
 </div>
-<div class="page">
+<!-- Second Brain — ambient background graph "overseeing" the homepage.
+     The canvas sits behind everything (z-index -1) and renders a ghostly,
+     low-opacity version of the same note network graph, making it feel
+     like a living intelligence is present underneath the tiles. -->
+<canvas id="homeBrainCanvas" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0.35"></canvas>
+
+<div class="page" style="position:relative;z-index:1">
 
   <div class="hub-head">
     <h1 class="dash-title">Shrey's Dashboard</h1>
@@ -772,6 +778,20 @@ body::after {
       <h2 class="tile-title">Help</h2>
       <div class="tile-foot">
         <span class="tile-sub">How everything works</span>
+        <span class="tile-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- Small tile -->
+    <a class="tile" href="brain.html" style="--accent:#A78BFA">
+      <div class="tile-top">
+        <span class="tile-num">·22</span>
+        <span class="tile-emoji">🧬</span>
+      </div>
+      <div class="tile-spacer"></div>
+      <h2 class="tile-title">Second Brain</h2>
+      <div class="tile-foot">
+        <span class="tile-sub">Note network + Obsidian</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -1310,6 +1330,100 @@ body::after {
 
   initWeather();
   loadNews();
+
+  // ---- Ambient background brain graph ("second brain overseeing the homepage") ----
+  // The same force-directed note network from brain.html, but rendered at low
+  // opacity behind the bento tiles so it feels like living intelligence underneath.
+  (function homeBrain() {
+    const canvas = document.getElementById('homeBrainCanvas');
+    if (!canvas) return;
+    const ctx2 = canvas.getContext('2d');
+    let W = 0, H = 0;
+    function resize2() {
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = W * devicePixelRatio;
+      canvas.height = H * devicePixelRatio;
+      ctx2.scale(devicePixelRatio, devicePixelRatio);
+    }
+    resize2();
+    window.addEventListener('resize', resize2);
+
+    const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so']);
+    function keywords(text) { return new Set((text||'').toLowerCase().match(/\b[a-z]{4,}\b/g)?.filter(w=>!STOPWORDS.has(w))||[]); }
+
+    function loadNodes() {
+      try {
+        const notes = JSON.parse(localStorage.getItem('notes:items')) || [];
+        const obsNotes = JSON.parse(localStorage.getItem('brain:obs_notes')) || [];
+        const all = notes.map(n => ({ label: n.title||'', body: n.body||'', src: 0 }))
+          .concat(obsNotes.map(n => ({ label: n.path.replace(/\.md$/,'').split('/').pop(), body: n.body||'', src: 1 })));
+        return all;
+      } catch(e) { return []; }
+    }
+
+    let nodes = [], edges = [], px = [], py = [], vx = [], vy = [], settled = false, bgTick = 0;
+    function rebuild2() {
+      nodes = loadNodes();
+      const n = nodes.length;
+      if (!n) return;
+      const kws = nodes.map(nd => keywords(nd.label + ' ' + nd.body));
+      edges = [];
+      for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
+        const shared = [...kws[i]].filter(w=>kws[j].has(w));
+        if (shared.length >= 1) edges.push({ a: i, b: j, w: Math.min(shared.length, 5) });
+      }
+      px = nodes.map(() => W * 0.1 + Math.random() * W * 0.8);
+      py = nodes.map(() => H * 0.1 + Math.random() * H * 0.8);
+      vx = new Array(n).fill(0); vy = new Array(n).fill(0);
+      settled = false; bgTick = 0;
+    }
+    function tick2() {
+      const n = nodes.length;
+      const fx = new Array(n).fill(0), fy = new Array(n).fill(0);
+      const K = 4000, L = Math.min(W, H) / (Math.sqrt(n) + 0.5) * 2.2, G = 0.006;
+      const cx2 = W * 0.5, cy2 = H * 0.48;
+      for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
+        let dx = px[i]-px[j], dy = py[i]-py[j];
+        const d2 = dx*dx+dy*dy+1, f = K/d2, inv = 1/Math.sqrt(d2);
+        fx[i]+=f*dx*inv; fy[i]+=f*dy*inv; fx[j]-=f*dx*inv; fy[j]-=f*dy*inv;
+      }
+      edges.forEach(e => {
+        let dx=px[e.b]-px[e.a], dy=py[e.b]-py[e.a];
+        const d=Math.max(Math.sqrt(dx*dx+dy*dy),0.1), f=(d-L)*0.025*e.w, inv=1/d;
+        fx[e.a]+=f*dx*inv; fy[e.a]+=f*dy*inv; fx[e.b]-=f*dx*inv; fy[e.b]-=f*dy*inv;
+      });
+      const cooling = bgTick < 100 ? 0.9 : 0.04;
+      for (let i = 0; i < n; i++) {
+        fx[i]+=(cx2-px[i])*G; fy[i]+=(cy2-py[i])*G;
+        vx[i]=(vx[i]+fx[i])*0.75*cooling; vy[i]=(vy[i]+fy[i])*0.75*cooling;
+        px[i]+=vx[i]; py[i]+=vy[i];
+        px[i]=Math.max(30,Math.min(W-30,px[i])); py[i]=Math.max(30,Math.min(H-30,py[i]));
+      }
+      bgTick++;
+    }
+    function draw2() {
+      ctx2.clearRect(0, 0, W, H);
+      if (!nodes.length) return;
+      edges.forEach(e => {
+        ctx2.beginPath(); ctx2.moveTo(px[e.a], py[e.a]); ctx2.lineTo(px[e.b], py[e.b]);
+        ctx2.strokeStyle = e.w >= 3 ? 'rgba(103,232,249,0.18)' : 'rgba(110,231,183,0.07)';
+        ctx2.lineWidth = e.w >= 3 ? 1.2 : 0.6; ctx2.stroke();
+      });
+      nodes.forEach((nd, i) => {
+        const r = 5;
+        const col = nd.src === 1 ? [167,139,250] : [110,231,183];
+        ctx2.beginPath(); ctx2.arc(px[i], py[i], r+6, 0, Math.PI*2);
+        ctx2.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.08)`; ctx2.fill();
+        ctx2.beginPath(); ctx2.arc(px[i], py[i], r, 0, Math.PI*2);
+        ctx2.fillStyle = '#020304'; ctx2.fill();
+        ctx2.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},0.5)`; ctx2.lineWidth = 1; ctx2.stroke();
+      });
+    }
+    function loop2() { if (nodes.length) tick2(); draw2(); requestAnimationFrame(loop2); }
+    rebuild2();
+    loop2();
+    window.addEventListener('storage', (e) => { if (e.key==='notes:items'||e.key==='brain:obs_notes') rebuild2(); });
+  })();
 })();
 </script>
 
