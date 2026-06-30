@@ -154,7 +154,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: REC_SYSTEM, messages: [{ role: 'user', content: prompt }] })
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'shopping');
       const json = await res.json();
       box.innerHTML = (!res.ok || json.error)
         ? '<div class="rec-block">' + escapeHtml(json.error || 'Something went wrong.') + '</div>'
@@ -253,7 +253,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: 'Read clothing/retail receipts and order confirmations precisely.', tool: RECEIPT_TOOL, image: base64, mediaType: 'image/jpeg', prompt: 'Read this receipt/order confirmation and record each item purchased.' })
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'shopping');
       const data = await res.json();
       $('purchaseBusy').classList.add('hidden');
       if (!res.ok || data.error) { $('purchaseErr').textContent = data.error || 'Could not read that receipt.'; $('purchaseErr').classList.remove('hidden'); return; }

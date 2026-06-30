@@ -20,7 +20,36 @@
   const TOPBAR_SUPABASE_KEY = (window.DASH_SUPABASE_KEY) || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
 
   // -------- CSS --------
+  // Themes are applied by setting data-theme="X" on <html>.
+  // Each theme overrides the shared CSS custom properties used by every
+  // page, so a single attribute flip changes the whole visual language.
+  // Default (no data-theme attribute) = the original dark/mint design.
   const css = `
+[data-theme="midnight"] {
+  --theme-bg: #08080f; --theme-bg2: #0c0c18;
+  --theme-accent: #A78BFA; --theme-accent2: #818CF8;
+  --theme-success: #A78BFA; --theme-warning: #FBBF24; --theme-danger: #F87171;
+}
+[data-theme="warm"] {
+  --theme-bg: #0a0806; --theme-bg2: #120e09;
+  --theme-accent: #F59E0B; --theme-accent2: #FCD34D;
+  --theme-success: #D97706; --theme-warning: #F59E0B; --theme-danger: #EF4444;
+}
+[data-theme="minimal"] {
+  --theme-bg: #000000; --theme-bg2: #080808;
+  --theme-accent: #FAFAFA; --theme-accent2: #C0C0C0;
+  --theme-success: #E0E0E0; --theme-warning: #A0A0A0; --theme-danger: #808080;
+}
+[data-theme="midnight"] body, [data-theme="warm"] body, [data-theme="minimal"] body {
+  background: var(--theme-bg);
+}
+[data-theme] .topbar, [data-theme] .bottombar {
+  background: var(--theme-bg, #0a0a0b);
+}
+[data-theme] .gm-card, [data-theme] .tile, [data-theme] .coach-panel,
+[data-theme] .modal, [data-theme] .po-modal {
+  background: color-mix(in srgb, var(--theme-bg2, rgba(255,255,255,0.04)) 90%, transparent);
+}
 .topbar {
   position: sticky; top: 0; z-index: 40;
   display: flex; justify-content: flex-end; align-items: center;
@@ -565,17 +594,58 @@ body.topbar-modal-open {
   // entry here, so spend can be estimated in one place (the index.html
   // settings panel) regardless of which module made the call.
   const USAGE_KEY = 'apiusage:log';
-  window.logApiUsage = function (inputTokens, outputTokens, model) {
+  // source is a short module name ('gym', 'finance', 'nova', 'marathon', 'coach', etc.)
+  // so the settings page can break down spending by module.
+  window.logApiUsage = function (inputTokens, outputTokens, model, source) {
     if (!inputTokens && !outputTokens) return;
     let log = [];
     try { log = JSON.parse(localStorage.getItem(USAGE_KEY)) || []; } catch (e) {}
-    log.push({ ts: Date.now(), model: model || 'claude-opus-4-8', inputTokens: Number(inputTokens) || 0, outputTokens: Number(outputTokens) || 0 });
-    // Cap history so this can't grow unbounded over months of use.
+    log.push({ ts: Date.now(), model: model || 'claude-opus-4-8', inputTokens: Number(inputTokens) || 0, outputTokens: Number(outputTokens) || 0, source: source || 'other' });
     if (log.length > 2000) log = log.slice(log.length - 2000);
     localStorage.setItem(USAGE_KEY, JSON.stringify(log));
+
+    // Budget alert: check if this month's spend has crossed the user's
+    // configured threshold. Runs after every logged call so the warning
+    // appears immediately rather than only when the settings page is open.
+    try {
+      const budgetStr = localStorage.getItem('settings:monthly_budget');
+      if (budgetStr) {
+        const budget = parseFloat(budgetStr);
+        if (budget > 0) {
+          const PRICES = { 'claude-haiku-4-5': { in: 1, out: 5 }, 'claude-sonnet-4-6': { in: 3, out: 15 }, 'claude-opus-4-8': { in: 5, out: 25 } };
+          const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+          const monthSpend = log.filter(e => e.ts >= monthStart.getTime()).reduce((s, e) => {
+            const p = PRICES[e.model] || PRICES['claude-opus-4-8'];
+            return s + (e.inputTokens / 1e6) * p.in + (e.outputTokens / 1e6) * p.out;
+          }, 0);
+          const pct = monthSpend / budget;
+          if (pct >= 1 && localStorage.getItem('settings:budget_alerted') !== 'over') {
+            localStorage.setItem('settings:budget_alerted', 'over');
+            showBudgetAlert('Budget exceeded — monthly AI spend ($' + monthSpend.toFixed(2) + ') is over your $' + budget.toFixed(2) + ' limit. Conservation mode recommended.', 'danger');
+          } else if (pct >= 0.8 && localStorage.getItem('settings:budget_alerted') !== '80' && localStorage.getItem('settings:budget_alerted') !== 'over') {
+            localStorage.setItem('settings:budget_alerted', '80');
+            showBudgetAlert('Heads-up — AI spend this month is $' + monthSpend.toFixed(2) + ' (80%+ of your $' + budget.toFixed(2) + ' budget).', 'warn');
+          }
+        }
+      }
+    } catch (e) {}
   };
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'apiusage', syncedKeys: [USAGE_KEY] });
+  }
+
+  // Shows a dismissible top-of-page banner for budget warnings.
+  // Uses a simple fixed bar rather than a modal so it doesn't interrupt work.
+  function showBudgetAlert(msg, level) {
+    if (document.getElementById('budget-alert-bar')) return; // one at a time
+    const bar = document.createElement('div');
+    bar.id = 'budget-alert-bar';
+    const bg = level === 'danger' ? 'rgba(255,107,107,0.15)' : 'rgba(242,192,99,0.12)';
+    const border = level === 'danger' ? 'rgba(255,107,107,0.4)' : 'rgba(242,192,99,0.35)';
+    const color = level === 'danger' ? '#FF8A8A' : '#F2C063';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:' + bg + ';border-bottom:1px solid ' + border + ';font-family:-apple-system,sans-serif;font-size:12.5px;font-weight:600;color:' + color + ';';
+    bar.innerHTML = '<span>' + msg + ' <a href="settings.html" style="color:inherit;text-decoration:underline;margin-left:6px">View settings →</a></span><button onclick="this.parentNode.remove()" style="border:0;background:transparent;color:inherit;font-size:18px;cursor:pointer;padding:0 4px;line-height:1">×</button>';
+    document.body.insertBefore(bar, document.body.firstChild);
   }
 
   // -------- Your Coach — JARVIS-styled, present on every page --------
@@ -635,9 +705,14 @@ body.topbar-modal-open {
       const res = await fetch('/api/ai/ai-chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-        body: JSON.stringify({ system: system + JSON.stringify(dashboardData()), messages: [{ role: 'user', content: userText }] }),
+        body: JSON.stringify({
+          system: system + JSON.stringify(dashboardData()),
+          model: window.getPreferredModel ? window.getPreferredModel() : 'claude-opus-4-8',
+          conservation: window.isConservationMode ? window.isConservationMode() : false,
+          messages: [{ role: 'user', content: userText }],
+        }),
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'coach');
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Something went wrong.');
       return json.text || '(no response)';
@@ -664,6 +739,13 @@ body.topbar-modal-open {
     async function runProactiveScan() {
       const cached = sessionStorage.getItem('coach_proactive_text');
       if (cached) { addMsg('coach', cached, true); return; }
+      // Conservation mode skips this entirely — it's the single biggest
+      // recurring cost (a full dashboard-data scan on every session) since
+      // it fires automatically rather than being something you asked for.
+      if (window.isConservationMode && window.isConservationMode()) {
+        addMsg('coach', 'Conservation mode is on, so I skipped the automatic scan — ask me anything directly instead.', true);
+        return;
+      }
       const loading = addLoading();
       try {
         const text = await callAI(PROACTIVE_SYS, 'Scan everything and tell me what is most worth knowing right now.');
@@ -805,6 +887,32 @@ body.topbar-modal-open {
   }
 
   // ---- Expose helper for requesting push permission (used by settings panel) ----
+  // Apply the saved theme immediately — runs BEFORE paint so there's no
+  // flash of the wrong theme. Setting data-theme on <html> lets the CSS
+  // rules injected above cascade to every element on the page.
+  function applyTheme() {
+    try {
+      const t = localStorage.getItem('settings:theme') || 'default';
+      if (t && t !== 'default') document.documentElement.setAttribute('data-theme', t);
+      else document.documentElement.removeAttribute('data-theme');
+    } catch (e) {}
+  }
+  applyTheme();
+  window.applyTheme = applyTheme; // expose so settings.html can call it live
+
+  // Returns the Claude model string the user has chosen in Settings.
+  // Pages pass this to the server so responses use the right tier.
+  // Falls back to Opus (the current default) if nothing is saved.
+  window.getPreferredModel = function () {
+    try { return localStorage.getItem('settings:model') || 'claude-opus-4-8'; } catch (e) { return 'claude-opus-4-8'; }
+  };
+
+  // Conservation mode reduces AI spend by skipping background-initiated
+  // calls (proactive scans, auto-classifications) and capping response length.
+  window.isConservationMode = function () {
+    try { return localStorage.getItem('settings:conservation_mode') === '1'; } catch (e) { return false; }
+  };
+
   window.requestPushPermission = function () {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       return Promise.reject(new Error('Push notifications not supported in this browser.'));

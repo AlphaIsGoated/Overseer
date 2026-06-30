@@ -1358,7 +1358,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       method: 'POST', headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
       body: JSON.stringify({ system: IMPORT_SYSTEM, tool: IMPORT_TOOL, image: base64, mediaType, prompt: 'Read this training plan and record every day.' })
     });
-    if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+    if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'marathon');
     const json = await res.json();
     if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that plan.'); throw e; }
     return json;
@@ -1372,7 +1372,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         messages: [{ role: 'user', content: 'Extract just the running/marathon training plan from this document:\n\n' + text }]
       })
     });
-    if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+    if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'marathon');
     const json = await res.json();
     if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that file.'); throw e; }
     return json;

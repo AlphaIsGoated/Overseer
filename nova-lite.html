@@ -158,10 +158,11 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({
           system: SYS + JSON.stringify(dashboardData()),
+          model: window.getPreferredModel ? window.getPreferredModel() : 'claude-opus-4-8',
           messages: [{ role: 'user', content: text }],
         }),
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'nova');
       const json = await res.json();
       if (!res.ok || json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error || 'Something went wrong.')); setOrb(''); busy = false; return; }
       loading.querySelector('div:last-child').innerHTML = render(json.text || 'Hmm, no reply.');

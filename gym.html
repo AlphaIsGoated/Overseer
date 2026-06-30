@@ -3892,7 +3892,7 @@ img, video, canvas, svg { max-width: 100%; }
         prompt: 'Read this body-composition result and record every figure on it.'
       })
     });
-    if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+    if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
     const json = await res.json();
     if (!res.ok || json.error) { const e = new Error(json.error || 'Could not read that image.'); e.code = 'API'; throw e; }
     return json;
@@ -3965,7 +3965,7 @@ img, video, canvas, svg { max-width: 100%; }
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: PLAN_IMPORT_SYSTEM, tool: PLAN_IMPORT_TOOL, image: img.base64, mediaType: img.mediaType, prompt: 'Read this strength training plan and record every exercise, grouped by day.' })
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
       const data = await res.json();
       if (!res.ok || data.error) { planImportError(data.error || 'Could not read that image.'); return; }
       if (data.readable === false) { planImportError("Couldn't find a strength plan in that image. Try a clearer photo."); return; }
@@ -3982,7 +3982,7 @@ img, video, canvas, svg { max-width: 100%; }
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: PLAN_IMPORT_SYSTEM, tool: PLAN_IMPORT_TOOL, messages: [{ role: 'user', content: 'Extract the strength training plan from this text:\n\n' + text }] })
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
       const data = await res.json();
       if (!res.ok || data.error) { planImportError(data.error || 'Could not read that text.'); return; }
       if (data.readable === false) { planImportError("Couldn't find a strength plan in that text."); return; }
@@ -4879,7 +4879,7 @@ img, video, canvas, svg { max-width: 100%; }
         headers: { 'content-type':'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: SYS + gymContext(), messages:[{role:'user', content:text}] }),
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
       const json = await res.json();
       if (!res.ok || json.error){ loading.innerHTML = md('- ' + (json.error || 'Something went wrong.')); busy=false; return; }
       loading.innerHTML = md(json.text || 'Hmm, no reply.');

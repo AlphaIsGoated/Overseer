@@ -197,7 +197,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: REVIEW_SYS, messages: [{ role: 'user', content: summary }] })
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'skincare');
       const json = await res.json();
       box.textContent = (!res.ok || json.error) ? (json.error || 'Something went wrong.') : (json.text || 'No feedback.');
     } catch (e) {

@@ -219,7 +219,7 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; }
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ system: DRAFT_SYS, messages: [{ role: 'user', content: prompt }] })
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
       const json = await res.json();
       $('draftBusy').classList.add('hidden');
       if (!res.ok || json.error) { $('draftErr').textContent = json.error || 'Something went wrong.'; $('draftErr').classList.remove('hidden'); return; }

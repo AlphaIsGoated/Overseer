@@ -197,7 +197,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify(body)
       });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'));
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'resume');
       const data = await res.json();
       if (!res.ok || data.error) { showError(data.error || 'Could not read that file.'); return; }
       if (data.readable === false) { showError("That didn't look like a resume — try a different file."); return; }

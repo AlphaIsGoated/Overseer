@@ -39,9 +39,20 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
+    // Accept a preferred model from the client (set in the Settings page).
+    // Whitelist-validated server-side so an attacker can't pass arbitrary
+    // model strings — only the three Claude tiers we actually support.
+    const VALID_MODELS = new Set(['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5']);
+    const requestedModel = (body && body.model) || '';
+    const selectedModel = VALID_MODELS.has(requestedModel) ? requestedModel : 'claude-opus-4-8';
+    // Conservation mode (set in Settings) caps response length for plain
+    // chat replies — tool-use extraction calls (plan imports, scans) keep
+    // their full budget since truncating those breaks the actual feature
+    // rather than just making replies shorter.
+    const conservation = !!(body && body.conservation);
     const payload = {
-      model: 'claude-opus-4-8',
-      max_tokens: tool ? 8192 : 1024,
+      model: selectedModel,
+      max_tokens: tool ? 8192 : (conservation ? 512 : 1024),
       system,
       messages,
     };

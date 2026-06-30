@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Settings · Dashboard</title>
+<script src="/api/config"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; position: relative; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 82% 14%, rgba(224,118,88,0.16), transparent 45%), radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 760px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 22px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 14px; }
+
+/* Shared UI */
+.gm-input { width: 100%; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-add { padding: 10px 16px; border: 0; border-radius: 11px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-add:hover { filter: brightness(1.06); }
+.gm-ghost { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.gm-ghost:hover { background: rgba(255,255,255,0.08); }
+.field-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 6px; display: block; }
+.hint { font-size: 11.5px; color: var(--text-tertiary); line-height: 1.45; margin-top: 8px; }
+
+/* Model seg control */
+.model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.model-card { padding: 14px 16px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.08); cursor: pointer; background: rgba(255,255,255,0.03); }
+.model-card:hover { background: rgba(255,255,255,0.06); }
+.model-card.selected { border-color: var(--success); background: rgba(107,227,164,0.06); }
+.model-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.model-cost { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+.model-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+
+/* Theme grid */
+.theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media(min-width:480px) { .theme-grid { grid-template-columns: repeat(4, 1fr); } }
+.theme-card { padding: 14px 12px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.08); cursor: pointer; text-align: center; }
+.theme-card:hover { border-color: rgba(255,255,255,0.2); }
+.theme-card.selected { border-color: var(--success); }
+.theme-swatch { height: 36px; border-radius: 8px; margin-bottom: 8px; }
+.theme-name { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+
+/* Toggle switch */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.toggle-row p { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.toggle { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.12); border-radius: 999px; cursor: pointer; transition: background 0.2s; }
+.toggle input:checked + .toggle-slider { background: var(--success); }
+.toggle-slider::after { content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: white; transition: transform 0.2s; }
+.toggle input:checked + .toggle-slider::after { transform: translateX(20px); }
+
+/* Spending chart */
+.chart-wrap { position: relative; width: 100%; margin-bottom: 4px; }
+.chart-svg { display: block; width: 100%; height: 100px; }
+.spend-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.spend-stat { text-align: center; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); }
+.spend-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.spend-lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 4px; }
+.module-bars { display: flex; flex-direction: column; gap: 7px; }
+.mod-row { display: flex; align-items: center; gap: 10px; }
+.mod-name { font-size: 12px; color: var(--text-secondary); width: 80px; flex-shrink: 0; text-transform: capitalize; }
+.mod-bar-track { flex: 1; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.mod-bar-fill { height: 100%; border-radius: 4px; background: var(--success); }
+.mod-amt { font-size: 11px; color: var(--text-tertiary); width: 52px; text-align: right; flex-shrink: 0; }
+
+/* Budget row */
+.budget-input-row { display: flex; gap: 8px; align-items: center; }
+.budget-status { font-size: 12px; margin-top: 10px; line-height: 1.45; }
+.budget-status.warn { color: var(--warning); } .budget-status.danger { color: var(--danger); } .budget-status.ok { color: var(--success); }
+
+/* Data management */
+.danger-zone { border-color: rgba(255,107,107,0.3); background: rgba(255,107,107,0.04); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Changelog */
+.changelog-entry { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.changelog-entry:last-child { border-bottom: 0; }
+.cl-ver { font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.cl-date { font-size: 10px; color: var(--text-tertiary); margin-left: 8px; font-weight: 400; }
+.cl-list { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+@media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <a href="index.html" class="back-btn" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <span>Back</span>
+  </a>
+  <h1 class="dash-title">Settings</h1>
+
+  <!-- ── API SPENDING ── -->
+  <div class="section-title" style="margin-top:0">API spending</div>
+  <div class="gm-card">
+    <div class="spend-stats">
+      <div class="spend-stat"><div class="spend-val" id="spendMonth">—</div><div class="spend-lbl">This month</div></div>
+      <div class="spend-stat"><div class="spend-val" id="spendTotal">—</div><div class="spend-lbl">All time</div></div>
+      <div class="spend-stat"><div class="spend-val" id="spendCalls">—</div><div class="spend-lbl">AI calls</div></div>
+    </div>
+    <div class="field-label">Daily spend — last 30 days</div>
+    <div class="chart-wrap"><svg class="chart-svg" id="spendChart" viewBox="0 0 320 100"></svg></div>
+    <div class="field-label" style="margin-top:14px">By module</div>
+    <div class="module-bars" id="moduleBars"></div>
+    <div style="font-size:10.5px;color:var(--text-tertiary);margin-top:10px">Estimated from token usage at published API pricing. Not an Anthropic invoice.</div>
+    <button class="gm-ghost" id="spendReset" type="button" style="margin-top:12px;font-size:12px">Reset spending log</button>
+  </div>
+
+  <!-- ── MODEL SELECTION ── -->
+  <div class="section-title">Claude model</div>
+  <div class="gm-card">
+    <p class="hint" style="margin-bottom:14px">Haiku is fastest and cheapest — good for quick questions. Opus is the most capable but costs 5× more. Sonnet is the sweet spot for most things.</p>
+    <div class="model-grid" id="modelGrid">
+      <div class="model-card" data-m="claude-haiku-4-5">
+        <div class="model-name">Haiku 4.5</div>
+        <div class="model-cost">$1 / $5 per MTok</div>
+        <div class="model-desc">Fastest. Best for quick answers, low-cost background tasks.</div>
+      </div>
+      <div class="model-card" data-m="claude-sonnet-4-6">
+        <div class="model-name">Sonnet 4.6</div>
+        <div class="model-cost">$3 / $15 per MTok</div>
+        <div class="model-desc">Balanced speed and intelligence. Good default for daily use.</div>
+      </div>
+      <div class="model-card selected" data-m="claude-opus-4-8">
+        <div class="model-name">Opus 4.8</div>
+        <div class="model-cost">$5 / $25 per MTok</div>
+        <div class="model-desc">Most capable. Best for complex reasoning and nuanced advice.</div>
+      </div>
+    </div>
+    <div class="hint" id="modelNote" style="margin-top:10px">Currently using Opus 4.8.</div>
+  </div>
+
+  <!-- ── CONSERVATION MODE ── -->
+  <div class="section-title">Conservation mode</div>
+  <div class="gm-card">
+    <div class="toggle-row">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Reduce AI spend automatically</div>
+        <p>Skips the proactive Coach scan on open, falls back to Web Speech instead of ElevenLabs, caps response length at 512 tokens, and shows a warning before image-processing operations. Text chat still works fully.</p>
+      </div>
+      <label class="toggle"><input type="checkbox" id="conservationToggle"><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+
+  <!-- ── BUDGET ALERTS ── -->
+  <div class="section-title">Budget alerts</div>
+  <div class="gm-card">
+    <label class="field-label">Monthly AI spending limit</label>
+    <div class="budget-input-row">
+      <span style="font-size:16px;color:var(--text-tertiary)">$</span>
+      <input class="gm-input" id="budgetInput" type="number" min="0" step="0.5" placeholder="e.g. 5.00" style="max-width:120px;margin-bottom:0" inputmode="decimal">
+      <button class="gm-add" id="budgetSave" type="button">Set</button>
+    </div>
+    <div class="budget-status" id="budgetStatus"></div>
+    <div class="hint">You'll see an alert at 80% and 100% of the limit. Warnings appear as a banner at the top of any page the next time the API is called.</div>
+  </div>
+
+  <!-- ── THEMES ── -->
+  <div class="section-title">Theme</div>
+  <div class="gm-card">
+    <div class="theme-grid" id="themeGrid">
+      <div class="theme-card selected" data-t="default">
+        <div class="theme-swatch" style="background:linear-gradient(135deg,#050506,#0c1a14)"></div>
+        <div class="theme-name">Default</div>
+      </div>
+      <div class="theme-card" data-t="midnight">
+        <div class="theme-swatch" style="background:linear-gradient(135deg,#08080f,#1a0c2e)"></div>
+        <div class="theme-name">Midnight</div>
+      </div>
+      <div class="theme-card" data-t="warm">
+        <div class="theme-swatch" style="background:linear-gradient(135deg,#0a0806,#2a1800)"></div>
+        <div class="theme-name">Warm</div>
+      </div>
+      <div class="theme-card" data-t="minimal">
+        <div class="theme-swatch" style="background:linear-gradient(135deg,#000,#111)"></div>
+        <div class="theme-name">Minimal</div>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:10px">Applied immediately and saved across all pages.</div>
+  </div>
+
+  <!-- ── DATA MANAGEMENT ── -->
+  <div class="section-title">Data management</div>
+  <div class="gm-card">
+    <label class="field-label">Export</label>
+    <p class="hint" style="margin-bottom:10px">Downloads all your Overseer data as a JSON file you can re-import on any device or keep as a backup.</p>
+    <button class="gm-add" id="exportBtn" type="button">⬇ Export all data</button>
+  </div>
+  <div class="gm-card danger-zone">
+    <label class="field-label" style="color:var(--danger)">Import / Restore</label>
+    <p class="hint" style="margin-bottom:10px">Load a previously-exported JSON file. <strong style="color:var(--danger)">This overwrites your current data</strong> — export first if you want to keep it.</p>
+    <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+    <div class="btn-row">
+      <button class="gm-ghost" id="importBtn" type="button">⬆ Import from file</button>
+      <button class="gm-ghost" id="clearAllBtn" type="button" style="color:var(--danger);border-color:rgba(255,107,107,0.3)">🗑 Clear all local data</button>
+    </div>
+    <div id="importStatus" class="hint" style="margin-top:8px"></div>
+  </div>
+
+  <!-- ── ABOUT & VERSION ── -->
+  <div class="section-title">About &amp; version</div>
+  <div class="gm-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text-primary)">Shrey's Dashboard (Overseer)</div>
+        <div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">Version 3.0 — built with Claude Code</div>
+      </div>
+      <a href="help.html" style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:1px solid rgba(255,255,255,0.10);border-radius:11px;background:rgba(255,255,255,0.04);color:var(--text-primary);font-size:12.5px;font-weight:700;text-decoration:none">📖 How to use</a>
+    </div>
+    <div class="field-label">Changelog</div>
+    <div id="changelog"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  // ── SPENDING ANALYSIS ──────────────────────────────────────────────
+  // Pricing table: input tokens cost and output tokens cost per million.
+  // Claude's input tokens (the prompt you send) are 5x cheaper than
+  // output (the response it generates) because generation is harder.
+  const PRICES = {
+    'claude-haiku-4-5': { in: 1, out: 5 },
+    'claude-sonnet-4-6': { in: 3, out: 15 },
+    'claude-opus-4-8': { in: 5, out: 25 },
+  };
+  function cost(entry) {
+    const p = PRICES[entry.model] || PRICES['claude-opus-4-8'];
+    return (entry.inputTokens / 1e6) * p.in + (entry.outputTokens / 1e6) * p.out;
+  }
+  function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 3 : 2); }
+
+  function renderSpend() {
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem('apiusage:log')) || []; } catch (e) {}
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const monthLog = log.filter(e => e.ts >= monthStart);
+
+    $('spendMonth').textContent = fmtUsd(monthLog.reduce((s, e) => s + cost(e), 0));
+    $('spendTotal').textContent = fmtUsd(log.reduce((s, e) => s + cost(e), 0));
+    $('spendCalls').textContent = String(log.length);
+
+    // Daily bar chart — last 30 days. Each day gets one bar.
+    // SVG approach: same pattern as marathon charts, viewBox matches
+    // dynamically so no distortion at different screen widths.
+    const svg = $('spendChart');
+    const W = svg.getBoundingClientRect().width || 320, H = 100, pad = 6;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    const days = 30;
+    const buckets = {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(now); d.setDate(d.getDate() - (days - 1 - i));
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      buckets[key] = 0;
+    }
+    log.forEach(e => {
+      const d = new Date(e.ts);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      if (key in buckets) buckets[key] += cost(e);
+    });
+    const vals = Object.values(buckets);
+    const maxV = Math.max(...vals, 0.001);
+    const bw = (W - pad * 2) / days;
+    let html = '';
+    vals.forEach((v, i) => {
+      const x = pad + i * bw;
+      const h = (v / maxV) * (H - 12);
+      const y = H - h;
+      html += '<rect x="' + (x + 1).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 2).toFixed(1) + '" height="' + Math.max(h, 1).toFixed(1) + '" rx="2" fill="rgba(107,227,164,' + (v > 0 ? '0.7' : '0.15') + ')" title="' + fmtUsd(v) + '"/>';
+    });
+    svg.innerHTML = html;
+
+    // By-module breakdown — totals per source tag.
+    const byModule = {};
+    log.forEach(e => { const s = e.source || 'other'; byModule[s] = (byModule[s] || 0) + cost(e); });
+    const totalAll = Object.values(byModule).reduce((a, b) => a + b, 0.001);
+    const sorted = Object.entries(byModule).sort((a, b) => b[1] - a[1]);
+    $('moduleBars').innerHTML = sorted.map(([name, amt]) =>
+      '<div class="mod-row"><span class="mod-name">' + name + '</span><div class="mod-bar-track"><div class="mod-bar-fill" style="width:' + Math.round((amt/totalAll)*100) + '%;"></div></div><span class="mod-amt">' + fmtUsd(amt) + '</span></div>'
+    ).join('') || '<div style="font-size:12px;color:var(--text-tertiary);font-style:italic">No calls logged yet.</div>';
+  }
+  renderSpend();
+  $('spendReset').addEventListener('click', () => {
+    if (!confirm('Clear the entire API usage history? This only resets the on-device estimate.')) return;
+    localStorage.setItem('apiusage:log', '[]');
+    localStorage.removeItem('settings:budget_alerted');
+    renderSpend();
+  });
+
+  // ── MODEL SELECTION ────────────────────────────────────────────────
+  // When you pick a model here, it gets saved to localStorage and
+  // every AI call site reads it via the global getPreferredModel()
+  // function added to topbar.js. The server validates the model value
+  // against a whitelist so you can't accidentally pass arbitrary strings.
+  const MODEL_NOTE = {
+    'claude-haiku-4-5': 'Using Haiku 4.5 — fastest, most cost-efficient.',
+    'claude-sonnet-4-6': 'Using Sonnet 4.6 — balanced speed and capability.',
+    'claude-opus-4-8': 'Using Opus 4.8 — most capable, highest cost.',
+  };
+  function renderModel() {
+    const cur = window.getPreferredModel ? window.getPreferredModel() : (localStorage.getItem('settings:model') || 'claude-opus-4-8');
+    document.querySelectorAll('.model-card').forEach(c => c.classList.toggle('selected', c.dataset.m === cur));
+    $('modelNote').textContent = MODEL_NOTE[cur] || 'Using ' + cur + '.';
+  }
+  renderModel();
+  document.querySelectorAll('.model-card').forEach(c => c.addEventListener('click', () => {
+    localStorage.setItem('settings:model', c.dataset.m);
+    renderModel();
+  }));
+
+  // ── CONSERVATION MODE ──────────────────────────────────────────────
+  const conservationToggle = $('conservationToggle');
+  conservationToggle.checked = localStorage.getItem('settings:conservation_mode') === '1';
+  conservationToggle.addEventListener('change', () => {
+    localStorage.setItem('settings:conservation_mode', conservationToggle.checked ? '1' : '0');
+  });
+
+  // ── BUDGET ALERTS ──────────────────────────────────────────────────
+  function renderBudget() {
+    const budgetStr = localStorage.getItem('settings:monthly_budget');
+    const budget = parseFloat(budgetStr) || 0;
+    if (budgetStr) $('budgetInput').value = budget.toFixed(2);
+    if (!budget) { $('budgetStatus').textContent = 'No limit set.'; $('budgetStatus').className = 'budget-status'; return; }
+
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem('apiusage:log')) || []; } catch (e) {}
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+    const monthSpend = log.filter(e => e.ts >= monthStart.getTime()).reduce((s, e) => s + cost(e), 0);
+    const pct = monthSpend / budget;
+    const cls = pct >= 1 ? 'danger' : pct >= 0.8 ? 'warn' : 'ok';
+    $('budgetStatus').className = 'budget-status ' + cls;
+    $('budgetStatus').textContent = fmtUsd(monthSpend) + ' spent this month — ' + Math.round(pct * 100) + '% of your $' + budget.toFixed(2) + ' limit.';
+  }
+  renderBudget();
+  $('budgetSave').addEventListener('click', () => {
+    const v = parseFloat($('budgetInput').value);
+    if (v > 0) { localStorage.setItem('settings:monthly_budget', v.toFixed(2)); localStorage.removeItem('settings:budget_alerted'); }
+    else localStorage.removeItem('settings:monthly_budget');
+    renderBudget();
+  });
+
+  // ── THEMES ────────────────────────────────────────────────────────
+  // Themes work by setting a data-theme attribute on the <html> element.
+  // CSS rules in topbar.js keyed on [data-theme="X"] override the
+  // default CSS custom properties, changing colors across all pages.
+  function renderTheme() {
+    const cur = localStorage.getItem('settings:theme') || 'default';
+    document.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('selected', c.dataset.t === cur));
+  }
+  renderTheme();
+  document.querySelectorAll('.theme-card').forEach(c => c.addEventListener('click', () => {
+    localStorage.setItem('settings:theme', c.dataset.t);
+    if (window.applyTheme) window.applyTheme(); // live preview — changes the page right now
+    renderTheme();
+  }));
+
+  // ── DATA MANAGEMENT ────────────────────────────────────────────────
+  // Export collects every key-value pair in localStorage and downloads
+  // it as JSON. Import reverses that — reads the file and restores
+  // all keys. This lets you move data between devices or recover from
+  // a browser data wipe (common on iOS if storage runs low).
+  $('exportBtn').addEventListener('click', () => {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      try { data[k] = JSON.parse(localStorage.getItem(k)); } catch (e) { data[k] = localStorage.getItem(k); }
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'overseer-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)));
+        $('importStatus').textContent = 'Imported ' + Object.keys(data).length + ' keys. Reload the page (or navigate away and back) to see the restored data.';
+        $('importStatus').style.color = 'var(--success)';
+      } catch (err) { $('importStatus').textContent = 'Invalid JSON file.'; $('importStatus').style.color = 'var(--danger)'; }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+  $('clearAllBtn').addEventListener('click', () => {
+    if (!confirm('Clear ALL local data? This removes every module\'s data from this device. Anything synced to Supabase will come back on the next page load.')) return;
+    localStorage.clear();
+    $('importStatus').textContent = 'All local data cleared. Reload to start fresh.';
+    $('importStatus').style.color = 'var(--warning)';
+  });
+
+  // ── VERSION HISTORY ────────────────────────────────────────────────
+  // Changelog is hardcoded here — no server needed, just a static list.
+  // Each entry describes what changed for that release so you can trace
+  // what was added when, which is useful for debugging "when did X appear?"
+  const CHANGELOG = [
+    { ver: '3.0', date: '2026-06-30', items: ['Settings page with spending graphs, model selection, themes, conservation mode, budget alerts, import/export', 'Help/instructions page for every module', 'Version history'] },
+    { ver: '2.9', date: '2026-06-30', items: ['Phase 6: internship outreach module, push notifications (VAPID), ElevenLabs TTS voice'] },
+    { ver: '2.8', date: '2026-06-29', items: ['Phase 5: master calendar (Google + Marathon + Canvas + Goals aggregated), Your Coach JARVIS-styled floating widget across all pages'] },
+    { ver: '2.7', date: '2026-06-29', items: ['Phase 4: nutrition tracker, skincare routine, shopping + style quiz, College/Canvas module (WIP)', 'Phase 3: homepage weather + news header'] },
+    { ver: '2.6', date: '2026-06-29', items: ['Phase 2: strength-plan import, resume review (PDF support), voice input/output (Web Speech), Google Calendar sync'] },
+    { ver: '2.5', date: '2026-06-29', items: ['Phase 1: notes, chores, personal care, saved-links, 1RM calculator, rest-day button, API spend tracker'] },
+    { ver: '2.4', date: '2026-06-27', items: ['API reorganized into subfolders (api/ai/, api/integrations/), function consolidation for Vercel Hobby 12-function limit'] },
+    { ver: '2.3', date: '2026-06-26', items: ['JARVIS boot animation, cookie-based login replacing HTTP Basic Auth, site-wide security hardening'] },
+    { ver: '2.2', date: '2026-06-25', items: ['Marathon module: Strava OAuth, training plan import, pace/mileage charts, glossary, per-day routine builder'] },
+    { ver: '2.1', date: '2026-06-25', items: ['InBody scan import in gym module, unit system fixes (lb/ft default), interactive birthday picker'] },
+    { ver: '2.0', date: '2026-06-25', items: ['Renamed from Rowans Dashboard to Shrey\'s Dashboard, added Nova AI mentor (nova-lite.html)'] },
+  ];
+  $('changelog').innerHTML = CHANGELOG.map(entry =>
+    '<div class="changelog-entry"><div class="cl-ver">v' + entry.ver + '<span class="cl-date">' + entry.date + '</span></div><div class="cl-list">' + entry.items.map(i => '· ' + i).join('<br>') + '</div></div>'
+  ).join('');
+
+  window.addEventListener('storage', () => { renderSpend(); renderBudget(); });
+})();
+</script>
+</body>
+</html>
