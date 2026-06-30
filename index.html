@@ -245,67 +245,212 @@ body::after {
 .whoop-btn { width: 100%; margin-top: 14px; padding: 11px; border: 1px solid rgba(255,255,255,0.12); border-radius: 11px; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: background 0.15s, color 0.15s; }
 .whoop-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
 
-/* ===== JARVIS-style boot sequence ===== */
+/* ===== JARVIS-style boot sequence — enhanced ===== */
 .jarvis-intro {
   position: fixed; inset: 0; z-index: 10000;
-  background: radial-gradient(ellipse 80% 60% at 50% 45%, #0c1411 0%, #050706 60%, #020302 100%);
+  background: #020304;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 26px; cursor: pointer;
-  transition: opacity 0.5s ease, visibility 0.5s ease;
+  gap: 22px; cursor: pointer; overflow: hidden;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
 }
+/* Dot-grid background texture */
+.jarvis-intro::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(110,231,183,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: jr-grid-pulse 4s ease-in-out infinite alternate;
+}
+/* Horizontal scanline sweeping top to bottom */
+.jarvis-intro::after {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(103,232,249,0.5) 40%, rgba(110,231,183,0.8) 50%, rgba(103,232,249,0.5) 60%, transparent 100%);
+  animation: jr-scanline 3.5s linear infinite;
+  z-index: 2;
+}
+@keyframes jr-grid-pulse { from { opacity: 0.6; } to { opacity: 1; } }
+@keyframes jr-scanline { 0% { transform: translateY(0); opacity: 0; } 5% { opacity: 1; } 95% { opacity: 0.6; } 100% { transform: translateY(100vh); opacity: 0; } }
 .jarvis-intro.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-.jarvis-rings { position: relative; width: min(280px, 62vw); height: min(280px, 62vw); }
+
+/* Corner HUD brackets */
+.jr-corner { position: absolute; width: 48px; height: 48px; }
+.jr-corner svg { display: block; width: 100%; height: 100%; }
+.jr-corner-tl { top: 18px; left: 18px; }
+.jr-corner-tr { top: 18px; right: 18px; transform: scaleX(-1); }
+.jr-corner-bl { bottom: 18px; left: 18px; transform: scaleY(-1); }
+.jr-corner-br { bottom: 18px; right: 18px; transform: scale(-1); }
+
+/* Side hex data panels */
+.jr-side-data {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 9px; letter-spacing: 0.06em; color: rgba(110,231,183,0.35);
+  line-height: 1.8; user-select: none; pointer-events: none;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.jr-side-data.left { left: max(14px, 2vw); text-align: left; }
+.jr-side-data.right { right: max(14px, 2vw); text-align: right; }
+
+/* Main ring container */
+.jarvis-rings { position: relative; width: min(300px, 68vw); height: min(300px, 68vw); }
 .jarvis-svg { width: 100%; height: 100%; overflow: visible; }
-.jr-ring { fill: none; stroke: #6EE7B7; transform-origin: 150px 150px; filter: drop-shadow(0 0 6px rgba(110,231,183,0.55)); }
-.jr-ring-outer { stroke-width: 1.4; stroke-dasharray: 4 10; opacity: 0.55; animation: jr-spin 14s linear infinite; }
-.jr-ring-mid { stroke-width: 2; stroke-dasharray: 30 8 4 8; opacity: 0.75; stroke: #67E8F9; animation: jr-spin-rev 9s linear infinite; }
-.jr-ring-inner { stroke-width: 1.2; stroke-dasharray: 2 6; opacity: 0.5; animation: jr-spin 6s linear infinite; }
-.jr-tick { stroke: #6EE7B7; stroke-width: 1.5; opacity: 0.35; }
-.jr-sweep { stroke: #67E8F9; stroke-width: 2; transform-origin: 150px 150px; animation: jr-spin 2.2s linear infinite; filter: drop-shadow(0 0 8px rgba(103,232,249,0.8)); }
-.jr-core { fill: #0c1411; stroke: #6EE7B7; stroke-width: 1.5; animation: jr-pulse 1.6s ease-in-out infinite; }
-.jr-core-glow { fill: #6EE7B7; opacity: 0.18; animation: jr-pulse 1.6s ease-in-out infinite; }
+
+/* Rings — each with its own speed and pattern */
+.jr-ring { fill: none; transform-origin: 150px 150px; }
+.jr-ring-outermost { stroke: #6EE7B7; stroke-width: 0.8; stroke-dasharray: 1 18; opacity: 0.3; animation: jr-spin 22s linear infinite; }
+.jr-ring-outer { stroke: #6EE7B7; stroke-width: 1.4; stroke-dasharray: 4 10; opacity: 0.5; animation: jr-spin 14s linear infinite; }
+.jr-ring-mid2 { stroke: rgba(110,231,183,0.6); stroke-width: 1; stroke-dasharray: 18 4 2 4; opacity: 0.45; animation: jr-spin-rev 11s linear infinite; }
+.jr-ring-mid { stroke: #67E8F9; stroke-width: 2; stroke-dasharray: 30 8 4 8; opacity: 0.75; animation: jr-spin-rev 9s linear infinite; }
+.jr-ring-inner { stroke: #6EE7B7; stroke-width: 1.2; stroke-dasharray: 2 6; opacity: 0.5; animation: jr-spin 6s linear infinite; }
+
+/* Progress arc — fills during boot sequence */
+.jr-progress { fill: none; stroke: #6EE7B7; stroke-width: 1.5; opacity: 0.7;
+  stroke-dasharray: 910; stroke-dashoffset: 910;
+  transform: rotate(-90deg); transform-origin: 150px 150px;
+  transition: stroke-dashoffset 0.4s ease;
+  filter: drop-shadow(0 0 5px rgba(110,231,183,0.7));
+}
+
+/* Tick marks */
+.jr-tick { stroke: #6EE7B7; stroke-width: 1.5; opacity: 0.3; }
+
+/* Sweep line — radar effect */
+.jr-sweep { stroke: #67E8F9; stroke-width: 1.8; transform-origin: 150px 150px; animation: jr-spin 2.8s linear infinite; filter: drop-shadow(0 0 6px rgba(103,232,249,0.9)); }
+/* Radar trail — a wider, fading version of the sweep */
+.jr-sweep-trail { fill: none; stroke: rgba(103,232,249,0.12); stroke-width: 60; transform-origin: 150px 150px; animation: jr-spin 2.8s linear infinite; }
+
+/* Orbital satellites */
+.jr-orbital { fill: #67E8F9; transform-origin: 150px 150px; filter: drop-shadow(0 0 4px rgba(103,232,249,1)); }
+.jr-orbital-a { animation: jr-spin 4.5s linear infinite; opacity: 0.9; }
+.jr-orbital-b { animation: jr-spin-rev 7s linear infinite; opacity: 0.7; }
+.jr-orbital-c { animation: jr-spin 11s linear infinite; opacity: 0.55; }
+
+/* Core geometry */
+.jr-core-glow { fill: #6EE7B7; opacity: 0.12; animation: jr-pulse 1.6s ease-in-out infinite; }
+.jr-core { fill: #030807; stroke: #6EE7B7; stroke-width: 1.5; animation: jr-pulse 1.6s ease-in-out infinite; }
+.jr-hex { fill: none; stroke: #67E8F9; stroke-width: 1; opacity: 0.7; animation: jr-spin-rev 20s linear infinite; transform-origin: 150px 150px; }
+.jr-crosshair { stroke: rgba(110,231,183,0.4); stroke-width: 0.8; }
+
+/* Arc segment decorations */
+.jr-arc-seg { fill: none; stroke: rgba(103,232,249,0.3); stroke-width: 3; stroke-dasharray: 18 200; }
+
 @keyframes jr-spin { to { transform: rotate(360deg); } }
 @keyframes jr-spin-rev { to { transform: rotate(-360deg); } }
-@keyframes jr-pulse { 0%, 100% { filter: drop-shadow(0 0 4px rgba(110,231,183,0.5)); } 50% { filter: drop-shadow(0 0 16px rgba(110,231,183,0.95)); } }
+@keyframes jr-pulse { 0%, 100% { filter: drop-shadow(0 0 4px rgba(110,231,183,0.5)); } 50% { filter: drop-shadow(0 0 18px rgba(110,231,183,1)); } }
+
+/* Logo */
 .jarvis-logo {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  font-family: 'Times New Roman', Georgia, serif; font-style: italic; font-weight: 500;
-  font-size: 15px; letter-spacing: 0.04em; color: #eafff6;
-  text-shadow: 0 0 14px rgba(110,231,183,0.85);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase;
+  color: #eafff6; text-shadow: 0 0 12px rgba(110,231,183,0.9), 0 0 30px rgba(110,231,183,0.4);
+  white-space: nowrap;
 }
+
+/* Boot log text */
 .jarvis-text {
-  width: min(340px, 84vw); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 11.5px; letter-spacing: 0.03em; color: #8eeebf; min-height: 90px;
+  width: min(360px, 88vw); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; letter-spacing: 0.04em; color: #8eeebf; min-height: 90px;
+  position: relative; z-index: 3;
 }
-.jarvis-line { opacity: 0; white-space: pre; overflow: hidden; margin-bottom: 5px; }
+.jarvis-line { opacity: 0; white-space: pre; overflow: hidden; margin-bottom: 4px; }
 .jarvis-line.show { opacity: 1; }
-.jarvis-line .jr-cursor { display: inline-block; width: 6px; height: 11px; background: #6EE7B7; margin-left: 2px; vertical-align: -1px; animation: jr-blink 0.9s steps(1) infinite; }
-@keyframes jr-blink { 50% { opacity: 0; } }
-.jarvis-skip { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(110,231,183,0.4); font-family: ui-monospace, monospace; }
+.jarvis-line.jr-ok::after { content: ' [OK]'; color: #6EE7B7; }
+.jarvis-line.jr-warn::after { content: ' [STANDBY]'; color: #F2C063; }
+.jarvis-skip { font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(110,231,183,0.3); font-family: ui-monospace, monospace; position: relative; z-index: 3; }
 </style>
 </head>
 <body>
 <div class="jarvis-intro" id="jarvisIntro">
+
+  <!-- Corner HUD brackets -->
+  <div class="jr-corner jr-corner-tl"><svg viewBox="0 0 48 48" fill="none"><path d="M4 30 L4 4 L30 4" stroke="#6EE7B7" stroke-width="1.5" opacity="0.55"/><circle cx="4" cy="4" r="2" fill="#6EE7B7" opacity="0.6"/></svg></div>
+  <div class="jr-corner jr-corner-tr"><svg viewBox="0 0 48 48" fill="none"><path d="M4 30 L4 4 L30 4" stroke="#6EE7B7" stroke-width="1.5" opacity="0.55"/><circle cx="4" cy="4" r="2" fill="#6EE7B7" opacity="0.6"/></svg></div>
+  <div class="jr-corner jr-corner-bl"><svg viewBox="0 0 48 48" fill="none"><path d="M4 30 L4 4 L30 4" stroke="#6EE7B7" stroke-width="1.5" opacity="0.55"/><circle cx="4" cy="4" r="2" fill="#6EE7B7" opacity="0.6"/></svg></div>
+  <div class="jr-corner jr-corner-br"><svg viewBox="0 0 48 48" fill="none"><path d="M4 30 L4 4 L30 4" stroke="#6EE7B7" stroke-width="1.5" opacity="0.55"/><circle cx="4" cy="4" r="2" fill="#6EE7B7" opacity="0.6"/></svg></div>
+
+  <!-- Side hex data panels (populated by JS) -->
+  <div class="jr-side-data left" id="jrDataLeft"></div>
+  <div class="jr-side-data right" id="jrDataRight"></div>
+
+  <!-- Main HUD ring assembly -->
   <div class="jarvis-rings">
     <svg class="jarvis-svg" viewBox="0 0 300 300">
+      <defs>
+        <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#6EE7B7" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#6EE7B7" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Outermost large ambient ring -->
+      <circle class="jr-ring jr-ring-outermost" cx="150" cy="150" r="144"/>
+
+      <!-- Progress arc — sweeps as boot text reveals -->
+      <circle class="jr-progress" id="jrProgressArc" cx="150" cy="150" r="144"/>
+
+      <!-- Tick marks (generated by JS) -->
       <g id="jrTicks"></g>
+
+      <!-- Outer rings -->
       <circle class="jr-ring jr-ring-outer" cx="150" cy="150" r="132"/>
-      <circle class="jr-ring jr-ring-mid" cx="150" cy="150" r="98"/>
-      <circle class="jr-ring jr-ring-inner" cx="150" cy="150" r="68"/>
+      <circle class="jr-ring jr-ring-mid2" cx="150" cy="150" r="112"/>
+
+      <!-- Radar sweep trail (wide fading wedge) -->
+      <path class="jr-sweep-trail" d="M150 150 L150 18 A132 132 0 0 1 282 150 Z" opacity="0.08" transform-origin="150px 150px" style="animation: jr-spin 2.8s linear infinite;"/>
+
+      <!-- Radar sweep line -->
       <line class="jr-sweep" x1="150" y1="150" x2="150" y2="18"/>
-      <circle class="jr-core-glow" cx="150" cy="150" r="34"/>
+
+      <!-- Mid ring with cyan color -->
+      <circle class="jr-ring jr-ring-mid" cx="150" cy="150" r="98"/>
+
+      <!-- Arc segment decorations at cardinal points -->
+      <circle class="jr-arc-seg" cx="150" cy="150" r="82" stroke-dasharray="22 999" stroke-dashoffset="-40"/>
+      <circle class="jr-arc-seg" cx="150" cy="150" r="82" stroke-dasharray="22 999" stroke-dashoffset="-245"/>
+      <circle class="jr-arc-seg" cx="150" cy="150" r="82" stroke-dasharray="22 999" stroke-dashoffset="-450"/>
+      <circle class="jr-arc-seg" cx="150" cy="150" r="82" stroke-dasharray="22 999" stroke-dashoffset="-655"/>
+
+      <!-- Inner ring -->
+      <circle class="jr-ring jr-ring-inner" cx="150" cy="150" r="68"/>
+
+      <!-- Orbital satellites -->
+      <circle class="jr-orbital jr-orbital-a" cx="150" cy="20" r="2.5"/>
+      <circle class="jr-orbital jr-orbital-b" cx="150" cy="54" r="2"/>
+      <circle class="jr-orbital jr-orbital-c" cx="150" cy="150" r="1.5" transform="translate(0,-115)"/>
+
+      <!-- Crosshair lines -->
+      <line class="jr-crosshair" x1="60" y1="150" x2="90" y2="150"/>
+      <line class="jr-crosshair" x1="210" y1="150" x2="240" y2="150"/>
+      <line class="jr-crosshair" x1="150" y1="60" x2="150" y2="90"/>
+      <line class="jr-crosshair" x1="150" y1="210" x2="150" y2="240"/>
+
+      <!-- Core glow fill -->
+      <circle cx="150" cy="150" r="50" fill="url(#coreGlow)"/>
+      <circle class="jr-core-glow" cx="150" cy="150" r="32"/>
+
+      <!-- Core circle -->
       <circle class="jr-core" cx="150" cy="150" r="22"/>
+
+      <!-- Hexagonal inner core outline -->
+      <polygon class="jr-hex" points="150,130 167,140 167,160 150,170 133,160 133,140"/>
+
+      <!-- Center dot -->
+      <circle cx="150" cy="150" r="3" fill="#67E8F9" opacity="0.9" style="filter:drop-shadow(0 0 6px rgba(103,232,249,1))"/>
     </svg>
     <div class="jarvis-logo">OVERSEER</div>
   </div>
+
+  <!-- Boot log -->
   <div class="jarvis-text" id="jarvisText">
-    <div class="jarvis-line">INITIALIZING OVERSEER SYSTEM...</div>
-    <div class="jarvis-line">LOADING DASHBOARD MODULES... OK</div>
-    <div class="jarvis-line">ESTABLISHING SECURE LINK... OK</div>
-    <div class="jarvis-line">ALL SYSTEMS NOMINAL</div>
+    <div class="jarvis-line jr-ok">SYSTEM CORE INITIALIZED</div>
+    <div class="jarvis-line jr-ok">LOADING DASHBOARD MODULES</div>
+    <div class="jarvis-line jr-ok">SECURE CHANNEL ESTABLISHED</div>
+    <div class="jarvis-line jr-ok">AI SUBSYSTEMS ONLINE</div>
     <div class="jarvis-line">WELCOME BACK, SHREY</div>
   </div>
-  <div class="jarvis-skip">tap to skip</div>
+  <div class="jarvis-skip">tap anywhere to skip</div>
 </div>
 <div class="page">
 
@@ -745,27 +890,73 @@ body::after {
     if (sessionStorage.getItem('overseer_booted')) { intro.remove(); return; }
     sessionStorage.setItem('overseer_booted', '1');
 
+    // ---- Tick marks around outer ring ----
+    // 36 ticks (finer than before — more cinematic), every 4th is longer.
     const ticksG = document.getElementById('jrTicks');
-    const cx = 150, cy = 150, r = 132;
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2;
-      const long = i % 3 === 0;
-      const r1 = long ? r + 9 : r + 5;
-      const x1 = cx + Math.cos(a) * r1, y1 = cy + Math.sin(a) * r1;
-      const x2 = cx + Math.cos(a) * (r + 14), y2 = cy + Math.sin(a) * (r + 14);
+    const cx = 150, cy = 150, rTick = 144;
+    for (let i = 0; i < 36; i++) {
+      const a = (i / 36) * Math.PI * 2;
+      const long = i % 4 === 0;
+      const r1 = rTick + (long ? 10 : 5);
+      const x1 = cx + Math.cos(a) * rTick, y1 = cy + Math.sin(a) * rTick;
+      const x2 = cx + Math.cos(a) * r1, y2 = cy + Math.sin(a) * r1;
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', x1); line.setAttribute('y1', y1);
       line.setAttribute('x2', x2); line.setAttribute('y2', y2);
       line.setAttribute('class', 'jr-tick');
+      line.setAttribute('opacity', long ? '0.5' : '0.22');
       ticksG.appendChild(line);
+    }
+
+    // ---- Side hex data panels — random-looking hex values scrolling ----
+    // These simulate "live system telemetry" — purely cosmetic but cinematic.
+    const HEX = '0123456789ABCDEF';
+    const rand16 = () => Array.from({length:4}, () => HEX[Math.floor(Math.random()*16)]).join('');
+    function genDataLines() {
+      return Array.from({length:9}, () => '0x' + rand16() + ' ' + rand16()).join('\n');
+    }
+    const leftEl = document.getElementById('jrDataLeft');
+    const rightEl = document.getElementById('jrDataRight');
+    if (leftEl && rightEl) {
+      leftEl.textContent = genDataLines();
+      rightEl.textContent = genDataLines();
+      const dataTimer = setInterval(() => {
+        if (leftEl.isConnected) {
+          // Only update 1-2 lines at a time so it looks like streaming data,
+          // not a full random refresh which would feel jarring.
+          const ll = leftEl.textContent.split('\n');
+          ll[Math.floor(Math.random()*ll.length)] = '0x' + rand16() + ' ' + rand16();
+          leftEl.textContent = ll.join('\n');
+          const rl = rightEl.textContent.split('\n');
+          rl[Math.floor(Math.random()*rl.length)] = '0x' + rand16() + ' ' + rand16();
+          rightEl.textContent = rl.join('\n');
+        } else {
+          clearInterval(dataTimer);
+        }
+      }, 120);
+    }
+
+    // ---- Progress arc — fills as each boot line reveals ----
+    // circumference of r=144 circle ≈ 904; we fill to ~88% leaving a gap.
+    const progressArc = document.getElementById('jrProgressArc');
+    const CIRCUMFERENCE = 2 * Math.PI * 144;
+    const LINES_TOTAL = 5;
+    let linesRevealed = 0;
+    function updateProgress() {
+      if (!progressArc) return;
+      linesRevealed++;
+      const pct = linesRevealed / LINES_TOTAL;
+      const offset = CIRCUMFERENCE * (1 - pct * 0.88);
+      progressArc.style.strokeDashoffset = String(offset);
     }
 
     let done = false;
     function finish() {
       if (done) return;
       done = true;
+      if (progressArc) progressArc.style.strokeDashoffset = String(CIRCUMFERENCE * 0.04); // nearly complete
       intro.classList.add('hidden');
-      setTimeout(() => intro.remove(), 550);
+      setTimeout(() => intro.remove(), 600);
     }
     intro.addEventListener('click', finish);
 
@@ -773,13 +964,14 @@ body::after {
     let i = 0;
     function revealNext() {
       if (done) return;
-      if (i >= lines.length) { setTimeout(finish, 650); return; }
+      if (i >= lines.length) { setTimeout(finish, 700); return; }
       lines[i].classList.add('show');
+      updateProgress();
       i++;
-      setTimeout(revealNext, 420);
+      setTimeout(revealNext, 430);
     }
-    setTimeout(revealNext, 350);
-    setTimeout(finish, 4200); // safety cap so it never overstays
+    setTimeout(revealNext, 400);
+    setTimeout(finish, 4500); // safety cap
   })();
 
   const $ = (id) => document.getElementById(id);
