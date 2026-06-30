@@ -45,6 +45,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
 
 .notes-toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.notes-import-btn { padding: 7px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-secondary); font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+.notes-import-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
 .notes-search { flex: 1; min-width: 140px; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
 .notes-search::placeholder { color: var(--text-tertiary); }
 .notes-search:focus { border-color: rgba(255,255,255,0.28); }
@@ -97,6 +99,15 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       <input class="notes-search" id="notesSearch" type="text" placeholder="Search notes…" autocomplete="off">
       <button class="notes-new" id="notesNew" type="button">+ New note</button>
     </div>
+    <div class="notes-import-row" id="notesImportRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="notes-import-btn" id="importAppleBtn" type="button" title="Import Apple Notes .txt export">🍎 Apple Notes</button>
+      <button class="notes-import-btn" id="importClaudeBtn" type="button" title="Import Claude conversations.json">💬 Claude</button>
+      <button class="notes-import-btn" id="importChatGPTBtn" type="button" title="Import ChatGPT conversations.json">🤖 ChatGPT</button>
+      <div id="importStatus" style="font-size:11px;color:#6BE3A4;align-self:center;padding-left:4px"></div>
+    </div>
+    <input type="file" id="importAppleFile" accept=".txt,.html,text/plain,text/html" multiple style="display:none">
+    <input type="file" id="importClaudeFile" accept=".json,application/json" style="display:none">
+    <input type="file" id="importChatGPTFile" accept=".json,application/json" style="display:none">
     <div id="notesList"></div>
   </div>
 
@@ -221,6 +232,116 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       clearTimeout(saveT);
       saveT = setTimeout(persistActive, 400);
     });
+  });
+
+  // ---- Multi-source import ----
+  // Each source exports in a very different format; we normalize each
+  // to {title, body} then merge with existing notes, deduplicating by title.
+  function importStatus(msg, ok) {
+    const el = $('importStatus');
+    el.textContent = msg;
+    el.style.color = ok ? '#6BE3A4' : '#FF8A8A';
+    if (ok) setTimeout(() => { el.textContent = ''; }, 3000);
+  }
+  function mergeNotes(incoming) {
+    const existing = load();
+    const titles = new Set(existing.map(n => (n.title || '').toLowerCase().trim()));
+    let added = 0;
+    incoming.forEach(({ title, body }) => {
+      const t = (title || '').trim() || 'Imported note';
+      if (titles.has(t.toLowerCase())) return; // skip duplicates
+      existing.unshift({ id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2), title: t, body: (body || '').trim(), pinned: false, updatedAt: Date.now() });
+      titles.add(t.toLowerCase());
+      added++;
+    });
+    save(existing);
+    render();
+    return added;
+  }
+
+  // Apple Notes — supports .txt export (File → Export as Text)
+  // Each file becomes one note; filename becomes the title.
+  $('importAppleBtn').addEventListener('click', () => $('importAppleFile').click());
+  $('importAppleFile').addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    let done = 0;
+    const incoming = [];
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        incoming.push({ title: file.name.replace(/\.(txt|html?)$/i, ''), body: ev.target.result });
+        done++;
+        if (done === files.length) {
+          const added = mergeNotes(incoming);
+          importStatus('Added ' + added + ' of ' + files.length + ' Apple Notes ✓', true);
+        }
+      };
+      reader.readAsText(file);
+    });
+    e.target.value = '';
+  });
+
+  // Claude — conversations.json (download from claude.ai)
+  // Format: [{uuid, name, created_at, chat_messages:[{sender,text}]}]
+  $('importClaudeBtn').addEventListener('click', () => $('importClaudeFile').click());
+  $('importClaudeFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const convs = Array.isArray(data) ? data : (data.conversations || [data]);
+        const incoming = convs.map(c => {
+          const title = c.name || c.title || ('Claude — ' + new Date(c.created_at || Date.now()).toLocaleDateString());
+          const msgs = (c.chat_messages || c.messages || []);
+          const body = msgs.map(m => {
+            const sender = m.sender === 'human' || m.role === 'user' ? 'You' : 'Claude';
+            const text = (typeof m.text === 'string' ? m.text : (m.content || '')).trim();
+            return text ? sender + ': ' + text : null;
+          }).filter(Boolean).join('\n\n');
+          return { title, body };
+        });
+        const added = mergeNotes(incoming);
+        importStatus('Added ' + added + ' Claude conversations ✓', true);
+      } catch (err) { importStatus('Could not read Claude export: ' + err.message, false); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ChatGPT — conversations.json (download from Settings → Data controls → Export)
+  // Format: [{id, title, create_time, mapping:{[id]:{message:{author:{role},content:{parts:[]}}}}}]
+  $('importChatGPTBtn').addEventListener('click', () => $('importChatGPTFile').click());
+  $('importChatGPTFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const convs = Array.isArray(data) ? data : [data];
+        const incoming = convs.map(c => {
+          const title = c.title || ('ChatGPT — ' + new Date((c.create_time || 0) * 1000).toLocaleDateString());
+          const mapping = c.mapping || {};
+          const msgs = Object.values(mapping)
+            .filter(node => node.message && node.message.content)
+            .sort((a, b) => (a.message.create_time || 0) - (b.message.create_time || 0));
+          const body = msgs.map(node => {
+            const role = (node.message.author || {}).role || '';
+            const parts = (node.message.content.parts || []).filter(p => typeof p === 'string').join('');
+            const sender = role === 'user' ? 'You' : 'ChatGPT';
+            return parts.trim() ? sender + ': ' + parts.trim() : null;
+          }).filter(Boolean).join('\n\n');
+          return { title, body };
+        });
+        const added = mergeNotes(incoming);
+        importStatus('Added ' + added + ' ChatGPT conversations ✓', true);
+      } catch (err) { importStatus('Could not read ChatGPT export: ' + err.message, false); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   });
 
   render();
