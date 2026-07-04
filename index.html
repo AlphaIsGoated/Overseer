@@ -59,6 +59,26 @@ body::after {
 }
 @media (max-width: 480px) { .dash-title { font-size: 22px; } }
 
+/* ===== Category tab strip ===== */
+.cat-tabs {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 12px;
+  scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;
+}
+.cat-tabs::-webkit-scrollbar { display: none; }
+.cat-tab {
+  flex-shrink: 0; padding: 7px 14px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04);
+  color: var(--text-tertiary); font-family: var(--font); font-size: 12px;
+  font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.cat-tab:hover { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.cat-tab.active {
+  background: rgba(110,231,183,0.14); border-color: rgba(110,231,183,0.45);
+  color: #6EE7B7;
+}
+.tile.hidden-tab { display: none; }
+
 /* ===== BENTO GRID ===== */
 .bento {
   display: grid;
@@ -489,10 +509,23 @@ body::after {
     </div>
   </div>
 
-  <div class="bento">
+  <!-- Category tabs — tap to browse modules by area instead of scrolling 22 tiles -->
+  <div class="cat-tabs" id="catTabs" role="tablist">
+    <button class="cat-tab active" data-filter="overview" type="button">⭐ Overview</button>
+    <button class="cat-tab" data-filter="health" type="button">💊 Health</button>
+    <button class="cat-tab" data-filter="training" type="button">💪 Training</button>
+    <button class="cat-tab" data-filter="finance" type="button">📊 Finance</button>
+    <button class="cat-tab" data-filter="career" type="button">🎓 Career</button>
+    <button class="cat-tab" data-filter="personal" type="button">📝 Personal</button>
+    <button class="cat-tab" data-filter="tools" type="button">🧠 Tools</button>
+    <button class="cat-tab" data-filter="system" type="button">⚙️ System</button>
+    <button class="cat-tab" data-filter="all" type="button">All</button>
+  </div>
+
+  <div class="bento" id="bentoGrid">
 
     <!-- Big tile -->
-    <a class="tile big" href="main.html" style="--accent:#6BE3A4">
+    <a class="tile big" data-cat="overview personal" href="main.html" style="--accent:#6BE3A4">
       <div class="tile-top">
         <span class="tile-num">·01</span>
         <span class="tile-emoji">🏠</span>
@@ -506,7 +539,7 @@ body::after {
     </a>
 
     <!-- Wide tile -->
-    <a class="tile wide" href="gym.html" style="--accent:#7DD3FC">
+    <a class="tile wide" data-cat="overview training" href="gym.html" style="--accent:#7DD3FC">
       <div class="tile-top">
         <span class="tile-num">·02</span>
         <span class="tile-emoji">💪</span>
@@ -520,7 +553,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="health.html" style="--accent:#A7F3D0">
+    <a class="tile" data-cat="overview health" href="health.html" style="--accent:#A7F3D0">
       <div class="tile-top">
         <span class="tile-num">·03</span>
         <span class="tile-emoji">💊</span>
@@ -534,7 +567,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="po-water.html" style="--accent:#60A5FA">
+    <a class="tile" data-cat="health" href="po-water.html" style="--accent:#60A5FA">
       <div class="tile-top">
         <span class="tile-num">·04</span>
         <span class="tile-emoji">💧</span>
@@ -548,7 +581,7 @@ body::after {
     </a>
 
     <!-- Wide tile -->
-    <a class="tile wide" href="finance.html" style="--accent:#F2C063">
+    <a class="tile wide" data-cat="overview finance" href="finance.html" style="--accent:#F2C063">
       <div class="tile-top">
         <span class="tile-num">·05</span>
         <span class="tile-emoji">📊</span>
@@ -562,7 +595,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="caffeine.html" style="--accent:#C9A36B">
+    <a class="tile" data-cat="health" href="caffeine.html" style="--accent:#C9A36B">
       <div class="tile-top">
         <span class="tile-num">·06</span>
         <span class="tile-emoji">☕</span>
@@ -576,7 +609,7 @@ body::after {
     </a>
 
     <!-- Wide tile -->
-    <a class="tile wide" href="nova-lite.html" style="--accent:#A78BFA">
+    <a class="tile wide" data-cat="overview tools" href="nova-lite.html" style="--accent:#A78BFA">
       <div class="tile-top">
         <span class="tile-num">·07</span>
         <span class="tile-emoji">🧠</span>
@@ -590,7 +623,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="marathon.html" style="--accent:#FF8A8A">
+    <a class="tile" data-cat="overview training" href="marathon.html" style="--accent:#FF8A8A">
       <div class="tile-top">
         <span class="tile-num">·08</span>
         <span class="tile-emoji">🏃</span>
@@ -604,7 +637,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="notes.html" style="--accent:#E8E5DD">
+    <a class="tile" data-cat="personal" href="notes.html" style="--accent:#E8E5DD">
       <div class="tile-top">
         <span class="tile-num">·09</span>
         <span class="tile-emoji">📝</span>
@@ -618,7 +651,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="chores.html" style="--accent:#6BE3A4">
+    <a class="tile" data-cat="personal" href="chores.html" style="--accent:#6BE3A4">
       <div class="tile-top">
         <span class="tile-num">·10</span>
         <span class="tile-emoji">✅</span>
@@ -632,7 +665,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="personal-care.html" style="--accent:#C9B8FF">
+    <a class="tile" data-cat="health personal" href="personal-care.html" style="--accent:#C9B8FF">
       <div class="tile-top">
         <span class="tile-num">·11</span>
         <span class="tile-emoji">🧴</span>
@@ -646,7 +679,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="saved-links.html" style="--accent:#7DD3FC">
+    <a class="tile" data-cat="personal" href="saved-links.html" style="--accent:#7DD3FC">
       <div class="tile-top">
         <span class="tile-num">·12</span>
         <span class="tile-emoji">🔗</span>
@@ -660,7 +693,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="resume.html" style="--accent:#F2C063">
+    <a class="tile" data-cat="career" href="resume.html" style="--accent:#F2C063">
       <div class="tile-top">
         <span class="tile-num">·13</span>
         <span class="tile-emoji">📄</span>
@@ -674,7 +707,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="calendar.html" style="--accent:#6BE3A4">
+    <a class="tile" data-cat="overview system" href="calendar.html" style="--accent:#6BE3A4">
       <div class="tile-top">
         <span class="tile-num">·14</span>
         <span class="tile-emoji">📅</span>
@@ -688,7 +721,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="nutrition.html" style="--accent:#FF8A8A">
+    <a class="tile" data-cat="health" href="nutrition.html" style="--accent:#FF8A8A">
       <div class="tile-top">
         <span class="tile-num">·15</span>
         <span class="tile-emoji">🥗</span>
@@ -702,7 +735,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="skincare.html" style="--accent:#C9B8FF">
+    <a class="tile" data-cat="health personal" href="skincare.html" style="--accent:#C9B8FF">
       <div class="tile-top">
         <span class="tile-num">·16</span>
         <span class="tile-emoji">🧖</span>
@@ -716,7 +749,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="shopping.html" style="--accent:#F2C063">
+    <a class="tile" data-cat="personal" href="shopping.html" style="--accent:#F2C063">
       <div class="tile-top">
         <span class="tile-num">·17</span>
         <span class="tile-emoji">🛍️</span>
@@ -730,7 +763,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="college.html" style="--accent:#7DD3FC">
+    <a class="tile" data-cat="career" href="college.html" style="--accent:#7DD3FC">
       <div class="tile-top">
         <span class="tile-num">·18</span>
         <span class="tile-emoji">🎓</span>
@@ -744,7 +777,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="internship.html" style="--accent:#C9B8FF">
+    <a class="tile" data-cat="career" href="internship.html" style="--accent:#C9B8FF">
       <div class="tile-top">
         <span class="tile-num">·19</span>
         <span class="tile-emoji">💼</span>
@@ -758,7 +791,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="settings.html" style="--accent:#A78BFA">
+    <a class="tile" data-cat="system" href="settings.html" style="--accent:#A78BFA">
       <div class="tile-top">
         <span class="tile-num">·20</span>
         <span class="tile-emoji">⚙️</span>
@@ -772,7 +805,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="help.html" style="--accent:#E8E5DD">
+    <a class="tile" data-cat="system" href="help.html" style="--accent:#E8E5DD">
       <div class="tile-top">
         <span class="tile-num">·21</span>
         <span class="tile-emoji">📖</span>
@@ -786,7 +819,7 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="brain.html" style="--accent:#A78BFA">
+    <a class="tile" data-cat="tools" href="brain.html" style="--accent:#A78BFA">
       <div class="tile-top">
         <span class="tile-num">·22</span>
         <span class="tile-emoji">🧬</span>
@@ -1330,6 +1363,28 @@ body::after {
       $('todayNews').innerHTML = '<div class="today-empty">News unavailable</div>';
     }
   }
+
+  // ---- Category tab filtering ----
+  // Each tile has data-cat="cat1 cat2" set by us. Clicking a tab shows
+  // only tiles whose data-cat includes the selected filter. "All" shows
+  // everything. Saved to sessionStorage so the chosen tab survives a
+  // refresh without resetting back to Overview every time.
+  (function initCatTabs() {
+    const tabs = document.querySelectorAll('.cat-tab');
+    const tiles = document.querySelectorAll('#bentoGrid [data-cat]');
+    const saved = sessionStorage.getItem('home_cat') || 'overview';
+    function applyFilter(filter) {
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.filter === filter));
+      tiles.forEach(tile => {
+        const cats = (tile.dataset.cat || '').split(' ');
+        const show = filter === 'all' || cats.includes(filter);
+        tile.classList.toggle('hidden-tab', !show);
+      });
+      sessionStorage.setItem('home_cat', filter);
+    }
+    tabs.forEach(t => t.addEventListener('click', () => applyFilter(t.dataset.filter)));
+    applyFilter(saved);
+  })();
 
   initWeather();
   loadNews();
