@@ -24,7 +24,7 @@ body::before { content: ''; position: fixed; inset: 0; background: radial-gradie
 body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
 @keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
 
-.page { max-width: 720px; margin: 0 auto; }
+.page { max-width: 760px; margin: 0 auto; }
 .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
 .back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
 .dash-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
@@ -36,32 +36,62 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
 .gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 14px; }
 
+.type-seg { display: inline-flex; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; overflow: hidden; margin-bottom: 14px; }
+.type-seg button { padding: 10px 20px; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.type-seg button.on { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+
 .gm-input { width: 100%; padding: 11px 14px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
 .gm-input::placeholder { color: var(--text-tertiary); }
-textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; }
+textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margin-bottom: 0; }
 .field-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 6px; display: block; }
-.gm-add { padding: 11px 18px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gm-add { padding: 12px 22px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
 .gm-add:hover { filter: brightness(1.06); }
 .gm-add:disabled { opacity: 0.5; cursor: default; }
 .gm-ghost { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .gm-ghost:hover { background: rgba(255,255,255,0.08); }
-.save-ok { font-size: 11.5px; color: var(--success); margin-left: 10px; }
 
-.opp-row { padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
-.opp-row.selected { border-color: rgba(110,231,183,0.4); background: rgba(110,231,183,0.06); }
-.opp-header { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.opp-title { flex: 1; font-size: 14px; font-weight: 700; color: var(--text-primary); }
-.opp-company { font-size: 12px; color: var(--text-tertiary); }
-.opp-actions { display: flex; gap: 8px; margin-top: 10px; }
-.opp-delete { border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer; opacity: 0.5; }
+.search-status { font-size: 12.5px; color: var(--text-tertiary); margin-top: 10px; font-style: italic; }
+.search-status.running { color: var(--warning); }
+.search-status.done { color: var(--success); font-style: normal; }
+.search-status.err { color: var(--danger); font-style: normal; }
+
+/* Opportunity cards */
+.opp-card { padding: 16px 18px; margin-bottom: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; transition: border-color 0.15s; }
+.opp-card.applied { border-color: rgba(110,231,183,0.35); background: rgba(110,231,183,0.04); opacity: 0.7; }
+.opp-header { display: flex; align-items: flex-start; gap: 12px; }
+.opp-score { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 1.5px solid; }
+.opp-score.high { border-color: var(--success); color: var(--success); background: rgba(110,231,183,0.1); }
+.opp-score.mid { border-color: var(--warning); color: var(--warning); background: rgba(242,192,99,0.1); }
+.opp-score.low { border-color: rgba(255,255,255,0.2); color: var(--text-tertiary); background: transparent; }
+.opp-info { flex: 1; min-width: 0; }
+.opp-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
+.opp-company { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+.opp-match { font-size: 11.5px; color: var(--text-secondary); margin-top: 5px; font-style: italic; }
+.opp-apply-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #7DD3FC; text-decoration: none; font-weight: 600; margin-top: 8px; }
+.opp-apply-link:hover { text-decoration: underline; }
+.opp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.opp-email-toggle { border: 1px solid rgba(255,255,255,0.10); background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 11.5px; font-weight: 700; padding: 7px 12px; border-radius: 9px; cursor: pointer; }
+.opp-email-toggle:hover { background: rgba(255,255,255,0.06); }
+.opp-applied-btn { border: 1px solid rgba(110,231,183,0.3); background: transparent; color: var(--success); font-family: inherit; font-size: 11.5px; font-weight: 700; padding: 7px 12px; border-radius: 9px; cursor: pointer; }
+.opp-applied-btn.on { background: rgba(110,231,183,0.14); }
+.opp-email-box { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap; display: none; }
+.opp-email-box.show { display: block; }
+.opp-copy-btn { margin-top: 8px; display: inline-block; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 7px; cursor: pointer; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 20px 0; }
+
+/* Manual opportunity entry */
+.opp-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; margin-bottom: 6px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.opp-row.applied-row { border-color: rgba(110,231,183,0.35); opacity: 0.65; }
+.opp-row-info { flex: 1; min-width: 0; }
+.opp-row-name { font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.opp-row-company { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.opp-delete { border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer; padding: 0 4px; opacity: 0.5; }
 .opp-delete:hover { color: var(--danger); }
-.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+.opp-draft-btn { border: 0; background: rgba(110,231,183,0.10); color: var(--success); font-family: inherit; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 8px; cursor: pointer; flex-shrink: 0; }
 
-.draft-box { margin-top: 14px; padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
-.draft-subj { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
-.draft-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.65; white-space: pre-wrap; margin-bottom: 14px; min-height: 80px; }
-.draft-text[contenteditable="true"] { outline: 1px solid rgba(255,255,255,0.18); border-radius: 6px; padding: 8px; cursor: text; }
-.draft-send-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.hint { font-size: 11.5px; color: var(--text-tertiary); line-height: 1.45; margin-top: 8px; }
+.download-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.no-apify-note { font-size: 12px; color: var(--warning); background: rgba(242,192,99,0.08); border: 1px solid rgba(242,192,99,0.25); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
 
 @media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
 </style>
@@ -75,23 +105,57 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; }
   </a>
 
   <h1 class="dash-title">Research &amp; Internships</h1>
-  <p class="dash-sub">Add opportunities, let AI draft a personalized email for each, then review and send yourself — no automated sending.</p>
+  <p class="dash-sub">AI-powered opportunity search using your resume. Draft personalized emails for each, track what you've applied to.</p>
 
-  <!-- Resume context -->
-  <div class="section-title" style="margin-top:0">Your background</div>
-  <div class="gm-card">
-    <label class="field-label" for="resumeCtx">Paste your resume / bio (the AI uses this to personalize each email)</label>
-    <textarea class="gm-input" id="resumeCtx" placeholder="Name, major, relevant experience, skills, what you're looking for…" style="min-height:120px"></textarea>
-    <button class="gm-ghost" id="resumeSave" type="button">Save context</button>
-    <span class="save-ok hidden" id="resumeSaveOk">Saved ✓</span>
+  <!-- AI Search section -->
+  <div class="section-title" style="margin-top:0">Find opportunities</div>
+  <div class="gm-card" id="searchCard">
+    <div id="noApifyNote" class="no-apify-note hidden">⚠ <b>APIFY_API_TOKEN not configured</b> — add it to Vercel env vars to enable automated search. You can still add opportunities manually below.</div>
+
+    <div class="type-seg" id="typeSeg">
+      <button data-t="internship" class="on">💼 Internship</button>
+      <button data-t="research">🔬 Research</button>
+    </div>
+
+    <label class="field-label">Field / area</label>
+    <input class="gm-input" id="srchField" type="text" placeholder="e.g. Computer Science, Neuroscience, Finance" autocomplete="off">
+
+    <div id="uniRow" style="display:none">
+      <label class="field-label">Target university / institution</label>
+      <input class="gm-input" id="srchUni" type="text" placeholder="e.g. Case Western Reserve, Carnegie Mellon, NIH" autocomplete="off">
+    </div>
+
+    <div id="locRow">
+      <label class="field-label">Location (optional)</label>
+      <input class="gm-input" id="srchLoc" type="text" placeholder="e.g. Remote, New York, San Francisco" autocomplete="off">
+    </div>
+
+    <label class="field-label" style="margin-top:10px">Your background (resume summary / skills)</label>
+    <textarea class="gm-input" id="srchResume" placeholder="Paste key resume sections, skills, GPA, relevant courses — the more specific, the better the matches and emails."></textarea>
+
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+      <button class="gm-add" id="srchGo" type="button">🔍 Find opportunities</button>
+      <button class="gm-ghost" id="srchDownload" type="button" style="display:none">⬇ Download master file</button>
+    </div>
+    <div class="search-status" id="srchStatus"></div>
   </div>
 
-  <!-- Opportunities -->
-  <div class="section-title">Opportunities</div>
+  <!-- Search results -->
+  <div id="srchResults"></div>
+
+  <!-- Manual opportunities (existing functionality) -->
+  <div class="section-title">Add manually</div>
+  <div class="gm-card">
+    <label class="field-label">Resume / bio context</label>
+    <textarea class="gm-input" id="resumeCtx" placeholder="Name, major, relevant experience, skills, what you're looking for…" style="min-height:90px;margin-bottom:10px"></textarea>
+    <button class="gm-ghost" id="resumeSave" type="button">Save context</button>
+    <span class="save-ok hidden" id="resumeSaveOk" style="font-size:11.5px;color:var(--success);margin-left:10px">Saved ✓</span>
+  </div>
+
   <div class="gm-card">
     <div id="oppList"></div>
     <details style="margin-top:12px">
-      <summary style="font-size:12.5px;color:var(--text-tertiary);cursor:pointer;font-weight:600">+ Add opportunity</summary>
+      <summary style="font-size:12.5px;color:var(--text-tertiary);cursor:pointer;font-weight:600">+ Add opportunity manually</summary>
       <div style="margin-top:12px">
         <label class="field-label">Role / project</label>
         <input class="gm-input" id="oppRole" type="text" placeholder="e.g. Software Engineering Intern" autocomplete="off">
@@ -99,31 +163,11 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; }
         <input class="gm-input" id="oppCompany" type="text" placeholder="e.g. Meta, Prof. Smith @ CWRU" autocomplete="off">
         <label class="field-label">Contact email (optional)</label>
         <input class="gm-input" id="oppEmail" type="email" placeholder="recruiter@company.com" autocomplete="off">
-        <label class="field-label">Notes (job description snippet, why you want it)</label>
-        <textarea class="gm-input" id="oppNotes" placeholder="Key skills listed, why this role, anything specific to mention…" style="min-height:80px"></textarea>
+        <label class="field-label">Notes</label>
+        <textarea class="gm-input" id="oppNotes" placeholder="Job description snippet, why you want it, anything specific to mention…" style="min-height:70px"></textarea>
         <button class="gm-add" id="oppAdd" type="button">Add</button>
       </div>
     </details>
-  </div>
-
-  <!-- Draft email section -->
-  <div id="draftSection" class="hidden">
-    <div class="section-title">Draft email</div>
-    <div class="gm-card">
-      <div id="draftBusy" class="empty-state hidden">Drafting your email…</div>
-      <div id="draftErr" class="hidden" style="font-size:12px;color:var(--danger);margin-bottom:10px"></div>
-      <div id="draftResult" class="hidden">
-        <div class="draft-subj">Subject</div>
-        <div class="draft-text" id="draftSubject" contenteditable="true"></div>
-        <div class="draft-subj">Body</div>
-        <div class="draft-text" id="draftBody" contenteditable="true"></div>
-        <div class="draft-send-row">
-          <button class="gm-add" id="draftCopy" type="button">📋 Copy body</button>
-          <button class="gm-ghost" id="draftMailto" type="button">📧 Open email client</button>
-          <button class="gm-ghost" id="draftRegen" type="button">↺ Re-draft</button>
-        </div>
-      </div>
-    </div>
   </div>
 
 </div>
@@ -134,52 +178,189 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; }
   const $ = (id) => document.getElementById(id);
   const RESUME_KEY = 'internship:resume_ctx';
   const OPP_KEY = 'internship:opportunities';
+  const APPLIED_KEY = 'internship:applied';
 
   function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
   function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  // ---- Resume context ----
-  $('resumeCtx').value = localStorage.getItem(RESUME_KEY) || '';
+  // ---- Search type toggle ----
+  let searchType = 'internship';
+  $('typeSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    searchType = b.dataset.t;
+    $('typeSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    $('uniRow').style.display = searchType === 'research' ? 'block' : 'none';
+    $('locRow').style.display = searchType === 'internship' ? 'block' : 'none';
+  }));
+
+  // ---- APIFY availability ----
+  if (!window.DASH_APIFY_ENABLED) $('noApifyNote').classList.remove('hidden');
+
+  // Pre-fill resume context from saved value or search card
+  const savedCtx = localStorage.getItem(RESUME_KEY) || '';
+  $('resumeCtx').value = savedCtx;
+  $('srchResume').value = savedCtx;
+
   $('resumeSave').addEventListener('click', () => {
     localStorage.setItem(RESUME_KEY, $('resumeCtx').value.trim());
     $('resumeSaveOk').classList.remove('hidden');
     setTimeout(() => $('resumeSaveOk').classList.add('hidden'), 1600);
   });
 
-  // ---- Opportunities ----
-  let selectedOppId = null;
+  // ---- Search functionality ----
+  let foundOpps = [];
+  let appliedSet = loadJSON(APPLIED_KEY, {});
 
+  function setStatus(msg, cls) {
+    const el = $('srchStatus');
+    el.textContent = msg; el.className = 'search-status' + (cls ? ' ' + cls : '');
+  }
+
+  function renderFoundOpps() {
+    const wrap = $('srchResults');
+    if (!foundOpps.length) { wrap.innerHTML = ''; $('srchDownload').style.display = 'none'; return; }
+    $('srchDownload').style.display = '';
+    wrap.innerHTML = foundOpps.map((opp, idx) => {
+      const applied = !!appliedSet[opp.id];
+      const score = opp.matchScore || 0;
+      const scoreCls = score >= 7 ? 'high' : score >= 5 ? 'mid' : 'low';
+      return `<div class="opp-card${applied ? ' applied' : ''}" data-idx="${idx}">
+        <div class="opp-header">
+          <div class="opp-score ${scoreCls}">${score}</div>
+          <div class="opp-info">
+            <div class="opp-title">${escapeHtml(opp.title)}</div>
+            <div class="opp-company">${escapeHtml(opp.company)}</div>
+            <div class="opp-match">${escapeHtml(opp.matchReason || '')}</div>
+            ${opp.url ? `<a class="opp-apply-link" href="${escapeHtml(opp.url)}" target="_blank" rel="noopener">🔗 View / Apply</a>` : ''}
+            ${opp.recruiter ? `<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Contact: ${escapeHtml(opp.recruiter)}</div>` : ''}
+            ${opp.howToApply ? `<div style="font-size:11px;color:var(--text-tertiary)">How to apply: ${escapeHtml(opp.howToApply)}</div>` : ''}
+          </div>
+        </div>
+        <div class="opp-actions">
+          <button class="opp-email-toggle" data-idx="${idx}">📧 Show email draft</button>
+          <button class="opp-applied-btn${applied ? ' on' : ''}" data-idx="${idx}">${applied ? '✓ Applied' : 'Mark as applied'}</button>
+          <button class="opp-copy-btn" data-idx="${idx}" style="display:none">📋 Copy email</button>
+        </div>
+        <div class="opp-email-box" id="email-${idx}">${escapeHtml(opp.draftEmail || '')}</div>
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.opp-email-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = document.getElementById('email-' + btn.dataset.idx);
+        const copyBtn = wrap.querySelectorAll('.opp-copy-btn')[parseInt(btn.dataset.idx)];
+        const showing = box.classList.toggle('show');
+        btn.textContent = showing ? '📧 Hide email draft' : '📧 Show email draft';
+        if (copyBtn) copyBtn.style.display = showing ? '' : 'none';
+      });
+    });
+    wrap.querySelectorAll('.opp-applied-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        const opp = foundOpps[idx];
+        appliedSet[opp.id] = !appliedSet[opp.id];
+        saveJSON(APPLIED_KEY, appliedSet);
+        renderFoundOpps();
+      });
+    });
+    wrap.querySelectorAll('.opp-copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const opp = foundOpps[parseInt(btn.dataset.idx)];
+        navigator.clipboard.writeText(opp.draftEmail || '').catch(() => {});
+        btn.textContent = '✓ Copied';
+        setTimeout(() => { btn.textContent = '📋 Copy email'; }, 1500);
+      });
+    });
+  }
+
+  $('srchGo').addEventListener('click', async () => {
+    if (!window.DASH_APIFY_ENABLED) {
+      setStatus('APIFY_API_TOKEN not set — add it to Vercel to enable search.', 'err');
+      return;
+    }
+    const field = $('srchField').value.trim();
+    if (!field) { setStatus('Enter a field/area first.', 'err'); return; }
+    const btn = $('srchGo');
+    btn.disabled = true;
+    btn.textContent = '⏳ Searching…';
+    setStatus('Searching the web and analyzing results with AI — this takes about 30-60 seconds…', 'running');
+
+    // Save resume context to localStorage for future use
+    const rc = $('srchResume').value.trim();
+    if (rc) localStorage.setItem(RESUME_KEY, rc);
+
+    try {
+      const res = await fetch('/api/search-opportunities', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({
+          type: searchType,
+          field,
+          university: $('srchUni').value.trim(),
+          location: $('srchLoc').value.trim(),
+          resumeContext: rc,
+        }),
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
+      const data = await res.json();
+      if (!res.ok || data.error) { setStatus('Error: ' + (data.error || 'Something went wrong.'), 'err'); return; }
+      foundOpps = (data.opportunities || []);
+      setStatus('Found ' + foundOpps.length + ' opportunities, ranked by resume fit.', 'done');
+      renderFoundOpps();
+    } catch (e) {
+      setStatus('Could not reach the search service: ' + e.message, 'err');
+    }
+    btn.disabled = false;
+    btn.textContent = '🔍 Find opportunities';
+  });
+
+  // ---- Download master file ----
+  $('srchDownload').addEventListener('click', () => {
+    const lines = foundOpps.map((opp, i) => [
+      '='.repeat(60),
+      `#${i+1} | Score: ${opp.matchScore}/10 | ${opp.title} @ ${opp.company}`,
+      `URL: ${opp.url || 'N/A'}`,
+      `Recruiter: ${opp.recruiter || 'N/A'}`,
+      `How to apply: ${opp.howToApply || 'N/A'}`,
+      `Match reason: ${opp.matchReason || ''}`,
+      appliedSet[opp.id] ? '[ APPLIED ]' : '[ NOT YET APPLIED ]',
+      '',
+      'EMAIL DRAFT:',
+      opp.draftEmail || '(none generated)',
+    ].join('\n'));
+    const text = 'RESEARCH & INTERNSHIPS MASTER FILE\nGenerated: ' + new Date().toLocaleDateString() + '\n\n' + lines.join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'opportunities-' + new Date().toISOString().slice(0, 10) + '.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // ---- Manual opportunities (legacy) ----
   function loadOpps() { return loadJSON(OPP_KEY, []); }
   function saveOpps(list) { saveJSON(OPP_KEY, list); }
 
   function renderOpps() {
     const opps = loadOpps();
-    const wrap = $('oppList');
-    if (!opps.length) { wrap.innerHTML = '<div class="empty-state">No opportunities yet — add one below.</div>'; return; }
-    wrap.innerHTML = opps.map(o =>
-      '<div class="opp-row' + (o.id === selectedOppId ? ' selected' : '') + '" data-id="' + o.id + '">' +
-        '<div class="opp-header">' +
-          '<div><div class="opp-title">' + escapeHtml(o.role) + '</div><div class="opp-company">' + escapeHtml(o.company) + '</div></div>' +
-          '<button class="gm-ghost" data-action="draft" style="padding:7px 12px;font-size:12px">✨ Draft email</button>' +
-          '<button class="opp-delete" data-action="delete" type="button">×</button>' +
-        '</div>' +
+    const list = $('oppList');
+    if (!opps.length) { list.innerHTML = '<div class="empty-state">No opportunities added yet.</div>'; return; }
+    list.innerHTML = opps.map(o =>
+      '<div class="opp-row' + (appliedSet[o.id] ? ' applied-row' : '') + '" data-id="' + o.id + '">' +
+        '<div class="opp-row-info"><div class="opp-row-name">' + escapeHtml(o.role) + '</div>' +
+        '<div class="opp-row-company">' + escapeHtml(o.company) + '</div></div>' +
+        '<button class="opp-draft-btn" data-id="' + o.id + '" type="button">✨ Draft email</button>' +
+        '<button class="opp-delete" data-id="' + o.id + '" type="button">×</button>' +
       '</div>'
     ).join('');
-    wrap.querySelectorAll('.opp-row').forEach(row => {
-      const id = row.dataset.id;
-      row.querySelector('[data-action="draft"]').addEventListener('click', () => startDraft(id));
-      row.querySelector('[data-action="delete"]').addEventListener('click', () => {
-        saveOpps(loadOpps().filter(o => o.id !== id));
-        if (selectedOppId === id) { selectedOppId = null; $('draftSection').classList.add('hidden'); }
-        renderOpps();
-      });
+    list.querySelectorAll('.opp-delete').forEach(btn => {
+      btn.addEventListener('click', () => { saveOpps(loadOpps().filter(o => o.id !== btn.dataset.id)); renderOpps(); });
     });
+    list.querySelectorAll('.opp-draft-btn').forEach(btn => startManualDraft(btn.dataset.id));
   }
 
   $('oppAdd').addEventListener('click', () => {
-    const role = $('oppRole').value.trim();
-    const company = $('oppCompany').value.trim();
+    const role = $('oppRole').value.trim(), company = $('oppCompany').value.trim();
     if (!role || !company) return;
     const opps = loadOpps();
     opps.push({ id: 'o_' + Date.now(), role, company, email: $('oppEmail').value.trim(), notes: $('oppNotes').value.trim() });
@@ -188,74 +369,33 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; }
     renderOpps();
   });
 
-  // ---- Email drafting ----
   const DRAFT_SYS =
     "You are an expert at writing concise, genuine, personalized outreach emails for internships and "
-    + "research positions. Write a short, specific cold email (Subject + Body) that: "
-    + "reads like a REAL human wrote it (not a generic template), mentions 1-2 SPECIFIC reasons this "
-    + "opportunity is a good match for this specific person based on their background, is respectful of "
-    + "the recipient's time (keep the body to 3-4 short paragraphs max), and ends with a clear single ask "
-    + "(a 20-min call, attaching resume, or reviewing your application). "
-    + "Do NOT start with 'I hope this email finds you well' or similar platitudes. "
+    + "research positions. Write a short, specific cold email (Subject + Body) that reads like a REAL "
+    + "human wrote it, mentions 1-2 SPECIFIC reasons this opportunity is a good match based on the student's "
+    + "background, and ends with a clear single ask. Do NOT start with platitudes. "
     + "Reply in exactly this format with no extra text: "
     + "SUBJECT: <subject line here>\\nBODY:\\n<email body here>";
 
-  async function startDraft(oppId) {
-    selectedOppId = oppId;
-    renderOpps();
+  function startManualDraft(oppId) {
     const opp = loadOpps().find(o => o.id === oppId);
     if (!opp) return;
-    $('draftSection').classList.remove('hidden');
-    $('draftBusy').classList.remove('hidden');
-    $('draftResult').classList.add('hidden');
-    $('draftErr').classList.add('hidden');
-    const resumeCtx = localStorage.getItem(RESUME_KEY) || '';
-    const prompt = 'My background:\n' + (resumeCtx || '(not provided — do your best)') +
-      '\n\nOpportunity:\nRole: ' + opp.role + '\nCompany/lab: ' + opp.company +
-      (opp.notes ? '\nNotes: ' + opp.notes : '');
-    try {
-      const res = await fetch('/api/ai/ai-chat', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-        body: JSON.stringify({ system: DRAFT_SYS, messages: [{ role: 'user', content: prompt }] })
-      });
-      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
-      const json = await res.json();
-      $('draftBusy').classList.add('hidden');
-      if (!res.ok || json.error) { $('draftErr').textContent = json.error || 'Something went wrong.'; $('draftErr').classList.remove('hidden'); return; }
-      const text = json.text || '';
-      const subMatch = text.match(/^SUBJECT:\s*(.+)/m);
-      const bodyMatch = text.match(/^BODY:\s*([\s\S]+)/m);
-      $('draftSubject').textContent = subMatch ? subMatch[1].trim() : '(no subject)';
-      $('draftBody').textContent = bodyMatch ? bodyMatch[1].trim() : text;
-      $('draftResult').classList.remove('hidden');
-    } catch (e) {
-      $('draftBusy').classList.add('hidden');
-      $('draftErr').textContent = (e && e.message) || 'Could not reach the AI.';
-      $('draftErr').classList.remove('hidden');
-    }
+    // For manual opps, open a simple modal-like view instead of inline
+    const row = document.querySelector(`[data-id="${oppId}"] .opp-draft-btn`);
+    if (row) row.addEventListener('click', async () => {
+      const draftWin = window.open('', '_blank', 'width=600,height=500');
+      const resumeCtx = localStorage.getItem(RESUME_KEY) || '';
+      const prompt = 'My background:\n' + (resumeCtx || '(not provided)') + '\n\nOpportunity:\nRole: ' + opp.role + '\nCompany/lab: ' + opp.company + (opp.notes ? '\nNotes: ' + opp.notes : '');
+      draftWin.document.write('<pre style="font:14px monospace;padding:20px;white-space:pre-wrap">Drafting…</pre>');
+      try {
+        const res = await fetch('/api/ai/ai-chat', { method:'POST', headers:{'content-type':'application/json','x-app-secret':(window.DASH_APP_SECRET||'')}, body:JSON.stringify({system:DRAFT_SYS,messages:[{role:'user',content:prompt}]}) });
+        const json = await res.json();
+        draftWin.document.querySelector('pre').textContent = (!res.ok || json.error) ? ('Error: ' + (json.error || 'Something went wrong.')) : (json.text || 'No draft generated.');
+      } catch(e) { draftWin.document.querySelector('pre').textContent = 'Error: ' + e.message; }
+    });
   }
 
-  $('draftCopy').addEventListener('click', () => {
-    navigator.clipboard.writeText($('draftBody').textContent || '').catch(() => {});
-    $('draftCopy').textContent = '✓ Copied';
-    setTimeout(() => $('draftCopy').textContent = '📋 Copy body', 1500);
-  });
-  $('draftMailto').addEventListener('click', () => {
-    const opp = loadOpps().find(o => o.id === selectedOppId) || {};
-    const subj = encodeURIComponent($('draftSubject').textContent || '');
-    const body = encodeURIComponent($('draftBody').textContent || '');
-    const to = encodeURIComponent(opp.email || '');
-    window.open('mailto:' + to + '?subject=' + subj + '&body=' + body, '_blank');
-  });
-  $('draftRegen').addEventListener('click', () => { if (selectedOppId) startDraft(selectedOppId); });
-
-  window.addEventListener('storage', renderOpps);
   renderOpps();
-
-  if (window.initCloudSync) {
-    window.initCloudSync({ appKey: 'internship', syncedKeys: [OPP_KEY], onApplied: renderOpps });
-  }
 })();
 </script>
 </body>

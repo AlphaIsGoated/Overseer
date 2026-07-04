@@ -34,6 +34,7 @@ export default function handler(req, res) {
   const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
   const elevenLabsEnabled = process.env.ELEVENLABS_API_KEY ? 'true' : 'false';
   const openAiEnabled = process.env.OPENAI_API_KEY ? 'true' : 'false';
+  const apifyEnabled = process.env.APIFY_API_TOKEN ? 'true' : 'false';
   const appSecret = process.env.APP_SECRET || '';
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
@@ -45,6 +46,7 @@ export default function handler(req, res) {
     'window.DASH_VAPID_PUBLIC_KEY=' + JSON.stringify(vapidPublicKey) + ';' +
     'window.DASH_ELEVENLABS_ENABLED=' + elevenLabsEnabled + ';' +
     'window.DASH_OPENAI_ENABLED=' + openAiEnabled + ';' +
+    'window.DASH_APIFY_ENABLED=' + apifyEnabled + ';' +
     'window.DASH_APP_SECRET=' + JSON.stringify(appSecret) + ';'
   );
 }
