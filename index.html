@@ -281,16 +281,19 @@ body::after {
 .jr-corner-bl { bottom: 18px; left: 18px; transform: scaleY(-1); }
 .jr-corner-br { bottom: 18px; right: 18px; transform: scale(-1); }
 
-/* Side hex data panels */
+/* Side hex data panels — hidden on narrow screens where they'd
+   collide with the rings (rings are 68vw, panels need room outside). */
 .jr-side-data {
   position: absolute; top: 50%; transform: translateY(-50%);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 9px; letter-spacing: 0.06em; color: rgba(110,231,183,0.35);
   line-height: 1.8; user-select: none; pointer-events: none;
   display: flex; flex-direction: column; gap: 2px;
+  max-width: calc((100vw - min(300px, 68vw)) / 2 - 20px); overflow: hidden;
 }
-.jr-side-data.left { left: max(14px, 2vw); text-align: left; }
-.jr-side-data.right { right: max(14px, 2vw); text-align: right; }
+.jr-side-data.left { left: 12px; text-align: left; }
+.jr-side-data.right { right: 12px; text-align: right; }
+@media (max-width: 560px) { .jr-side-data { display: none; } }
 
 /* Main ring container */
 .jarvis-rings { position: relative; width: min(300px, 68vw); height: min(300px, 68vw); }
