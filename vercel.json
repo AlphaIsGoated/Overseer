@@ -18,7 +18,23 @@
   ],
   "crons": [
     {
-      "path": "/api/push-send?cron=1",
+      "path": "/api/push-send?type=morning&cron=1",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/push-send?type=training&cron=1",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/push-send?type=nutrition&cron=1",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/push-send?type=skincare&cron=1",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/push-send?type=reminders&cron=1",
       "schedule": "0 13 * * *"
     }
   ]
