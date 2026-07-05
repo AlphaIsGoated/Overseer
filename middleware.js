@@ -31,7 +31,12 @@ export const config = {
   matcher: '/(.*)',
 };
 
-const PUBLIC_PATHS = ['/login.html', '/api/auth', '/sw.js', '/manifest.json'];
+// /api/config only returns intentionally-public values (Supabase URL,
+// Strava client ID, feature flags like DASH_APIFY_ENABLED) — no secrets.
+// Making it public ensures it loads reliably for all pages including the
+// login page itself, and avoids any edge-case auth failures that would
+// leave window.DASH_* variables undefined.
+const PUBLIC_PATHS = ['/login.html', '/api/auth', '/api/config', '/sw.js', '/manifest.json'];
 
 export default async function middleware(req) {
   const { pathname } = new URL(req.url);
