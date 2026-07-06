@@ -85,6 +85,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 </style>
 </head>
 <body>
+<!-- Full-page drop overlay — appears when text is dragged over the window -->
+<div id="dropOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(6,9,10,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;gap:16px;pointer-events:none">
+  <div style="width:80px;height:80px;border-radius:50%;border:2.5px solid #6EE7B7;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 0 30px rgba(110,231,183,0.5)">📝</div>
+  <div style="font-size:20px;font-weight:700;color:#FAFAFA;letter-spacing:-0.01em">Drop to save as a note</div>
+  <div style="font-size:13px;color:rgba(110,231,183,0.7)">First line becomes the title</div>
+</div>
+
 <div class="page">
 
   <a href="index.html" class="back-btn" aria-label="Back to dashboard">
@@ -402,6 +409,54 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY], onApplied: render });
   }
+
+  // ---- Full-page drag-and-drop from Apple Notes ----
+  // When you drag selected text from Apple Notes (or any app) over this
+  // window, a full-screen overlay appears. Drop anywhere to instantly
+  // create a note — no need to find the paste zone.
+  const overlay = document.getElementById('dropOverlay');
+  let dragDepth = 0; // track nested dragenter/dragleave so overlay doesn't flicker
+
+  document.addEventListener('dragenter', (e) => {
+    // Only show overlay for text content (not file drops)
+    if (!e.dataTransfer) return;
+    const types = Array.from(e.dataTransfer.types || []);
+    if (!types.includes('text/plain') && !types.includes('text')) return;
+    dragDepth++;
+    overlay.style.display = 'flex';
+    overlay.style.pointerEvents = 'all';
+  });
+
+  document.addEventListener('dragleave', () => {
+    dragDepth--;
+    if (dragDepth <= 0) { dragDepth = 0; overlay.style.display = 'none'; overlay.style.pointerEvents = 'none'; }
+  });
+
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault(); // required to allow drop
+  });
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
+
+    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || '';
+    if (!text.trim()) return;
+
+    // First non-blank line → title; rest → body
+    const lines = text.split('\n');
+    const title = (lines.find(l => l.trim()) || 'Dropped note').slice(0, 80).trim();
+    const body = text.trim();
+
+    const added = mergeNotes([{ title, body }]);
+    if (added) {
+      importStatus('Note saved from drag-and-drop ✓', true);
+    } else {
+      importStatus('A note with that title already exists.', false);
+    }
+  });
 })();
 </script>
 </body>
