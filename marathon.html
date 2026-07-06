@@ -930,120 +930,152 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     outerSvgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + H);
     return w;
   }
+  // ── Apple-style chart helpers ──────────────────────────────────────────────
+  function smoothCurve(pts) {
+    if (!pts || pts.length < 2) return pts && pts.length === 1 ? `M${pts[0][0]},${pts[0][1]}` : '';
+    const t = 0.35;
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0=pts[Math.max(0,i-1)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(pts.length-1,i+2)];
+      const cp1x=p1[0]+(p2[0]-p0[0])*t, cp1y=p1[1]+(p2[1]-p0[1])*t;
+      const cp2x=p2[0]-(p3[0]-p1[0])*t, cp2y=p2[1]-(p3[1]-p1[1])*t;
+      d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
+  function areaPath(pts, yBot, x0, xN) {
+    if (!pts || pts.length < 2) return '';
+    return smoothCurve(pts) + ` L${xN.toFixed(1)},${yBot} L${x0.toFixed(1)},${yBot} Z`;
+  }
+  function injectDefs(svgEl, defsHtml) {
+    let defs = svgEl.querySelector('defs');
+    if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svgEl.insertBefore(defs,svgEl.firstChild); }
+    defs.innerHTML = defsHtml;
+  }
+
   function renderMileageChart() {
-    const svg = $('mtMileageContent'), empty = $('mtMileageEmpty'), meta = $('mtMileageMeta');
+    const gEl = $('mtMileageContent'), svgEl = $('mtMileageSvg');
+    const empty = $('mtMileageEmpty'), meta = $('mtMileageMeta');
     const byWeek = byWeekBuckets();
     const allWeeks = Object.keys(byWeek).sort();
-    if (!allWeeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; $('mtWeekSliderWrap').classList.add('hidden'); return; }
+    if (!allWeeks.length) { gEl.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; $('mtWeekSliderWrap').classList.add('hidden'); return; }
     empty.classList.add('hidden');
     setupWeekSlider(allWeeks, byWeek);
     const weeks = allWeeks.slice(weekWindowStart, weekWindowStart + WEEK_WINDOW_SIZE);
     const maxV = Math.max.apply(null, weeks.map(w => Math.max(byWeek[w].planned, byWeek[w].actual))) || 1;
-    const H = 140, pad = 8, gap = 6;
-    const W = syncChartViewBoxWidth($('mtMileageSvg'), H, 320);
-    const bw = (W - pad * 2) / weeks.length;
+    const H = 140, pad = 14, yTop = 8, yBot = 122;
+    const W = syncChartViewBoxWidth(svgEl, H, 320);
+    const xFor = i => pad + (i / Math.max(1, weeks.length - 1)) * (W - pad * 2);
+    const yFor = v => yBot - (v / maxV) * (yBot - yTop);
+    injectDefs(svgEl, `
+      <linearGradient id="migPlanGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7DD3FC" stop-opacity="0.28"/><stop offset="100%" stop-color="#7DD3FC" stop-opacity="0.02"/>
+      </linearGradient>
+      <linearGradient id="migActGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6EE7B7" stop-opacity="0.45"/><stop offset="100%" stop-color="#6EE7B7" stop-opacity="0.03"/>
+      </linearGradient>`);
+    const planPts = weeks.map((w,i) => [xFor(i), yFor(byWeek[w].planned)]);
+    const actPts  = weeks.map((w,i) => [xFor(i), yFor(byWeek[w].actual)]);
     let html = '';
-    weeks.forEach((w, i) => {
-      const x = pad + i * bw;
-      const wd = byWeek[w];
-      const pH = (wd.planned / maxV) * (H - 24);
-      const aH = (wd.actual / maxV) * (H - 24);
-      const barW = (bw - gap) / 2;
-      const wkLabel = weekOfLabel(wd.monday);
-      const pct = wd.planned > 0 ? Math.round((wd.actual / wd.planned) * 100) : null;
-      const plannedTip = attrTip('Week of ' + wkLabel + '\\nPlanned: ' + wd.planned.toFixed(1) + ' mi\\nTotal miles your plan calls for this week.');
-      const actualTip = attrTip('Week of ' + wkLabel + '\\nActual: ' + wd.actual.toFixed(1) + ' mi' + (pct != null ? ' (' + pct + '% of planned)' : '') + '\\nMiles you actually ran — manual logs + Strava-synced runs.');
-      html += '<rect data-tip="' + plannedTip + '" x="' + x.toFixed(1) + '" y="' + (H - 18 - pH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(pH, 1).toFixed(1) + '" fill="#7DD3FC" rx="2"></rect>';
-      html += '<rect data-tip="' + actualTip + '" x="' + (x + barW).toFixed(1) + '" y="' + (H - 18 - aH).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(aH, 1).toFixed(1) + '" fill="#6ee7b7" rx="2"></rect>';
-      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + wkLabel + '</text>';
+    html += `<path fill="url(#migPlanGrad)" d="${areaPath(planPts,yBot,xFor(0),xFor(weeks.length-1))}" pointer-events="none"/>`;
+    html += `<path fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.55" d="${smoothCurve(planPts)}" pointer-events="none"/>`;
+    html += `<path fill="url(#migActGrad)" d="${areaPath(actPts,yBot,xFor(0),xFor(weeks.length-1))}" pointer-events="none"/>`;
+    html += `<path fill="none" stroke="#6EE7B7" stroke-width="2.2" d="${smoothCurve(actPts)}" pointer-events="none"/>`;
+    weeks.forEach((w,i) => {
+      const x = xFor(i), wd = byWeek[w], wkLabel = weekOfLabel(wd.monday);
+      const pct = wd.planned > 0 ? Math.round((wd.actual / wd.planned)*100) : null;
+      const tip = attrTip('Week of '+wkLabel+'\\nActual: '+wd.actual.toFixed(1)+' mi'+(pct!=null?' ('+pct+'% of planned)':'')+' · Planned: '+wd.planned.toFixed(1)+' mi');
+      html += `<rect data-tip="${tip}" x="${(x-14).toFixed(1)}" y="${yTop}" width="28" height="${yBot-yTop}" fill="transparent"/>`;
+      if (i===0||i===weeks.length-1||weeks.length<=6)
+        html += `<text x="${x.toFixed(1)}" y="${H-2}" font-size="7.5" fill="rgba(255,255,255,0.28)" text-anchor="middle">${wkLabel}</text>`;
     });
-    svg.innerHTML = html;
-    const todayWk = isoWeekKey(new Date());
-    const thisWeek = byWeek[todayWk];
-    meta.textContent = thisWeek ? ('this week: ' + thisWeek.actual.toFixed(1) + ' / ' + thisWeek.planned.toFixed(1) + ' mi') : '—';
+    gEl.innerHTML = html;
+    const todayWk = isoWeekKey(new Date()), thisWeek = byWeek[todayWk];
+    meta.textContent = thisWeek ? (thisWeek.actual.toFixed(1)+' / '+thisWeek.planned.toFixed(1)+' mi this week') : '—';
   }
+
   function renderCompletionChart() {
-    const svg = $('mtCompletionContent'), empty = $('mtCompletionEmpty'), meta = $('mtCompletionMeta');
+    const gEl = $('mtCompletionContent'), svgEl = $('mtCompletionSvg');
+    const empty = $('mtCompletionEmpty'), meta = $('mtCompletionMeta');
     const byWeek = byWeekBuckets();
     const allWeeks = Object.keys(byWeek).sort();
-    if (!allWeeks.length) { svg.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
+    if (!allWeeks.length) { gEl.innerHTML = ''; empty.classList.remove('hidden'); meta.textContent = '—'; return; }
     empty.classList.add('hidden');
     const weeks = allWeeks.slice(weekWindowStart, weekWindowStart + WEEK_WINDOW_SIZE);
-    const H = 100, pad = 8, gap = 6;
-    const W = syncChartViewBoxWidth($('mtCompletionSvg'), H, 320);
-    const bw = (W - pad * 2) / weeks.length;
-    const barW = bw - gap;
-    let html = '<line x1="' + pad + '" y1="14" x2="' + (W - pad) + '" y2="14" stroke="rgba(255,255,255,0.08)" stroke-width="1"></line>';
-    weeks.forEach((w, i) => {
-      const wd = byWeek[w];
-      const wkLabel = weekOfLabel(wd.monday);
-      const x = pad + i * bw;
-      if (!wd.plannedDays) {
-        html += '<rect x="' + x.toFixed(1) + '" y="' + (H - 19) + '" width="' + barW.toFixed(1) + '" height="2" fill="rgba(255,255,255,0.10)" rx="1"></rect>';
-        html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + wkLabel + '</text>';
-        return;
-      }
-      const pct = Math.min(100, Math.round((wd.completedDays / wd.plannedDays) * 100));
-      const h = (pct / 100) * (H - 30);
-      const color = pct >= 90 ? '#6BE3A4' : pct >= 60 ? '#F2C063' : '#FF8A8A';
-      const tip = attrTip('Week of ' + wkLabel + '\\n' + wd.completedDays + ' of ' + wd.plannedDays + ' planned days completed (' + pct + '%)\\nShare of that week\'s training days you actually got done.');
-      html += '<rect data-tip="' + tip + '" x="' + x.toFixed(1) + '" y="' + (H - 18 - h).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(h, 1).toFixed(1) + '" fill="' + color + '" rx="2"></rect>';
-      html += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" font-size="8" fill="rgba(255,255,255,0.35)" text-anchor="middle">' + wkLabel + '</text>';
+    const H = 100, pad = 14, yTop = 8, yBot = 84;
+    const W = syncChartViewBoxWidth(svgEl, H, 320);
+    const xFor = i => pad + (i / Math.max(1,weeks.length-1)) * (W - pad*2);
+    const yFor = pct => yBot - (Math.min(100,pct)/100) * (yBot-yTop);
+    injectDefs(svgEl, `<linearGradient id="cmpGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6EE7B7" stop-opacity="0.42"/><stop offset="100%" stop-color="#6EE7B7" stop-opacity="0.03"/>
+    </linearGradient>`);
+    const pts = weeks.map((w,i) => { const wd=byWeek[w]; return [xFor(i), yFor(wd.plannedDays ? (wd.completedDays/wd.plannedDays)*100 : 0)]; });
+    let html = '';
+    html += `<path fill="url(#cmpGrad)" d="${areaPath(pts,yBot,xFor(0),xFor(weeks.length-1))}" pointer-events="none"/>`;
+    html += `<path fill="none" stroke="#6EE7B7" stroke-width="2.2" d="${smoothCurve(pts)}" pointer-events="none"/>`;
+    weeks.forEach((w,i) => {
+      const wd=byWeek[w], wkLabel=weekOfLabel(wd.monday);
+      const pct = wd.plannedDays ? Math.min(100,Math.round((wd.completedDays/wd.plannedDays)*100)) : 0;
+      const tip = attrTip('Week of '+wkLabel+'\\n'+wd.completedDays+' of '+(wd.plannedDays||0)+' days done ('+pct+'%)');
+      const x = xFor(i);
+      html += `<rect data-tip="${tip}" x="${(x-14).toFixed(1)}" y="${yTop}" width="28" height="${yBot-yTop}" fill="transparent"/>`;
+      html += `<circle cx="${x.toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="2.5" fill="#6EE7B7" opacity="0.85" pointer-events="none"/>`;
+      if (i===0||i===weeks.length-1||weeks.length<=6)
+        html += `<text x="${x.toFixed(1)}" y="${H-2}" font-size="7.5" fill="rgba(255,255,255,0.28)" text-anchor="middle">${wkLabel}</text>`;
     });
-    svg.innerHTML = html;
-    const todayWk = isoWeekKey(new Date());
-    const thisWeek = byWeek[todayWk];
-    meta.textContent = thisWeek ? (thisWeek.completedDays + '/' + thisWeek.plannedDays + ' this week') : '—';
+    gEl.innerHTML = html;
+    const todayWk = isoWeekKey(new Date()), thisWeek = byWeek[todayWk];
+    meta.textContent = thisWeek ? (thisWeek.completedDays+'/'+(thisWeek.plannedDays||0)+' days this week') : '—';
   }
+
   const TYPE_COLOR = { easy: '#6ee7b7', long: '#7DD3FC', speed: '#FF8A8A', tempo: '#F2C063', rest: '#4D4B47', cross: '#C9B8FF', race: '#FFD166', other: '#9CA3AF' };
   function renderPaceTrendChart() {
-    const svg = $('mtPaceTrendContent'), empty = $('mtPaceTrendEmpty'), meta = $('mtPaceTrendMeta'), legend = $('mtPaceTrendLegend');
-    const pts = plan.entries.filter(e => e.completed && e.actualPaceSecPerMi).sort((a, b) => a.date.localeCompare(b.date)).slice(-16);
+    const gEl = $('mtPaceTrendContent'), svgEl = $('mtPaceTrendSvg');
+    const empty = $('mtPaceTrendEmpty'), meta = $('mtPaceTrendMeta'), legend = $('mtPaceTrendLegend');
+    const pts = plan.entries.filter(e => e.completed && e.actualPaceSecPerMi).sort((a,b) => a.date.localeCompare(b.date)).slice(-16);
     if (pts.length < 2) {
-      svg.innerHTML = ''; legend.innerHTML = ''; empty.classList.remove('hidden');
-      meta.textContent = pts.length ? paceStr(pts[0].actualPaceSecPerMi) : '—';
-      return;
+      gEl.innerHTML = ''; legend.innerHTML = ''; empty.classList.remove('hidden');
+      meta.textContent = pts.length ? paceStr(pts[0].actualPaceSecPerMi) : '—'; return;
     }
     empty.classList.add('hidden');
     const vals = pts.map(p => p.actualPaceSecPerMi);
     const gp = goalPaceSecPerMi();
     const allVals = gp ? vals.concat([gp]) : vals;
-    const min = Math.min.apply(null, allVals), max = Math.max.apply(null, allVals);
-    const padV = Math.max((max - min) * 0.2, 5);
-    const yMin = min - padV, yMax = max + padV;
-    const H = 140, xPad = 8, yTop = 10, yBot = 122;
-    const W = syncChartViewBoxWidth($('mtPaceTrendSvg'), H, 320);
-    const xFor = (i) => xPad + (i / (pts.length - 1)) * (W - xPad * 2);
-    const yFor = (v) => yBot - ((v - yMin) / (yMax - yMin)) * (yBot - yTop);
+    const minV=Math.min.apply(null,allVals), maxV=Math.max.apply(null,allVals);
+    const padV = Math.max((maxV-minV)*0.22, 5);
+    const yMin=minV-padV, yMax=maxV+padV;
+    const H=140, xPad=14, yTop=8, yBot=122;
+    const W = syncChartViewBoxWidth(svgEl, H, 320);
+    const xFor = i => xPad + (i/(pts.length-1))*(W-xPad*2);
+    const yFor = v => yBot - ((v-yMin)/(yMax-yMin))*(yBot-yTop);
+    injectDefs(svgEl, `<linearGradient id="paceGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF8A8A" stop-opacity="0.38"/><stop offset="100%" stop-color="#FF8A8A" stop-opacity="0.02"/>
+    </linearGradient>`);
+    const coordPts = pts.map((p,i) => [xFor(i), yFor(p.actualPaceSecPerMi)]);
     let html = '';
     if (gp) {
       const y = yFor(gp);
-      const goalTip = attrTip('Goal pace: ' + paceStr(gp) + '\\nThe pace you need to average to hit your goal finish time over ' + distanceMi.toFixed(1) + ' mi.');
-      html += '<line data-tip="' + goalTip + '" x1="' + xPad + '" y1="' + y.toFixed(1) + '" x2="' + (W - xPad) + '" y2="' + y.toFixed(1) + '" stroke="#F2C063" stroke-width="6" stroke-opacity="0.001"></line>';
-      html += '<line x1="' + xPad + '" y1="' + y.toFixed(1) + '" x2="' + (W - xPad) + '" y2="' + y.toFixed(1) + '" stroke="#F2C063" stroke-width="1.5" stroke-dasharray="4 3" pointer-events="none"></line>';
-      html += '<text x="' + (W - xPad) + '" y="' + (y - 4).toFixed(1) + '" font-size="8" fill="#F2C063" text-anchor="end" pointer-events="none">goal</text>';
+      const goalTip = attrTip('Goal pace: '+paceStr(gp)+'\\nThe pace you need to average to finish in your goal time.');
+      html += `<line data-tip="${goalTip}" x1="${xPad}" y1="${y.toFixed(1)}" x2="${W-xPad}" y2="${y.toFixed(1)}" stroke="#F2C063" stroke-width="10" stroke-opacity="0.001"/>`;
+      html += `<line x1="${xPad}" y1="${y.toFixed(1)}" x2="${W-xPad}" y2="${y.toFixed(1)}" stroke="#F2C063" stroke-width="1" stroke-dasharray="3 4" stroke-opacity="0.55" pointer-events="none"/>`;
+      html += `<text x="${W-xPad}" y="${(y-4).toFixed(1)}" font-size="7.5" fill="#F2C063" text-anchor="end" pointer-events="none">goal</text>`;
     }
-    let line = '';
-    pts.forEach((p, i) => { const x = xFor(i), y = yFor(p.actualPaceSecPerMi); line += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' '; });
-    html += '<path d="' + line + '" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="2" pointer-events="none"></path>';
-    pts.forEach((p, i) => {
-      const x = xFor(i), y = yFor(p.actualPaceSecPerMi);
-      const color = TYPE_COLOR[p.type] || TYPE_COLOR.other;
+    html += `<path fill="url(#paceGrad)" d="${areaPath(coordPts,yBot,xFor(0),xFor(pts.length-1))}" pointer-events="none"/>`;
+    html += `<path fill="none" stroke="#FF8A8A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="${smoothCurve(coordPts)}" pointer-events="none"/>`;
+    pts.forEach((p,i) => {
+      const x=xFor(i), y=yFor(p.actualPaceSecPerMi);
+      const color = TYPE_COLOR[p.type]||TYPE_COLOR.other;
       const d = parseKey(p.date);
-      const delta = gp ? p.actualPaceSecPerMi - gp : null;
-      const deltaLine = delta == null ? '' : ('\\n' + (delta <= 0 ? Math.abs(delta).toFixed(0) + 's/mi faster than goal' : delta.toFixed(0) + 's/mi slower than goal'));
-      const tip = attrTip(
-        d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + (p.label || p.type || 'Run') + '\\n'
-        + 'Pace: ' + paceStr(p.actualPaceSecPerMi) + deltaLine + '\\n'
-        + (p.actualDistanceMi ? p.actualDistanceMi.toFixed(1) + ' mi · ' + fmtSec(p.actualDurationSec) : '')
-      );
-      html += '<circle data-tip="' + tip + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="9" fill="transparent"></circle>';
-      html += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3.5" fill="' + color + '" pointer-events="none"></circle>';
+      const delta = gp ? p.actualPaceSecPerMi-gp : null;
+      const deltaLine = delta==null ? '' : ('\\n'+(delta<=0 ? Math.abs(delta).toFixed(0)+'s/mi faster than goal' : delta.toFixed(0)+'s/mi slower than goal'));
+      const tip = attrTip(d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+(p.label||p.type||'Run')+'\\nPace: '+paceStr(p.actualPaceSecPerMi)+deltaLine+(p.actualDistanceMi?'\\n'+p.actualDistanceMi.toFixed(1)+' mi · '+fmtSec(p.actualDurationSec):''));
+      html += `<rect data-tip="${tip}" x="${(x-14).toFixed(1)}" y="${yTop}" width="28" height="${yBot-yTop}" fill="transparent"/>`;
+      html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}" stroke="rgba(5,5,6,0.6)" stroke-width="1" pointer-events="none"/>`;
     });
-    svg.innerHTML = html;
-    meta.textContent = 'latest: ' + paceStr(vals[vals.length - 1]);
-    const typesUsed = [...new Set(pts.map(p => p.type || 'other'))];
-    legend.innerHTML = typesUsed.map(t => '<span class="mt-chart-legend-item"><span class="mt-chart-legend-dot" style="background:' + (TYPE_COLOR[t] || TYPE_COLOR.other) + '"></span>' + (TYPE_ICON[t] ? TYPE_ICON[t] + ' ' : '') + t + '</span>').join('');
+    gEl.innerHTML = html;
+    meta.textContent = 'latest: '+paceStr(vals[vals.length-1]);
+    const typesUsed = [...new Set(pts.map(p => p.type||'other'))];
+    legend.innerHTML = typesUsed.map(t => '<span class="mt-chart-legend-item"><span class="mt-chart-legend-dot" style="background:'+(TYPE_COLOR[t]||TYPE_COLOR.other)+'"></span>'+(TYPE_ICON[t]?TYPE_ICON[t]+' ':'')+t+'</span>').join('');
   }
 
   /* ============================================================

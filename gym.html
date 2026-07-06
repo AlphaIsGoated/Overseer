@@ -1433,6 +1433,252 @@ img, video, canvas, svg { max-width: 100%; }
 }
 
 .hidden { display: none !important; }
+
+/* ================================================================
+   OVERLOAD-STYLE EXERCISE TRACKING
+   ================================================================ */
+
+/* Range toggle (W / M / 3M / 6M / Y / ALL) */
+.ol-range-toggle {
+  display: flex; gap: 4px; margin-bottom: 12px;
+}
+.ol-range-btn {
+  flex: 1; padding: 7px 0; border: none;
+  background: rgba(255,255,255,0.04);
+  border-radius: 9px; color: var(--text-3);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  cursor: pointer; transition: 0.15s; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.ol-range-btn.active { background: var(--good); color: #0a0a0b; }
+.ol-range-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: var(--text-2); }
+
+/* Chart area */
+.ol-chart-wrap { position: relative; user-select: none; -webkit-user-select: none; }
+.ol-chart-svg { width: 100%; display: block; touch-action: none; overflow: visible; }
+.ol-chart-tip {
+  position: absolute; top: 0; left: 0;
+  background: rgba(12,12,14,0.94); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 9px 13px;
+  pointer-events: none; transform: translateX(-50%);
+  font-size: 12px; line-height: 1.5; white-space: nowrap;
+  transition: opacity 0.1s; opacity: 0; z-index: 20;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.55);
+}
+.ol-chart-tip.show { opacity: 1; }
+.ol-chart-tip-date { font-size: 10px; color: var(--text-3); margin-bottom: 2px; letter-spacing: 0.04em; }
+.ol-chart-tip-weight { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.ol-chart-tip-delta { font-size: 12px; margin-top: 1px; }
+.ol-chart-tip-delta.pos { color: var(--good); }
+.ol-chart-tip-delta.neg { color: var(--bad); }
+
+/* Delta summary below chart */
+.ol-chart-delta {
+  text-align: center; font-size: 12px; color: var(--text-3);
+  margin: 8px 0 14px; letter-spacing: 0.01em; min-height: 18px;
+}
+.ol-chart-delta-val { color: var(--good); font-weight: 600; }
+.ol-chart-delta-val.neg { color: var(--bad); }
+
+/* Sets strip */
+.ol-sets-strip {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap; margin-bottom: 16px; min-height: 34px;
+}
+.ol-sets-date {
+  font-size: 11px; color: var(--text-3); font-family: var(--font-mono);
+  margin-right: 2px;
+}
+.ol-set-box {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; border: 1.5px solid rgba(110,231,183,0.28);
+  background: rgba(110,231,183,0.07); color: var(--good);
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
+.ol-set-box.is-best {
+  border-color: rgba(242,192,99,0.4); background: rgba(242,192,99,0.11); color: var(--warn);
+}
+.ol-set-box.is-missed {
+  border-color: rgba(255,255,255,0.08); background: transparent;
+  color: var(--text-4); text-decoration: line-through;
+}
+.ol-sets-total {
+  margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: 0.10em;
+  color: var(--text-4); text-transform: uppercase;
+}
+
+/* Stats row — SESSIONS | LAST 30 DAYS | BEST */
+.ol-stats-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+}
+.ol-stat {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 8px; border-right: 1px solid var(--border);
+}
+.ol-stat:last-child { border-right: none; }
+.ol-stat-label {
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.14em;
+  color: var(--text-4); text-transform: uppercase; margin-bottom: 8px;
+}
+.ol-stat-val {
+  font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ol-stat-val.is-neutral { color: var(--text-1); }
+.ol-stat-val.is-good { color: var(--good); }
+.ol-stat-val.is-warn { color: var(--warn); }
+.ol-stat-val.is-bad { color: var(--bad); }
+
+/* Overload rule card */
+.ol-overload-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: rgba(242,192,99,0.06); border: 1px solid rgba(242,192,99,0.18);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; font-size: 13px;
+}
+.ol-overload-star { font-size: 15px; flex-shrink: 0; margin-top: 1px; line-height: 1.5; }
+.ol-overload-text { color: var(--text-2); line-height: 1.55; }
+.ol-overload-text strong { color: var(--text-1); font-weight: 600; }
+.ol-overload-text em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+/* History table */
+.ol-hist-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.ol-hist-table th {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.12em;
+  color: var(--text-4); text-transform: uppercase;
+  padding: 0 0 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ol-hist-table th:not(:first-child) { text-align: right; }
+.ol-hist-table td {
+  padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 13px; color: var(--text-2); vertical-align: middle;
+}
+.ol-hist-table td:not(:first-child) {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.ol-hist-table tr:last-child td { border-bottom: none; }
+.ol-hist-row-date { font-style: italic; color: var(--text-1); font-weight: 500; }
+.ol-hist-row-date.is-rest { color: var(--text-3); }
+.ol-hist-row-weight.is-best::before { content: '★ '; color: var(--warn); }
+.ol-hist-row-weight.is-best { color: var(--warn); font-weight: 700; }
+.ol-hist-row-progress { font-size: 12px; }
+.ol-hist-row-progress.is-pos { color: var(--good); }
+.ol-hist-row-progress.is-first { color: var(--text-4); font-style: italic; }
+.ol-hist-row-progress.is-neutral { color: var(--text-4); font-style: italic; }
+.ol-hist-table tr { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ol-hist-table tr:hover td { background: rgba(255,255,255,0.025); }
+
+/* Log session modal */
+.ol-log-bg {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,0.62); backdrop-filter: blur(8px);
+  align-items: flex-end; justify-content: center;
+}
+.ol-log-bg.show { display: flex; }
+.ol-log-sheet {
+  background: #141416; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 22px 22px 0 0;
+  padding: 24px 20px calc(36px + env(safe-area-inset-bottom));
+  width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto;
+}
+.ol-log-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.12); margin: 0 auto 18px;
+}
+.ol-log-title { font-size: 17px; font-weight: 700; margin: 0 0 20px; }
+.ol-log-row {
+  display: flex; align-items: center; margin-bottom: 14px; gap: 12px;
+}
+.ol-log-row-label { font-size: 14px; color: var(--text-2); flex: 1 1 0; min-width: 60px; }
+.ol-stepper { display: flex; align-items: center; gap: 10px; }
+.ol-stepper-btn {
+  width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+  background: #222226; border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px; color: var(--text-1);
+  font-size: 22px; font-weight: 300; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+  transition: background 0.12s;
+}
+.ol-stepper-btn:hover { background: #2c2c30; }
+.ol-stepper-val {
+  font-size: 21px; font-weight: 700; min-width: 72px;
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+.ol-stepper-unit { font-size: 12px; color: var(--text-3); }
+.ol-date-input {
+  background: #222226; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; color: var(--text-1);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  padding: 10px 14px; outline: none; width: 100%;
+  -webkit-appearance: none; appearance: none;
+}
+.ol-set-boxes-row { display: flex; gap: 7px; flex-wrap: wrap; margin: 4px 0 14px; }
+.ol-set-box-btn {
+  width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; border: 1.5px solid rgba(242,192,99,0.35);
+  background: rgba(242,192,99,0.09); color: var(--warn);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; user-select: none; flex-shrink: 0;
+  transition: background 0.12s;
+}
+.ol-set-box-btn.is-missed {
+  border-color: rgba(255,255,255,0.08); background: transparent;
+  color: var(--text-4); text-decoration: line-through;
+}
+.ol-set-hint { font-size: 11px; color: var(--text-4); margin-top: -6px; margin-bottom: 14px; }
+.ol-rest-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 11px; padding: 13px 14px; margin-bottom: 20px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ol-rest-label { font-size: 14px; color: var(--text-2); flex: 1; }
+.ol-log-save {
+  width: 100%; padding: 16px; background: var(--good);
+  border: none; border-radius: 14px; color: #0a0a0b;
+  font-size: 16px; font-weight: 700; font-family: inherit;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s, transform 0.12s;
+}
+.ol-log-save:active { transform: scale(0.98); }
+.ol-log-delete { display: none; width: 100%; background: transparent; border: none;
+  color: var(--bad); font-family: inherit; font-size: 13px; cursor: pointer;
+  padding: 12px; text-align: center; text-decoration: underline;
+  -webkit-tap-highlight-color: transparent; margin-top: 6px;
+}
+
+/* New-best celebration */
+.ol-celebrate-bg {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.ol-celebrate-bg.show { display: flex; }
+.ol-celebrate-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+}
+.ol-celebrate-card {
+  position: relative; text-align: center;
+  animation: ol-burst-in 0.42s cubic-bezier(0.175,0.885,0.32,1.275) both;
+  padding: 32px 40px; background: rgba(14,14,16,0.92);
+  border: 1px solid rgba(242,192,99,0.35); border-radius: 20px;
+  backdrop-filter: blur(12px);
+}
+@keyframes ol-burst-in {
+  from { transform: scale(0.55); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.ol-celebrate-emoji { font-size: 52px; display: block; margin-bottom: 10px; }
+.ol-celebrate-title { font-size: 26px; font-weight: 800; color: var(--warn);
+  letter-spacing: -0.02em; margin-bottom: 6px; }
+.ol-celebrate-sub { font-size: 14px; color: var(--text-2); }
+
+@media (max-width: 480px) {
+  .ol-stat-val { font-size: 20px; }
+  .ol-stat-label { font-size: 8px; }
+  .ol-stepper-val { font-size: 18px; min-width: 60px; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1768,89 +2014,59 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-no-ex" id="noExMsg" style="display:none">No exercises here yet. Tap <strong>+</strong> to add one.</div>
     </div>
 
-    <!-- Log a set -->
+    <!-- Log a session -->
     <div class="po-sub-section">
-      <div class="po-sub-title">Log today's top set</div>
-      <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
-      <div class="po-last-set" id="lastSet">
-        <span class="po-last-label">Last time</span>
-        <span class="po-last-value" id="lastSetValue"></span>
-        <span class="po-last-meta" id="lastSetMeta"></span>
-      </div>
-      <div class="po-log-grid" id="logGrid">
-        <div class="po-field" id="weightField">
-          <label id="weightLabel">Weight (kg)</label>
-          <div class="po-weight-row">
-            <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
-            <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
-            <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
-          </div>
-        </div>
-        <div class="po-field">
-          <label>Reps</label>
-          <div class="po-reps-row" id="repsRow" data-value="8">
-            <button type="button" class="po-reps-pill" data-v="4">4</button>
-            <button type="button" class="po-reps-pill" data-v="5">5</button>
-            <button type="button" class="po-reps-pill" data-v="6">6</button>
-            <button type="button" class="po-reps-pill" data-v="7">7</button>
-            <button type="button" class="po-reps-pill active" data-v="8">8</button>
-            <button type="button" class="po-reps-pill" data-v="9">9</button>
-            <button type="button" class="po-reps-pill" data-v="10">10</button>
-            <button type="button" class="po-reps-pill" data-v="11">11</button>
-            <button type="button" class="po-reps-pill" data-v="12">12</button>
-          </div>
-        </div>
-      </div>
-      <button class="po-btn-primary" id="logBtn">Log set</button>
+      <button class="po-btn-primary" id="olLogBtn" type="button" style="margin-top:2px">+ Log a session</button>
     </div>
 
-    <!-- Prescription -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Next session</div>
-      <div id="rxWrap"></div>
+    <!-- Exercise weight chart (Overload-style) -->
+    <div class="po-sub-section" id="olChartSection">
+      <div class="ol-range-toggle" id="olRangeToggle">
+        <button class="ol-range-btn" data-range="W" type="button">W</button>
+        <button class="ol-range-btn" data-range="M" type="button">M</button>
+        <button class="ol-range-btn" data-range="3M" type="button">3M</button>
+        <button class="ol-range-btn" data-range="6M" type="button">6M</button>
+        <button class="ol-range-btn" data-range="Y" type="button">Y</button>
+        <button class="ol-range-btn active" data-range="ALL" type="button">ALL</button>
+      </div>
+      <div class="ol-chart-wrap" id="olChartWrap">
+        <svg id="olChartSvg" class="ol-chart-svg"></svg>
+        <div id="olChartTip" class="ol-chart-tip">
+          <div class="ol-chart-tip-date" id="olTipDate"></div>
+          <div class="ol-chart-tip-weight" id="olTipWeight"></div>
+          <div class="ol-chart-tip-delta" id="olTipDelta"></div>
+        </div>
+      </div>
+      <div class="ol-chart-delta" id="olChartDelta"></div>
+      <div class="ol-sets-strip" id="olSetsStrip"></div>
     </div>
 
-    <!-- Stats -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Stats</div>
-      <div class="po-stats-row">
-        <div class="po-stat-box">
-          <div class="po-stat-label" id="oneRmLabel">Est. 1RM</div>
-          <div class="po-stat-val" id="oneRm">—<span class="po-unit" id="oneRmUnit">kg</span></div>
-        </div>
-        <div class="po-stat-box">
-          <div class="po-stat-label">Best set</div>
-          <div class="po-stat-val" id="bestSet">—</div>
-        </div>
-        <div class="po-stat-box">
-          <div class="po-stat-label">Sessions</div>
-          <div class="po-stat-val" id="sessionCount">—</div>
-        </div>
+    <!-- Stats row: SESSIONS · LAST 30 DAYS · BEST -->
+    <div class="ol-stats-row">
+      <div class="ol-stat">
+        <div class="ol-stat-label">Sessions</div>
+        <div class="ol-stat-val is-neutral" id="olStatSessions">—</div>
+      </div>
+      <div class="ol-stat">
+        <div class="ol-stat-label">Last 30 days</div>
+        <div class="ol-stat-val" id="olStatDelta">—</div>
+      </div>
+      <div class="ol-stat">
+        <div class="ol-stat-label">Best</div>
+        <div class="ol-stat-val is-warn" id="olStatBest">—</div>
       </div>
     </div>
 
-    <!-- Trend -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Trend (last 10 sessions)</div>
-      <div class="po-spark-wrap">
-        <svg class="po-spark-svg" id="sparkline" viewBox="0 0 300 60" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
-              <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="po-spark-empty" id="sparkEmpty">Need 2+ sessions for trend</div>
-      </div>
+    <!-- Overload rule card -->
+    <div class="ol-overload-card" id="olOverloadCard" style="display:none">
+      <span class="ol-overload-star">★</span>
+      <div class="ol-overload-text" id="olOverloadText"></div>
     </div>
 
-    <!-- History -->
+    <!-- Session history table -->
     <div class="po-sub-section">
       <div class="po-sub-title">History</div>
-      <div id="historyCard">
-        <div class="po-empty">No logs yet.</div>
-      </div>
+      <div id="olHistWrap"><div class="po-empty">No sessions yet.</div></div>
     </div>
 
     <!-- Today's Workout — every set logged today, grouped by exercise.
@@ -1931,6 +2147,74 @@ img, video, canvas, svg { max-width: 100%; }
   </div>
 </div>
 
+<!-- Log / Edit Session Modal (Overload-style) -->
+<div class="ol-log-bg" id="olLogBg">
+  <div class="ol-log-sheet">
+    <div class="ol-log-handle"></div>
+    <h3 class="ol-log-title" id="olLogTitle">Log a session</h3>
+
+    <!-- Date -->
+    <div class="ol-log-row">
+      <span class="ol-log-row-label">Date</span>
+      <input type="date" class="ol-date-input" id="olLogDate">
+    </div>
+
+    <!-- Weight stepper -->
+    <div class="ol-log-row" id="olLogWeightRow">
+      <span class="ol-log-row-label">Weight</span>
+      <div class="ol-stepper">
+        <button class="ol-stepper-btn" id="olWtDown" type="button">−</button>
+        <span class="ol-stepper-val"><span id="olWtVal">60</span><span class="ol-stepper-unit" id="olWtUnit"> kg</span></span>
+        <button class="ol-stepper-btn" id="olWtUp" type="button">+</button>
+      </div>
+    </div>
+
+    <!-- Reps stepper -->
+    <div class="ol-log-row">
+      <span class="ol-log-row-label">Reps</span>
+      <div class="ol-stepper">
+        <button class="ol-stepper-btn" id="olRepsDown" type="button">−</button>
+        <span class="ol-stepper-val" id="olRepsVal">5</span>
+        <button class="ol-stepper-btn" id="olRepsUp" type="button">+</button>
+      </div>
+    </div>
+
+    <!-- Sets stepper -->
+    <div class="ol-log-row">
+      <span class="ol-log-row-label">Sets</span>
+      <div class="ol-stepper">
+        <button class="ol-stepper-btn" id="olSetsDown" type="button">−</button>
+        <span class="ol-stepper-val" id="olSetsVal">4</span>
+        <button class="ol-stepper-btn" id="olSetsUp" type="button">+</button>
+      </div>
+    </div>
+
+    <!-- Per-set rep boxes -->
+    <div class="ol-set-boxes-row" id="olSetBoxesRow"></div>
+    <p class="ol-set-hint">Tap a set to lower its reps. Tap past 1 to mark it missed.</p>
+
+    <!-- Rest/deload toggle -->
+    <label class="ol-rest-row">
+      <input type="checkbox" id="olIsRest" style="width:16px;height:16px;accent-color:var(--good)">
+      <span class="ol-rest-label">Rest or deload day</span>
+    </label>
+
+    <!-- Save + delete -->
+    <button class="ol-log-save" id="olLogSave" type="button">Save session</button>
+    <button class="ol-log-delete" id="olLogDelete" type="button">Delete this session</button>
+  </div>
+</div>
+
+<!-- New-best celebration overlay -->
+<div class="ol-celebrate-bg" id="olCelebrateBg">
+  <canvas class="ol-celebrate-canvas" id="olCelebrateCanvas"></canvas>
+  <div class="ol-celebrate-card" id="olCelebrateCard">
+    <span class="ol-celebrate-emoji">🏆</span>
+    <div class="ol-celebrate-title" id="olCelebrateTitle">New best!</div>
+    <div class="ol-celebrate-sub" id="olCelebrateSub"></div>
+  </div>
+</div>
+
 <!-- Rotation editor modal -->
 <div class="po-modal-bg" id="rotModalBg">
   <div class="po-modal">
@@ -1955,20 +2239,24 @@ img, video, canvas, svg { max-width: 100%; }
 
     <div id="planImportChoice">
       <p style="font-size:12px;color:var(--text-3);margin:-6px 0 14px;line-height:1.45;">
-        Photo of a written program, a screenshot, or pasted text — exercises get grouped by
-        training day and merged into your existing days (new days are created if needed).
+        Describe your split in plain text or paste a Markdown file — Claude converts it to exercises
+        grouped by training day and merged into your current plan.
       </p>
-      <div class="po-modal-actions" style="margin-bottom:10px">
-        <button class="po-btn-secondary" id="planImportPhotoBtn" type="button">📷 Take photo</button>
-        <button class="po-btn-secondary" id="planImportLibraryBtn" type="button">🖼️ From library</button>
+      <!-- File upload row -->
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="po-btn-secondary" id="planImportPhotoBtn" type="button" style="flex:1">📷 Photo</button>
+        <button class="po-btn-secondary" id="planImportLibraryBtn" type="button" style="flex:1">🖼️ Image</button>
+        <button class="po-btn-secondary" id="planImportMdBtn" type="button" style="flex:1">📄 .md / .txt</button>
       </div>
-      <textarea id="planImportText" rows="5" placeholder="…or paste the plan as text" style="width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:11px;background:rgba(0,0,0,0.3);color:var(--text-1);font-family:inherit;font-size:13px;resize:vertical"></textarea>
-      <div class="po-modal-actions">
+      <div id="planImportMdName" style="font-size:11px;color:var(--text-3);margin-bottom:8px;display:none"></div>
+      <textarea id="planImportText" rows="6" placeholder="Paste your workout plan — e.g.&#10;Push: Bench 4×5, OHP 3×5, Tricep pushdown 3×10&#10;Pull: Row 4×8, Lat pulldown 3×10, Curl 3×12&#10;Legs: Squat 4×5, RDL 3×8, Leg press 3×12&#10;Rest" style="width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:11px;background:rgba(0,0,0,0.3);color:var(--text-1);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+      <div class="po-modal-actions" style="margin-top:10px">
         <button class="po-btn-secondary" id="planImportCancel1" type="button">Cancel</button>
-        <button class="po-btn-primary" id="planImportTextGo" type="button">Read plan</button>
+        <button class="po-btn-primary" id="planImportTextGo" type="button">Convert with Claude</button>
       </div>
       <input type="file" id="planImportFileCamera" accept="image/*" capture="environment" style="display:none">
       <input type="file" id="planImportFileLibrary" accept="image/*" style="display:none">
+      <input type="file" id="planImportFileMd" accept=".md,.txt,.markdown" style="display:none">
     </div>
 
     <div id="planImportBusy" class="hidden" style="text-align:center;padding:20px 0">
@@ -2244,14 +2532,14 @@ img, video, canvas, svg { max-width: 100%; }
     const f = getFiltered();
     const noMsg = $('noExMsg');
     const editBtn = $('editExBtn');
-    const logBtn = $('logBtn');
+    const olLogBtn = $('olLogBtn');
     if (!f.length) {
       sel.innerHTML = '<option>—</option>';
-      sel.disabled = true; editBtn.disabled = true; logBtn.disabled = true;
+      sel.disabled = true; editBtn.disabled = true; if (olLogBtn) olLogBtn.disabled = true;
       noMsg.style.display = 'block'; state.currentEx = null;
       return;
     }
-    sel.disabled = false; editBtn.disabled = false; logBtn.disabled = false;
+    sel.disabled = false; editBtn.disabled = false; if (olLogBtn) olLogBtn.disabled = false;
     noMsg.style.display = 'none';
     if (!f.find(e => e.id === state.currentEx)) state.currentEx = f[0].id;
     sel.innerHTML = f.map(e => {
@@ -2260,149 +2548,610 @@ img, video, canvas, svg { max-width: 100%; }
       return '<option value="' + e.id + '"' + (e.id === state.currentEx ? ' selected' : '') + '>' + escape(e.name) + wLbl + sh + '</option>';
     }).join('');
   }
-  function renderForm() {
-    const ex = getCurrentEx();
-    const banner = $('bwBanner');
-    const wField = $('weightField');
-    const oneRmLbl = $('oneRmLabel');
-    const grid = $('logGrid');
-    $('weightLabel').textContent = 'Weight (' + unit() + ')';
-    if (ex && ex.bw) {
-      banner.classList.add('show');
-      wField.style.display = 'none';
-      grid.classList.add('po-bw-mode');
-      oneRmLbl.textContent = 'Best reps';
-    } else {
-      banner.classList.remove('show');
-      wField.style.display = '';
-      grid.classList.remove('po-bw-mode');
-      oneRmLbl.textContent = 'Est. 1RM';
+  function renderForm() { /* log form moved to ol-log-sheet modal */ }
+  function renderLastSet() { /* last-set preview moved to log modal */ }
+  // ================================================================
+  // OVERLOAD-STYLE EXERCISE TRACKING
+  // ================================================================
+
+  // Time range for the weight chart — persists for the session only
+  let olRange = 'ALL';
+  // Index of the currently-scrubbed session (null = none, shows last)
+  let olScrubbedIdx = null;
+  // Cache of the rendered chart points for scrubber hit-testing
+  let olChartPoints = [];
+  // Index of the session being edited in the log modal (null = new)
+  let olEditingIdx = null;
+  // Per-set reps state for the log modal
+  let olSetReps = [];
+
+  // Normalize old single-set logs to new multi-set format
+  function olNorm(log) {
+    return {
+      weight:  log.weight  || 0,
+      reps:    log.reps    || 0,
+      sets:    log.sets    || 1,
+      setReps: log.setReps || [log.reps || 0],
+      isRest:  log.isRest  || false,
+      date:    log.date    || new Date().toISOString(),
+    };
+  }
+
+  // Returns the start Date for the current olRange filter (null = no filter)
+  function olRangeStart() {
+    const d = new Date(); d.setHours(0,0,0,0);
+    if (olRange === 'W')  { d.setDate(d.getDate() - 7);   return d; }
+    if (olRange === 'M')  { d.setMonth(d.getMonth() - 1);  return d; }
+    if (olRange === '3M') { d.setMonth(d.getMonth() - 3);  return d; }
+    if (olRange === '6M') { d.setMonth(d.getMonth() - 6);  return d; }
+    if (olRange === 'Y')  { d.setFullYear(d.getFullYear()-1); return d; }
+    return null;
+  }
+
+  // Cardinal spline → smooth bezier path through [x,y] points
+  function olSmoothPath(pts) {
+    if (!pts || pts.length < 2) return pts && pts.length === 1 ? `M${pts[0][0]},${pts[0][1]}` : '';
+    const t = 0.35;
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0=pts[Math.max(0,i-1)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(pts.length-1,i+2)];
+      d += ` C${(p1[0]+(p2[0]-p0[0])*t).toFixed(1)},${(p1[1]+(p2[1]-p0[1])*t).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])*t).toFixed(1)},${(p2[1]-(p3[1]-p1[1])*t).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
     }
+    return d;
   }
-  function renderLastSet() {
-    const wrap = $('lastSet');
-    const v = $('lastSetValue');
-    const m = $('lastSetMeta');
-    const ex = getCurrentEx();
-    const logs = ex ? getLogs() : [];
-    if (!ex || !logs.length) { wrap.classList.remove('show'); return; }
-    const last = logs[logs.length - 1];
-    const setStr = ex.bw ? (last.reps + ' reps') : (last.weight + unit() + ' × ' + last.reps);
-    const d = new Date(last.date);
-    const da = Math.floor((Date.now() - d.getTime()) / 86400000);
-    const ago = da === 0 ? 'today' : da === 1 ? 'yesterday' : da + ' days ago';
-    v.textContent = setStr;
-    m.textContent = ago;
-    wrap.classList.add('show');
+
+  // Formats a date string like "Jun 21"
+  function olFmtDate(isoStr) {
+    const d = new Date(isoStr);
+    const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return MONS[d.getMonth()] + ' ' + d.getDate();
   }
-  function renderRx() {
-    const wrap = $('rxWrap');
+
+  // Get all non-rest logs filtered by range, sorted oldest-first
+  function olGetLogs() {
     const ex = getCurrentEx();
-    if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Pick a gym and day above.</div>'; return; }
-    const logs = getLogs();
-    const rx = getRx(ex, logs);
-    if (!rx) {
-      const sw = ex.startWeight, sr = ex.repMin;
-      const head = ex.bw
-        ? '<span class="po-accent">' + sr + '</span> reps'
-        : '<span class="po-accent">' + (sw || 0) + unit() + '</span> × ' + sr + ' reps';
-      const reason = ex.bw
-        ? 'Aim for ' + ex.repMin + '-' + ex.repMax + ' clean reps. Once you hit ' + ex.repMax + '+, push for more.'
-        : 'Hit ' + ex.repMin + '-' + ex.repMax + ' reps. Once logged, the coach will start prescribing.';
-      wrap.innerHTML = '<div class="po-rx-card"><div class="po-rx-label">' + escape(ex.name) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + '</p></div>';
-      return;
-    }
-    const head = rx.bw
-      ? '<span class="po-accent">' + rx.reps + '</span> reps'
-      : '<span class="po-accent">' + rx.weight + unit() + '</span> × ' + rx.reps + ' reps';
-    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + '"><div class="po-rx-label">' + escape(ex.name) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + '</p></div>';
+    if (!ex) return [];
+    const all = (state.logs[ex.id] || []).map(olNorm).filter(l => !l.isRest);
+    const start = olRangeStart();
+    if (!start) return all;
+    return all.filter(l => new Date(l.date) >= start);
   }
-  function renderStats() {
+
+  // ── Main chart renderer ─────────────────────────────────────────
+  function olRenderChart() {
+    const svgEl   = $('olChartSvg');
+    const tipEl   = $('olChartTip');
+    const deltaEl = $('olChartDelta');
     const ex = getCurrentEx();
-    const logs = ex ? getLogs() : [];
+    const logs = olGetLogs();
+
     if (!logs.length) {
-      $('oneRm').innerHTML = '—<span class="po-unit">' + unit() + '</span>';
-      $('bestSet').textContent = '—';
-      $('sessionCount').textContent = '—';
+      svgEl.innerHTML = '';
+      svgEl.style.height = '0';
+      deltaEl.innerHTML = '';
+      olChartPoints = [];
+      olRenderSetsStrip(null);
       return;
     }
-    if (ex.bw) {
-      const br = Math.max.apply(null, logs.map(l => l.reps));
-      $('oneRm').innerHTML = br + '<span class="po-unit">reps</span>';
+    svgEl.style.height = '';
+
+    const u = unit();
+    const isBw = ex && ex.bw;
+    const vals = logs.map(l => isBw ? l.reps : l.weight);
+    const bestVal = Math.max.apply(null, vals);
+    const bestIdx = vals.lastIndexOf(bestVal);
+
+    // Y-axis: pad by 10% above/below, then round to nearest 5-unit grid
+    const rawMin = Math.min.apply(null, vals), rawMax = Math.max.apply(null, vals);
+    const pad = Math.max((rawMax - rawMin) * 0.18, isBw ? 2 : 5);
+    const step = isBw ? 1 : 5;
+    const yMin = Math.floor((rawMin - pad) / step) * step;
+    const yMax = Math.ceil((rawMax  + pad) / step) * step;
+
+    const W = svgEl.getBoundingClientRect().width || 320;
+    const H = 120, lPad = 34, rPad = 12, yTop = 10, yBot = 106;
+    const xFor = i => lPad + (i / Math.max(1, logs.length - 1)) * (W - lPad - rPad);
+    const yFor = v => yBot - ((v - yMin) / (yMax - yMin)) * (yBot - yTop);
+
+    // Store points for scrubber hit-testing
+    olChartPoints = logs.map((l, i) => ({
+      x: xFor(i), y: yFor(isBw ? l.reps : l.weight),
+      log: l, idx: i,
+    }));
+
+    svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+    // Gradient defs
+    let svg = `<defs>
+      <linearGradient id="olGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6EE7B7" stop-opacity="0.42"/>
+        <stop offset="100%" stop-color="#6EE7B7" stop-opacity="0.02"/>
+      </linearGradient>
+    </defs>`;
+
+    // Y-axis grid lines + labels
+    for (let gv = yMin; gv <= yMax; gv += step) {
+      const gy = yFor(gv);
+      if (gy < yTop - 2 || gy > yBot + 2) continue;
+      svg += `<line x1="${lPad}" y1="${gy.toFixed(1)}" x2="${(W-rPad)}" y2="${gy.toFixed(1)}" stroke="rgba(255,255,255,0.055)" stroke-width="1"/>`;
+      svg += `<text x="${(lPad-5)}" y="${(gy+4).toFixed(1)}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="end">${gv}</text>`;
+    }
+
+    // Date labels — first and last
+    if (logs.length > 0) {
+      svg += `<text x="${lPad}" y="${H-1}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="start">${olFmtDate(logs[0].date)}</text>`;
+      svg += `<text x="${(W-rPad)}" y="${H-1}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="end">${olFmtDate(logs[logs.length-1].date)}</text>`;
+    }
+
+    // Area fill + smooth line
+    if (logs.length >= 2) {
+      const pts = olChartPoints.map(p => [p.x, p.y]);
+      const linePath = olSmoothPath(pts);
+      const lastPt = pts[pts.length - 1], firstPt = pts[0];
+      const areaPath = linePath + ` L${lastPt[0].toFixed(1)},${yBot} L${firstPt[0].toFixed(1)},${yBot} Z`;
+      svg += `<path fill="url(#olGrad)" d="${areaPath}" pointer-events="none"/>`;
+      svg += `<path fill="none" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="${linePath}" pointer-events="none"/>`;
+    }
+
+    // Best session — gold dot + dashed vertical line
+    const bp = olChartPoints[bestIdx];
+    svg += `<line x1="${bp.x.toFixed(1)}" y1="${bp.y.toFixed(1)}" x2="${bp.x.toFixed(1)}" y2="${yBot}" stroke="#F2C063" stroke-width="1" stroke-dasharray="3 3" opacity="0.6" pointer-events="none"/>`;
+    svg += `<circle cx="${bp.x.toFixed(1)}" cy="${bp.y.toFixed(1)}" r="5" fill="#F2C063" pointer-events="none"/>`;
+    svg += `<circle cx="${bp.x.toFixed(1)}" cy="${bp.y.toFixed(1)}" r="8.5" fill="#F2C063" fill-opacity="0.18" pointer-events="none"/>`;
+
+    // Regular dots (small)
+    olChartPoints.forEach((p, i) => {
+      if (i === bestIdx) return;
+      svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2" fill="#6EE7B7" stroke="rgba(10,10,11,0.6)" stroke-width="1" pointer-events="none"/>`;
+    });
+
+    // Scrubber line (initially hidden via opacity 0)
+    svg += `<line id="olScrubLine" x1="0" y1="${yTop}" x2="0" y2="${yBot}" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-dasharray="4 3" opacity="0" pointer-events="none"/>`;
+    svg += `<circle id="olScrubDot" cx="0" cy="0" r="4.5" fill="#fff" stroke="rgba(10,10,11,0.7)" stroke-width="1.5" opacity="0" pointer-events="none"/>`;
+
+    // Invisible wide hit targets for each point
+    olChartPoints.forEach((p, i) => {
+      svg += `<rect data-idx="${i}" x="${(p.x-14).toFixed(1)}" y="${yTop}" width="28" height="${yBot-yTop}" fill="transparent" style="cursor:crosshair"/>`;
+    });
+
+    svgEl.innerHTML = svg;
+
+    // Show the last session's sets strip by default
+    olRenderSetsStrip(logs[logs.length - 1], true);
+
+    // All-time delta
+    if (logs.length >= 2) {
+      const delta = vals[vals.length - 1] - vals[0];
+      const sign = delta >= 0 ? '+' : '';
+      const cls = delta >= 0 ? '' : 'neg';
+      deltaEl.innerHTML = `<span class="ol-chart-delta-val ${cls}">${sign}${delta.toFixed(1)} ${u}</span> · all time`;
     } else {
-      const orm = Math.max.apply(null, logs.map(l => estimate1RM(l.weight, l.reps)));
-      $('oneRm').innerHTML = Math.round(orm) + '<span class="po-unit">' + unit() + '</span>';
+      deltaEl.textContent = '';
     }
-    let best = logs[0];
-    logs.forEach(l => {
-      const cur = ex.bw ? l.reps : estimate1RM(l.weight, l.reps);
-      const bestVal = ex.bw ? best.reps : estimate1RM(best.weight, best.reps);
-      if (cur > bestVal) best = l;
-    });
-    $('bestSet').textContent = ex.bw ? (best.reps + 'r') : (best.weight + '×' + best.reps);
-    $('sessionCount').textContent = logs.length;
+
+    // Pointer interaction for scrubber
+    function onMove(e) {
+      if (!olChartPoints.length) return;
+      const rect = svgEl.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const scaleX = W / rect.width;
+      const svgX = cx * scaleX;
+      // Find nearest point
+      let nearIdx = 0, nearDist = Infinity;
+      olChartPoints.forEach((p, i) => {
+        const d = Math.abs(p.x - svgX);
+        if (d < nearDist) { nearDist = d; nearIdx = i; }
+      });
+      olScrubbedIdx = nearIdx;
+      olUpdateScrubber(nearIdx);
+    }
+    function onLeave() {
+      olScrubbedIdx = null;
+      olUpdateScrubber(null);
+    }
+    svgEl.addEventListener('pointermove', onMove, { passive: true });
+    svgEl.addEventListener('pointerleave', onLeave);
+    svgEl.addEventListener('touchmove', onMove, { passive: true });
+    svgEl.addEventListener('touchend', onLeave);
   }
-  function renderSparkline() {
-    const svg = $('sparkline');
-    const empty = $('sparkEmpty');
+
+  function olUpdateScrubber(idx) {
+    const svgEl = $('olChartSvg');
+    const tipEl  = $('olChartTip');
+    const scrubLine = svgEl.querySelector('#olScrubLine');
+    const scrubDot  = svgEl.querySelector('#olScrubDot');
     const ex = getCurrentEx();
-    const logs = ex ? getLogs().slice(-10) : [];
-    if (logs.length < 2) {
-      svg.style.display = 'none'; empty.style.display = 'block';
+    if (!scrubLine || !olChartPoints.length) return;
+
+    if (idx === null) {
+      scrubLine.setAttribute('opacity', '0');
+      scrubDot.setAttribute('opacity', '0');
+      tipEl.classList.remove('show');
+      const logs = olGetLogs();
+      olRenderSetsStrip(logs.length ? logs[logs.length-1] : null, true);
       return;
     }
-    svg.style.display = 'block'; empty.style.display = 'none';
-    const vals = logs.map(l => ex.bw ? l.reps : estimate1RM(l.weight, l.reps));
-    const min = Math.min.apply(null, vals);
-    const max = Math.max.apply(null, vals);
-    const range = max - min || 1;
-    const W = 300, H = 60, pad = 4;
-    const pts = vals.map((v, i) => {
-      const x = pad + (W - pad * 2) * (i / (vals.length - 1));
-      const y = H - pad - (H - pad * 2) * ((v - min) / range);
-      return [x, y];
-    });
-    const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-    const fillPath = linePath + ' L' + pts[pts.length - 1][0].toFixed(1) + ' ' + H + ' L' + pts[0][0].toFixed(1) + ' ' + H + ' Z';
-    // Keep <defs> in place; replace any prior paths
-    const defsHTML = '<defs><linearGradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,0.18)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient></defs>';
-    svg.innerHTML = defsHTML
-      + '<path class="po-spark-fill" d="' + fillPath + '"/>'
-      + '<path class="po-spark-line" d="' + linePath + '"/>';
+
+    const p = olChartPoints[idx];
+    const logs = olGetLogs();
+    const log = p.log;
+    const prevLog = idx > 0 ? logs[idx - 1] : null;
+    const val = (ex && ex.bw) ? log.reps : log.weight;
+    const prevVal = prevLog ? ((ex && ex.bw) ? prevLog.reps : prevLog.weight) : null;
+    const u = unit();
+
+    scrubLine.setAttribute('x1', p.x.toFixed(1));
+    scrubLine.setAttribute('x2', p.x.toFixed(1));
+    scrubLine.setAttribute('opacity', '1');
+    scrubDot.setAttribute('cx', p.x.toFixed(1));
+    scrubDot.setAttribute('cy', p.y.toFixed(1));
+    scrubDot.setAttribute('opacity', '1');
+
+    // Tooltip
+    $('olTipDate').textContent = olFmtDate(log.date) + ' · ' + (olNorm(log).sets || 1) + ' sets';
+    $('olTipWeight').textContent = val + (ex && ex.bw ? ' reps' : ' ' + u);
+    const deltaEl2 = $('olTipDelta');
+    if (prevVal !== null) {
+      const d = val - prevVal;
+      const sign = d >= 0 ? '+' : '';
+      deltaEl2.textContent = sign + d.toFixed(1) + (ex && ex.bw ? ' reps' : ' ' + u) + ' vs last';
+      deltaEl2.className = 'ol-chart-tip-delta ' + (d >= 0 ? 'pos' : 'neg');
+    } else {
+      deltaEl2.textContent = 'first session';
+      deltaEl2.className = 'ol-chart-tip-delta';
+    }
+
+    // Position tip above the point
+    const rect = svgEl.getBoundingClientRect();
+    const tipX = (p.x / (svgEl.viewBox.baseVal.width || 320)) * rect.width;
+    const tipY = (p.y / (svgEl.viewBox.baseVal.height || 120)) * rect.height - 8;
+    tipEl.style.left = tipX + 'px';
+    tipEl.style.top  = (tipY - tipEl.offsetHeight - 8) + 'px';
+    tipEl.classList.add('show');
+
+    olRenderSetsStrip(log, false);
   }
-  function renderHistory() {
-    const wrap = $('historyCard');
+
+  // ── Sets strip ──────────────────────────────────────────────────
+  function olRenderSetsStrip(log, isLast) {
+    const strip = $('olSetsStrip');
+    if (!log) { strip.innerHTML = ''; return; }
+    const norm = olNorm(log);
     const ex = getCurrentEx();
-    const logs = ex ? getLogs().slice().reverse() : [];
-    if (!logs.length) {
-      wrap.innerHTML = '<div class="po-empty">No logs yet.</div>';
+    const isBw = ex && ex.bw;
+    const allLogs = (ex ? (state.logs[ex.id] || []) : []).map(olNorm).filter(l => !l.isRest);
+    const bestVal = allLogs.length ? Math.max.apply(null, allLogs.map(l => isBw ? l.reps : l.weight)) : 0;
+    const isThisBest = (isBw ? norm.reps : norm.weight) === bestVal;
+    const totalReps = norm.setReps.reduce((s, r) => s + (r || 0), 0);
+    let html = `<span class="ol-sets-date">${olFmtDate(norm.date)}</span>`;
+    norm.setReps.forEach(r => {
+      const isMissed = !r;
+      const cls = isMissed ? 'is-missed' : (isThisBest ? 'is-best' : '');
+      html += `<span class="ol-set-box ${cls}">${isMissed ? '—' : r}</span>`;
+    });
+    html += `<span class="ol-sets-total">${totalReps} REPS</span>`;
+    strip.innerHTML = html;
+  }
+
+  // ── Stats row: SESSIONS | LAST 30 DAYS | BEST ───────────────────
+  function olRenderStats() {
+    const ex = getCurrentEx();
+    const allLogs = ex ? (state.logs[ex.id] || []).map(olNorm).filter(l => !l.isRest) : [];
+    const u = unit();
+    const isBw = ex && ex.bw;
+
+    $('olStatSessions').textContent = allLogs.length || '—';
+
+    // Last 30 days delta: compare earliest log ≥ 30 days ago to latest
+    if (allLogs.length >= 2) {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      const recent = allLogs.filter(l => new Date(l.date) >= cutoff);
+      const older  = allLogs.filter(l => new Date(l.date) <  cutoff);
+      if (recent.length && older.length) {
+        const latestVal = isBw ? recent[recent.length-1].reps : recent[recent.length-1].weight;
+        const baseVal   = isBw ? older[older.length-1].reps   : older[older.length-1].weight;
+        const delta = latestVal - baseVal;
+        const sign  = delta >= 0 ? '+' : '';
+        const el = $('olStatDelta');
+        el.textContent = sign + delta.toFixed(1) + (isBw ? ' reps' : ' ' + u);
+        el.className = 'ol-stat-val ' + (delta > 0 ? 'is-good' : delta < 0 ? 'is-bad' : 'is-neutral');
+      } else {
+        $('olStatDelta').textContent = recent.length ? '—' : '—';
+        $('olStatDelta').className = 'ol-stat-val is-neutral';
+      }
+    } else {
+      $('olStatDelta').textContent = '—';
+      $('olStatDelta').className = 'ol-stat-val is-neutral';
+    }
+
+    // All-time best (top-set weight or max reps)
+    if (allLogs.length) {
+      const bestVal = Math.max.apply(null, allLogs.map(l => isBw ? l.reps : l.weight));
+      $('olStatBest').textContent = bestVal + (isBw ? 'r' : ' ' + u);
+    } else {
+      $('olStatBest').textContent = '—';
+    }
+  }
+
+  // ── Overload rule card (replaces prescription) ──────────────────
+  function olRenderOverloadCard() {
+    const card = $('olOverloadCard');
+    const textEl = $('olOverloadText');
+    const ex = getCurrentEx();
+    if (!ex) { card.style.display = 'none'; return; }
+    const allLogs = (state.logs[ex.id] || []).map(olNorm).filter(l => !l.isRest);
+    if (!allLogs.length) { card.style.display = 'none'; return; }
+    const rx = getRx(ex, allLogs);
+    if (!rx) { card.style.display = 'none'; return; }
+    const u = unit();
+    const isBw = ex && ex.bw;
+    const last = allLogs[allLogs.length - 1];
+    const bestVal = Math.max.apply(null, allLogs.map(l => isBw ? l.reps : l.weight));
+
+    let text;
+    if (isBw) {
+      text = `Your best is <strong>${bestVal} reps</strong>. Next session: push for <em>${rx.reps} reps</em>.`;
+    } else {
+      const nextWt = (last.weight + (ex.step || 2.5)).toFixed(1);
+      const sameMoreRep = last.reps + 1;
+      text = `Your best is <strong>${bestVal} ${u} × ${last.reps}</strong>. Beat it next session: <em>${nextWt} ${u}</em>, or <em>${bestVal} ${u} × ${sameMoreRep}</em>.`;
+    }
+    textEl.innerHTML = text;
+    card.style.display = 'flex';
+  }
+
+  // ── Session history table ───────────────────────────────────────
+  function olRenderHistory() {
+    const wrap = $('olHistWrap');
+    const ex = getCurrentEx();
+    const allLogs = ex ? (state.logs[ex.id] || []).map((l, origIdx) => ({ ...olNorm(l), _origIdx: origIdx })) : [];
+    if (!allLogs.length) {
+      wrap.innerHTML = '<div class="po-empty">No sessions yet.</div>';
       return;
     }
-    wrap.innerHTML = logs.slice(0, 12).map((l, i) => {
-      const d = new Date(l.date);
-      const dStr = (d.getMonth() + 1) + '/' + d.getDate();
-      const setStr = ex.bw ? (l.reps + ' reps') : (l.weight + unit() + ' × ' + l.reps);
-      const realIdx = logs.length - 1 - i; // since we reversed
-      return '<div class="po-hist-row">'
-        + '<div class="po-hist-date">' + dStr + '</div>'
-        + '<div class="po-hist-set">' + setStr + '</div>'
-        + '<button class="po-hist-del" data-idx="' + realIdx + '" aria-label="Delete">×</button>'
-        + '</div>';
-    }).join('');
-    wrap.querySelectorAll('.po-hist-del').forEach(b => {
-      b.addEventListener('click', () => {
-        if (!confirm('Delete this log?')) return;
-        const realIdx = parseInt(b.dataset.idx, 10);
-        const arr = state.logs[state.currentEx] || [];
-        // realIdx is index in REVERSED list; map back to original
-        const origIdx = arr.length - 1 - realIdx;
-        arr.splice(origIdx, 1);
-        if (!arr.length) delete state.logs[state.currentEx];
-        else state.logs[state.currentEx] = arr;
-        saveState(); renderAll();
+    const u = unit();
+    const isBw = ex && ex.bw;
+    const sorted = allLogs.slice().sort((a, b) => b.date.localeCompare(a.date));
+    const bestVal = Math.max.apply(null, allLogs.filter(l => !l.isRest).map(l => isBw ? l.reps : l.weight));
+
+    let html = `<table class="ol-hist-table">
+      <thead><tr>
+        <th>Date</th><th>Sets</th><th>Reps</th><th>Weight</th><th>Progress</th>
+      </tr></thead><tbody>`;
+
+    sorted.forEach((l, si) => {
+      // Find the next older non-rest entry for delta
+      const prevNonRest = sorted.slice(si + 1).find(x => !x.isRest);
+      const prevVal = prevNonRest ? (isBw ? prevNonRest.reps : prevNonRest.weight) : null;
+      const curVal  = isBw ? l.reps : l.weight;
+      const isFirst = si === sorted.length - 1 || !sorted.slice(si+1).find(x => !x.isRest);
+      const isBest  = !l.isRest && curVal === bestVal;
+
+      let progress = '';
+      let progressCls = 'is-neutral';
+      if (l.isRest) {
+        progress = 'rest day'; progressCls = 'is-neutral';
+      } else if (prevVal === null || isFirst) {
+        progress = 'first'; progressCls = 'is-first';
+      } else {
+        const d = curVal - prevVal;
+        if (d === 0) { progress = 'same'; progressCls = 'is-neutral'; }
+        else {
+          const sign = d > 0 ? '+' : '';
+          progress = sign + d.toFixed(1);
+          progressCls = d > 0 ? 'is-pos' : 'is-neutral';
+        }
+      }
+
+      const dateLabel = l.isRest
+        ? `<span class="ol-hist-row-date is-rest">🌙 ${olFmtDate(l.date)}</span>`
+        : `<span class="ol-hist-row-date">${olFmtDate(l.date)}</span>`;
+      const wtLabel = l.isRest ? '—'
+        : `<span class="ol-hist-row-weight${isBest ? ' is-best' : ''}">${isBw ? '' : curVal + ' ' + u}</span>`;
+      const repsLabel = l.isRest ? '—' : (isBw ? curVal : l.reps);
+      const setsLabel = l.isRest ? '—' : l.sets;
+
+      html += `<tr data-origidx="${l._origIdx}">
+        <td>${dateLabel}</td>
+        <td>${setsLabel}</td>
+        <td>${repsLabel}</td>
+        <td>${wtLabel}</td>
+        <td><span class="ol-hist-row-progress ${progressCls}">${progress}</span></td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+
+    // Tap row to edit
+    wrap.querySelectorAll('tr[data-origidx]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const origIdx = parseInt(tr.dataset.origidx, 10);
+        olOpenLogModal(origIdx);
       });
     });
   }
+
+  // ── Old renderStats/renderHistory stubs (kept to not break renderAll) ──
+  function renderStats() {}
+  function renderSparkline() {}
+  function renderHistory() {}
+  function renderRx() {}
+
+  // ── Log modal ───────────────────────────────────────────────────
+  function olOpenLogModal(editOrigIdx) {
+    olEditingIdx = (editOrigIdx !== undefined) ? editOrigIdx : null;
+    const ex = getCurrentEx();
+    const u = unit();
+    const isBw = ex && ex.bw;
+
+    let log = null;
+    if (olEditingIdx !== null) {
+      const arr = state.logs[state.currentEx] || [];
+      log = arr[olEditingIdx] ? olNorm(arr[olEditingIdx]) : null;
+    }
+    const isNew = !log;
+
+    $('olLogTitle').textContent = isNew ? 'Log a session' : ('Edit · ' + escape(ex ? ex.name : ''));
+    $('olLogDelete').style.display = isNew ? 'none' : 'block';
+
+    // Date
+    const todayStr = new Date().toISOString().slice(0, 10);
+    $('olLogDate').value = log ? log.date.slice(0, 10) : todayStr;
+
+    // Weight
+    const defWeight = log ? log.weight : ((() => {
+      const logs = (state.logs[state.currentEx] || []).map(olNorm).filter(l => !l.isRest);
+      return logs.length ? logs[logs.length-1].weight : (ex ? (ex.startWeight || 0) : 0);
+    })());
+    $('olWtVal').textContent = defWeight;
+    $('olWtUnit').textContent = ' ' + u;
+    $('olLogWeightRow').style.display = isBw ? 'none' : '';
+
+    // Reps
+    const defReps = log ? log.reps : (ex ? (ex.repMin || 5) : 5);
+    $('olRepsVal').textContent = defReps;
+
+    // Sets
+    const defSets = log ? log.sets : 4;
+    $('olSetsVal').textContent = defSets;
+
+    // Per-set reps
+    olSetReps = log ? [...log.setReps] : Array(defSets).fill(defReps);
+    olRebuildSetBoxes();
+
+    // Rest toggle
+    $('olIsRest').checked = log ? log.isRest : false;
+
+    $('olLogBg').classList.add('show');
+  }
+
+  function olRebuildSetBoxes() {
+    const sets = parseInt($('olSetsVal').textContent, 10) || 1;
+    // Sync olSetReps array length to sets count
+    while (olSetReps.length < sets) olSetReps.push(parseInt($('olRepsVal').textContent, 10) || 5);
+    olSetReps = olSetReps.slice(0, sets);
+    const row = $('olSetBoxesRow');
+    row.innerHTML = olSetReps.map((r, i) =>
+      `<button class="ol-set-box-btn${!r ? ' is-missed' : ''}" data-i="${i}" type="button">${r || '—'}</button>`
+    ).join('');
+    row.querySelectorAll('.ol-set-box-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.i, 10);
+        const cur = olSetReps[i];
+        if (cur === null || cur === 0) {
+          // Missed → restore to reps value
+          olSetReps[i] = parseInt($('olRepsVal').textContent, 10) || 1;
+        } else if (cur <= 1) {
+          olSetReps[i] = 0; // mark missed
+        } else {
+          olSetReps[i] = cur - 1;
+        }
+        olRebuildSetBoxes();
+      });
+    });
+  }
+
+  // Saves the currently open log modal session
+  function olSaveSession() {
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const dateVal = $('olLogDate').value;
+    if (!dateVal) { alert('Pick a date.'); return; }
+    const isRest = $('olIsRest').checked;
+    const weight = isRest ? 0 : (ex.bw ? 0 : parseFloat($('olWtVal').textContent) || 0);
+    const reps   = isRest ? 0 : (parseInt($('olRepsVal').textContent, 10) || 0);
+    const sets   = isRest ? 0 : (parseInt($('olSetsVal').textContent, 10) || 1);
+    const setReps = isRest ? [] : olSetReps.slice(0, sets);
+
+    if (!isRest && !ex.bw && weight <= 0) { alert('Enter a weight.'); return; }
+    if (!isRest && reps <= 0) { alert('Enter reps.'); return; }
+
+    const entry = { weight, reps, sets, setReps, isRest, date: dateVal + 'T12:00:00.000Z' };
+    const arr = state.logs[ex.id] || [];
+
+    const prevBest = arr.length
+      ? Math.max.apply(null, arr.map(l => olNorm(l).weight))
+      : -Infinity;
+
+    if (olEditingIdx !== null && olEditingIdx < arr.length) {
+      arr[olEditingIdx] = entry;
+    } else {
+      arr.push(entry);
+      arr.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    state.logs[ex.id] = arr;
+    saveState();
+
+    // Check for new best and fire celebration
+    if (!isRest && !ex.bw && weight > prevBest && prevBest > -Infinity) {
+      olFireCelebration(weight, ex.name, unit());
+    }
+
+    $('olLogBg').classList.remove('show');
+    renderAll();
+    if (typeof wtRender === 'function') wtRender();
+  }
+
+  // ── New-best celebration ────────────────────────────────────────
+  function olFireCelebration(newBest, exName, u) {
+    $('olCelebrateTitle').textContent = 'New best — ' + newBest + ' ' + u + '!';
+    $('olCelebrateSub').textContent = exName + ' · keep that momentum going.';
+    const bg = $('olCelebrateBg');
+    bg.classList.add('show');
+    olSpawnConfetti();
+    setTimeout(() => {
+      bg.classList.remove('show');
+    }, 3400);
+    bg.addEventListener('pointerdown', () => bg.classList.remove('show'), { once: true });
+  }
+
+  function olSpawnConfetti() {
+    const canvas = $('olCelebrateCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const particles = [];
+    const COLORS = ['#F2C063','#6EE7B7','#FF8A8A','#7DD3FC','#C9B8FF','#FFD166'];
+    for (let i = 0; i < 90; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: -10 - Math.random() * 200,
+        vx: (Math.random() - 0.5) * 4,
+        vy: 2 + Math.random() * 4,
+        angle: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.2,
+        size: 6 + Math.random() * 8,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        shape: Math.random() > 0.5 ? 'rect' : 'circle',
+      });
+    }
+    let frame = 0;
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.angle += p.spin; p.vy += 0.06;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, 1 - frame / 140);
+        if (p.shape === 'rect') {
+          ctx.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size/2, 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+      frame++;
+      if (frame < 150) requestAnimationFrame(draw);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    requestAnimationFrame(draw);
+  }
+
   // Compute today's split from state.splitRotation + state.splitAnchor.
   // Returns the rotation entry name (e.g. "Push" or "Rest") AND the index.
   function todaySplit() {
@@ -2442,49 +3191,22 @@ img, video, canvas, svg { max-width: 100%; }
   // Always spans repMin → repMax + 2 (a small buffer for over-performing
   // sets that trigger the upgrade signal), capped at 16 buttons total so
   // wide ranges don't break the mobile layout.
-  function renderRepsRow() {
-    const row = document.getElementById('repsRow');
-    if (!row) return;
-    const ex = getCurrentEx();
-    let repMin, repMax;
-    if (ex) {
-      repMin = Math.max(1, parseInt(ex.repMin, 10) || 1);
-      repMax = Math.max(repMin, parseInt(ex.repMax, 10) || repMin);
-    } else {
-      repMin = 4; repMax = 12;
-    }
-    const upper = Math.max(repMax + 2, repMin + 5);
-    const end = Math.min(upper, repMin + 15);
-
-    // Preserve the previously-selected rep if it still fits in the new
-    // range; otherwise default to the target (repMax).
-    const prev = parseInt(row.dataset.value, 10);
-    const active = (prev >= repMin && prev <= end) ? prev : repMax;
-
-    let html = '';
-    for (let i = repMin; i <= end; i++) {
-      html += '<button type="button" class="po-reps-pill' +
-        (i === active ? ' active' : '') +
-        '" data-v="' + i + '">' + i + '</button>';
-    }
-    row.innerHTML = html;
-    row.dataset.value = String(active);
-  }
+  function renderRepsRow() { /* no-op — reps picker moved to log modal */ }
 
   function renderAll() {
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
-    renderRepsRow();
-    renderRx(); renderStats(); renderSparkline(); renderHistory();
+    // Overload-style exercise chart + stats + history
+    olRenderChart();
+    olRenderStats();
+    olRenderOverloadCard();
+    olRenderHistory();
     renderTodaysWorkout();
     renderPastWorkouts();
-    // Pre-fill weight input with last logged weight (or starting weight)
-    const ex = getCurrentEx();
-    if (ex && !ex.bw) {
-      const logs = getLogs();
-      const w = logs.length ? logs[logs.length - 1].weight : (ex.startWeight || 0);
-      $('weightInput').value = w;
-    }
+    // Update range toggle active state
+    document.querySelectorAll('.ol-range-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.range === olRange)
+    );
   }
 
   // ============================================================
@@ -2665,44 +3387,71 @@ img, video, canvas, svg { max-width: 100%; }
   $('exSelect').addEventListener('change', e => {
     state.currentEx = e.target.value; saveState(); renderAll();
   });
-  $('weightDownBtn').addEventListener('click', () => {
-    const ex = getCurrentEx(); if (!ex || ex.bw) return;
-    const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = Math.max(0, w - (ex.step || 2.5));
-  });
-  $('weightUpBtn').addEventListener('click', () => {
-    const ex = getCurrentEx(); if (!ex || ex.bw) return;
-    const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = w + (ex.step || 2.5);
-  });
-  // Delegated click handler — reps row is regenerated per exercise via
-  // renderRepsRow(), so we listen on the container rather than the
-  // individual buttons.
-  $('repsRow').addEventListener('click', (e) => {
-    const p = e.target.closest('.po-reps-pill');
-    if (!p) return;
-    $('repsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
-    p.classList.add('active');
-    $('repsRow').dataset.value = p.dataset.v;
-  });
-  $('logBtn').addEventListener('click', () => {
+  // ── Overload log modal events ───────────────────────────────────
+  $('olLogBtn').addEventListener('click', () => olOpenLogModal());
+  $('olLogBg').addEventListener('click', e => { if (e.target === $('olLogBg')) $('olLogBg').classList.remove('show'); });
+
+  // Stepper helpers
+  function olStepVal(elId, delta, min, step) {
+    const el = $(elId);
+    const cur = parseFloat(el.textContent) || 0;
+    const next = Math.max(min, Math.round((cur + delta) / step) * step);
+    el.textContent = step % 1 === 0 ? next : next.toFixed(1);
+  }
+
+  $('olWtDown').addEventListener('click', () => {
     const ex = getCurrentEx();
-    if (!ex) return;
-    const reps = parseInt($('repsRow').dataset.value, 10) || 0;
-    if (reps <= 0) { alert('Pick a rep count.'); return; }
-    const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
-    if (!ex.bw && w <= 0) { alert('Enter a weight.'); return; }
-    const arr = state.logs[ex.id] || [];
-    arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
-    state.logs[ex.id] = arr;
-    saveState(); renderAll();
-    // Strength changed → composition estimate may shift
+    olStepVal('olWtVal', -(ex && ex.step || 2.5), 0, ex && ex.step || 2.5);
+  });
+  $('olWtUp').addEventListener('click', () => {
+    const ex = getCurrentEx();
+    olStepVal('olWtVal', +(ex && ex.step || 2.5), 0, ex && ex.step || 2.5);
+  });
+  $('olRepsDown').addEventListener('click', () => {
+    olStepVal('olRepsVal', -1, 1, 1);
+    olSetReps = olSetReps.map(r => r ? Math.max(1, r - 1) : r);
+    olRebuildSetBoxes();
+  });
+  $('olRepsUp').addEventListener('click', () => {
+    olStepVal('olRepsVal', +1, 1, 1);
+    olSetReps = olSetReps.map(r => r ? r + 1 : r);
+    olRebuildSetBoxes();
+  });
+  $('olSetsDown').addEventListener('click', () => {
+    const cur = parseInt($('olSetsVal').textContent, 10) || 1;
+    if (cur <= 1) return;
+    $('olSetsVal').textContent = cur - 1;
+    olSetReps = olSetReps.slice(0, cur - 1);
+    olRebuildSetBoxes();
+  });
+  $('olSetsUp').addEventListener('click', () => {
+    const cur = parseInt($('olSetsVal').textContent, 10) || 1;
+    $('olSetsVal').textContent = cur + 1;
+    olSetReps.push(parseInt($('olRepsVal').textContent, 10) || 5);
+    olRebuildSetBoxes();
+  });
+  $('olLogSave').addEventListener('click', olSaveSession);
+  $('olLogDelete').addEventListener('click', () => {
+    if (olEditingIdx === null) return;
+    if (!confirm('Delete this session?')) return;
+    const arr = state.logs[state.currentEx] || [];
+    arr.splice(olEditingIdx, 1);
+    if (!arr.length) delete state.logs[state.currentEx];
+    else state.logs[state.currentEx] = arr;
+    saveState();
+    $('olLogBg').classList.remove('show');
+    renderAll();
     if (typeof wtRender === 'function') wtRender();
-    // Tiny pulse on the button so the user feels the save
-    const btn = $('logBtn');
-    btn.style.transition = 'transform 0.15s';
-    btn.style.transform = 'scale(0.96)';
-    setTimeout(() => { btn.style.transform = ''; }, 160);
+  });
+
+  // Range toggle
+  document.querySelectorAll('.ol-range-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      olRange = b.dataset.range;
+      olScrubbedIdx = null;
+      document.querySelectorAll('.ol-range-btn').forEach(x => x.classList.toggle('active', x.dataset.range === olRange));
+      olRenderChart();
+    });
   });
 
   // ============================================================
@@ -4055,11 +4804,21 @@ img, video, canvas, svg { max-width: 100%; }
   $('planImportCancel2').addEventListener('click', () => $('planImportModalBg').classList.remove('show'));
   $('planImportPhotoBtn').addEventListener('click', () => $('planImportFileCamera').click());
   $('planImportLibraryBtn').addEventListener('click', () => $('planImportFileLibrary').click());
+  $('planImportMdBtn').addEventListener('click', () => $('planImportFileMd').click());
   $('planImportFileCamera').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) planImportRunImage(f); e.target.value = ''; });
   $('planImportFileLibrary').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) planImportRunImage(f); e.target.value = ''; });
+  $('planImportFileMd').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    const nameEl = $('planImportMdName');
+    nameEl.textContent = '📄 ' + f.name; nameEl.style.display = 'block';
+    const reader = new FileReader();
+    reader.onload = ev => { $('planImportText').value = ev.target.result || ''; };
+    reader.readAsText(f, 'utf-8');
+  });
   $('planImportTextGo').addEventListener('click', () => {
     const text = $('planImportText').value.trim();
-    if (!text) { planImportError('Paste some plan text first, or use a photo instead.'); return; }
+    if (!text) { planImportError('Paste a plan, type it out, or load a .md / .txt file.'); return; }
     planImportRunText(text);
   });
   $('planImportSave').addEventListener('click', planImportSave);

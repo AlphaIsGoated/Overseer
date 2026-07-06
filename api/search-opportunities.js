@@ -101,7 +101,7 @@ CRITICAL: Only generate opportunities where the student is GENUINELY QUALIFIED b
 - If they are a freshman and a program targets juniors/seniors, skip it
 - Only include opportunities with a realistic chance of success
 
-Generate 5-7 REAL, SPECIFIC opportunities from your training knowledge of the job market:
+Generate the requested number of REAL, SPECIFIC opportunities from your training knowledge of the job market:
 - Use REAL company and institution names
 - Use realistic role titles these organizations actually offer
 - Provide real application channels you know about
@@ -148,6 +148,7 @@ export default async function handler(req, res) {
   const location     = (body && body.location)     || '';
   const resumeCtx    = (body && body.resumeContext)|| '';
   const addInfo      = (body && body.additionalInfo);  // undefined in Phase 1
+  const count        = Math.min(20, Math.max(1, parseInt(body && body.count, 10) || 5));
 
   if (!field) return res.status(400).json({ error: 'field is required' });
   if (rejectIfTooLarge(resumeCtx, 10000, res, 'resume context')) return;
@@ -218,13 +219,15 @@ ${addInfoStr || '(none provided)'}`;
     } catch (e) { /* proceed without */ }
   }
 
-  const prompt = `Find ${type === 'research' ? 'research position' : 'internship'} opportunities in: ${field}
+  const prompt = `Find exactly ${count} ${type === 'research' ? 'research position' : 'internship'} opportunities in: ${field}
 ${university ? 'Prioritize opportunities at/near: ' + university : ''}
 ${location ? 'Location preference: ' + location : ''}
 
 Complete student profile:
 ${fullProfile}
-${searchContext}`;
+${searchContext}
+
+Generate EXACTLY ${count} opportunities (no more, no fewer).`;
 
   try {
     const text = await callClaude(anthropicKey, OPPORTUNITIES_SYSTEM, prompt, 4096);

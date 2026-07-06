@@ -134,10 +134,27 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
     </div>
 
     <label class="field-label" style="margin-top:10px">Your background (resume summary / skills)</label>
-    <textarea class="gm-input" id="srchResume" placeholder="Paste key resume sections, skills, GPA, relevant courses — the more specific, the better the matches and emails."></textarea>
+    <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+      <label id="srchResumePdfLabel" style="cursor:pointer;padding:7px 13px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;font-size:12px;font-weight:600;color:var(--text-secondary);flex-shrink:0;transition:0.15s" onmouseenter="this.style.background='rgba(255,255,255,0.09)'" onmouseleave="this.style.background='rgba(255,255,255,0.05)'">
+        📎 Upload resume (PDF / TXT)
+        <input type="file" id="srchResumePdf" accept=".pdf,.txt,.md" style="display:none">
+      </label>
+      <span id="srchResumePdfName" style="font-size:11px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    </div>
+    <textarea class="gm-input" id="srchResume" placeholder="Paste key resume sections, skills, GPA, relevant courses — or upload a PDF/TXT above."></textarea>
 
     <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
       <button class="gm-add" id="srchGo" type="button">🔍 Find opportunities</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);white-space:nowrap">
+        Count:
+        <select id="srchCount" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:var(--text-primary);font-family:inherit;font-size:12px;padding:5px 8px;outline:none">
+          <option value="3">3</option>
+          <option value="5" selected>5</option>
+          <option value="7">7</option>
+          <option value="10">10</option>
+          <option value="15">15</option>
+        </select>
+      </label>
       <button class="gm-ghost" id="srchDownload" type="button" style="display:none">⬇ Download master file</button>
     </div>
     <div class="search-status" id="srchStatus"></div>
@@ -212,6 +229,45 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
   const savedCtx = localStorage.getItem(RESUME_KEY) || '';
   $('resumeCtx').value = savedCtx;
   $('srchResume').value = savedCtx;
+
+  // ---- Resume file upload (PDF / TXT / MD) ----
+  $('srchResumePdf').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    const nameEl = $('srchResumePdfName');
+    nameEl.textContent = '⏳ Reading ' + f.name + '…';
+    if (f.type === 'application/pdf') {
+      // For PDFs: read as base64 and extract text via Claude on the server
+      try {
+        const ab = await f.arrayBuffer();
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(ab)));
+        const secret = window.APP_SECRET || localStorage.getItem('app_secret') || '';
+        const res = await fetch('/api/extract-resume-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+          body: JSON.stringify({ pdfBase64: b64, filename: f.name }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.text) {
+          $('srchResume').value = data.text;
+          nameEl.textContent = '✓ ' + f.name;
+        } else {
+          nameEl.textContent = '⚠ Could not extract text from PDF';
+        }
+      } catch (err) {
+        nameEl.textContent = '⚠ Error reading PDF: ' + (err.message || err);
+      }
+    } else {
+      // Plain text / MD: read directly
+      const reader = new FileReader();
+      reader.onload = ev => {
+        $('srchResume').value = ev.target.result || '';
+        nameEl.textContent = '✓ ' + f.name;
+      };
+      reader.onerror = () => { nameEl.textContent = '⚠ Could not read file'; };
+      reader.readAsText(f, 'utf-8');
+    }
+  });
 
   $('resumeSave').addEventListener('click', () => {
     localStorage.setItem(RESUME_KEY, $('resumeCtx').value.trim());
@@ -303,7 +359,7 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
       const res = await fetch('/api/search-opportunities', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-        body: JSON.stringify({ type: searchType, field, university: $('srchUni').value.trim(), location: $('srchLoc').value.trim(), resumeContext: rc }),
+        body: JSON.stringify({ type: searchType, field, university: $('srchUni').value.trim(), location: $('srchLoc').value.trim(), resumeContext: rc, count: parseInt($('srchCount').value, 10) || 5 }),
       });
       if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
       const data = await res.json();
@@ -371,7 +427,7 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
       const res = await fetch('/api/search-opportunities', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-        body: JSON.stringify({ type: searchType, field, university: $('srchUni').value.trim(), location: $('srchLoc').value.trim(), resumeContext: rc, additionalInfo }),
+        body: JSON.stringify({ type: searchType, field, university: $('srchUni').value.trim(), location: $('srchLoc').value.trim(), resumeContext: rc, additionalInfo, count: parseInt($('srchCount').value, 10) || 5 }),
       });
       if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
       const data = await res.json();
