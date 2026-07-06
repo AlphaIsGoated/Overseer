@@ -19,7 +19,9 @@
 // ============================================================
 import { requireAppSecret, rejectIfTooLarge } from './_lib/security.js';
 
-const APIFY_ACTOR = 'apify/google-search-scraper';
+// Apify API uses ~ to separate owner/name in the URL path (not /)
+// apify/google-search-scraper in the UI = apify~google-search-scraper in the API
+const APIFY_ACTOR = 'apify~google-search-scraper';
 
 async function runApify(apiToken, queries) {
   const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apiToken}&timeout=55&maxItems=30`;
