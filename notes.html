@@ -89,7 +89,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 <div id="dropOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(6,9,10,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;gap:16px;pointer-events:none">
   <div style="width:80px;height:80px;border-radius:50%;border:2.5px solid #6EE7B7;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 0 30px rgba(110,231,183,0.5)">📝</div>
   <div style="font-size:20px;font-weight:700;color:#FAFAFA;letter-spacing:-0.01em">Drop to save as a note</div>
-  <div style="font-size:13px;color:rgba(110,231,183,0.7)">First line becomes the title</div>
+  <div style="font-size:13px;color:rgba(110,231,183,0.7)">Drag a note from the sidebar, or selected text from within a note</div>
 </div>
 
 <div class="page">
@@ -410,18 +410,64 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY], onApplied: render });
   }
 
-  // ---- Full-page drag-and-drop from Apple Notes ----
-  // When you drag selected text from Apple Notes (or any app) over this
-  // window, a full-screen overlay appears. Drop anywhere to instantly
-  // create a note — no need to find the paste zone.
+  // ---- Full-page drag-and-drop ----
+  // Handles two cases:
+  //   1. Dragging an actual note from Apple Notes sidebar → browser receives
+  //      the note as a file (.enex XML, .txt, .rtf, .md, or .html).
+  //   2. Dragging selected text from within a note → received as text/plain.
+  // Both show the same overlay and create a note instantly on drop.
+
+  // Parse Apple Notes' .enex XML format (also used by Evernote-compatible apps).
+  // The note title is in <title>, content is HTML inside a <content> CDATA block.
+  function parseEnex(xml) {
+    const titleMatch = xml.match(/<title>([\s\S]*?)<\/title>/i);
+    const contentMatch = xml.match(/<content>([\s\S]*?)<\/content>/i);
+    const title = titleMatch ? titleMatch[1].replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim() : 'Apple Note';
+    let body = '';
+    if (contentMatch) {
+      body = contentMatch[1]
+        .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1') // unwrap CDATA
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<\/li>/gi, '\n')
+        .replace(/<li[^>]*>/gi, '• ')
+        .replace(/<[^>]+>/g, '')            // strip remaining HTML tags
+        .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').replace(/&#39;/g,"'")
+        .replace(/\n{3,}/g, '\n\n').trim();
+    }
+    return { title, body: body || title };
+  }
+
+  // Minimal RTF → plain text: strip RTF control words and group delimiters.
+  function parseRtf(rtf) {
+    const text = rtf
+      .replace(/\{[^{}]*\}/g, '')          // remove groups like {\fonttbl...}
+      .replace(/\\[a-z]+[-]?\d*[ ]?/g, '') // strip control words like \par \b0 etc
+      .replace(/[{}\\]/g, '')
+      .replace(/\n{3,}/g, '\n\n').trim();
+    const lines = text.split('\n');
+    return { title: (lines.find(l => l.trim()) || 'Dropped note').slice(0, 80), body: text };
+  }
+
+  function processDroppedText(text) {
+    const lines = text.split('\n');
+    const title = (lines.find(l => l.trim()) || 'Dropped note').slice(0, 80).trim();
+    return { title, body: text.trim() };
+  }
+
+  function importFromNotes(incoming) {
+    const added = mergeNotes(incoming);
+    if (added > 0) importStatus(added + ' note' + (added > 1 ? 's' : '') + ' imported ✓', true);
+    else importStatus('Already exists — note with that title was skipped.', false);
+  }
+
   const overlay = document.getElementById('dropOverlay');
-  let dragDepth = 0; // track nested dragenter/dragleave so overlay doesn't flicker
+  let dragDepth = 0;
 
   document.addEventListener('dragenter', (e) => {
-    // Only show overlay for text content (not file drops)
     if (!e.dataTransfer) return;
     const types = Array.from(e.dataTransfer.types || []);
-    if (!types.includes('text/plain') && !types.includes('text')) return;
+    // Show for text drops OR file drops
+    if (!types.includes('text/plain') && !types.includes('text') && !types.includes('Files')) return;
     dragDepth++;
     overlay.style.display = 'flex';
     overlay.style.pointerEvents = 'all';
@@ -432,9 +478,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     if (dragDepth <= 0) { dragDepth = 0; overlay.style.display = 'none'; overlay.style.pointerEvents = 'none'; }
   });
 
-  document.addEventListener('dragover', (e) => {
-    e.preventDefault(); // required to allow drop
-  });
+  document.addEventListener('dragover', (e) => { e.preventDefault(); });
 
   document.addEventListener('drop', (e) => {
     e.preventDefault();
@@ -442,19 +486,39 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     overlay.style.display = 'none';
     overlay.style.pointerEvents = 'none';
 
-    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || '';
-    if (!text.trim()) return;
+    const files = e.dataTransfer.files;
 
-    // First non-blank line → title; rest → body
-    const lines = text.split('\n');
-    const title = (lines.find(l => l.trim()) || 'Dropped note').slice(0, 80).trim();
-    const body = text.trim();
-
-    const added = mergeNotes([{ title, body }]);
-    if (added) {
-      importStatus('Note saved from drag-and-drop ✓', true);
+    if (files && files.length > 0) {
+      // ---- File drop (actual note dragged from Apple Notes sidebar) ----
+      const incoming = [];
+      let pending = files.length;
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const content = ev.target.result || '';
+          const name = file.name.replace(/\.(enex|txt|rtf|md|html?)$/i, '');
+          let parsed;
+          if (/\.enex$/i.test(file.name)) {
+            parsed = parseEnex(content);
+          } else if (/\.rtf$/i.test(file.name)) {
+            parsed = parseRtf(content);
+            if (!parsed.title || parsed.title === 'Dropped note') parsed.title = name;
+          } else {
+            // .txt, .md, .html, or unknown — treat as plain text
+            parsed = processDroppedText(content.replace(/<[^>]+>/g, ''));
+            if (!parsed.title || parsed.title === 'Dropped note') parsed.title = name;
+          }
+          incoming.push(parsed);
+          pending--;
+          if (pending === 0) importFromNotes(incoming);
+        };
+        reader.readAsText(file);
+      });
     } else {
-      importStatus('A note with that title already exists.', false);
+      // ---- Text drop (selected text dragged from within a note) ----
+      const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || '';
+      if (!text.trim()) return;
+      importFromNotes([processDroppedText(text)]);
     }
   });
 })();
