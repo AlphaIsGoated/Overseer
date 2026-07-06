@@ -351,28 +351,24 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   });
   window.addEventListener('resize', () => { resize(); if (layout) { layout.px; } });
 
-  // ---- Obsidian Local REST API — routed via server proxy ----
-  // Browsers block HTTPS → HTTP requests (mixed content), so we can't
-  // call localhost:27124 directly from the dashboard page. Instead, we
-  // send requests through /api/obsidian-proxy which runs server-side in
-  // Node.js and isn't subject to the browser's mixed-content restriction.
-  function obsProxyUrl(obsBase, path, accept) {
-    const qs = new URLSearchParams({ obsBase, path, accept: accept || 'application/json' });
-    return '/api/obsidian-proxy?' + qs.toString();
-  }
-
+  // ---- Obsidian Local REST API — called directly from browser ----
+  // Browsers exempt http://localhost from mixed-content restrictions, so
+  // direct calls work from an HTTPS page. The original "Failed to fetch"
+  // was a CORS issue. Fix: use the plugin's HTTPS mode (https://localhost:27124)
+  // and trust the self-signed cert once — then all browsers work without any
+  // CORS config. HTTP also works in Chrome/Firefox if you prefer.
   async function syncObsidian() {
     const url = document.getElementById('obsUrl').value.trim().replace(/\/+$/, '');
     const key = document.getElementById('obsKey').value.trim();
     if (!url || !key) { setStatus('Enter URL and API key first.', 'err'); return; }
     saveJSON(OBS_CREDS_KEY, { url, key });
     setStatus('Connecting to Obsidian…', '');
-    const authHeader = { 'Authorization': 'Bearer ' + key, 'x-app-secret': (window.DASH_APP_SECRET || '') };
+    const headers = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' };
     try {
-      const listRes = await fetch(obsProxyUrl(url, '/vault/'), { headers: authHeader });
+      const listRes = await fetch(url + '/vault/', { headers });
       if (!listRes.ok) {
-        const err = await listRes.json().catch(() => ({}));
-        setStatus(err.error || 'Could not reach Obsidian — is it open with Local REST API enabled?', 'err');
+        const text = await listRes.text().catch(() => '');
+        setStatus('Obsidian returned ' + listRes.status + '. Make sure the plugin is enabled and the API key is correct.', 'err');
         return;
       }
       const files = await listRes.json();
@@ -380,7 +376,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       const notes = [];
       for (const path of mdFiles) {
         try {
-          const r = await fetch(obsProxyUrl(url, '/vault/' + encodeURIComponent(path), 'text/plain'), { headers: authHeader });
+          const r = await fetch(url + '/vault/' + encodeURIComponent(path), { headers: { ...headers, Accept: 'text/plain' } });
           const body = r.ok ? (await r.text()).slice(0, 1000) : '';
           notes.push({ path, body });
         } catch (e) { notes.push({ path, body: '' }); }
@@ -389,7 +385,12 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       setStatus('Synced ' + notes.length + ' Obsidian notes ✓', 'ok');
       rebuild();
     } catch (e) {
-      setStatus('Error: ' + (e.message || String(e)), 'err');
+      const msg = e && e.message ? e.message : String(e);
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        setStatus('Could not reach Obsidian. Try: 1) Enable HTTPS in the plugin and use https://localhost:27124, then visit that URL in your browser once to trust the cert. 2) Or in the plugin settings, enable "Enable CORS requests".', 'err');
+      } else {
+        setStatus('Error: ' + msg, 'err');
+      }
     }
   }
 
