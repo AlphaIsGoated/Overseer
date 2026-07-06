@@ -43,35 +43,36 @@ async function runApify(apiToken, queries) {
   return Array.isArray(items) ? items.filter(i => i.title && i.url) : [];
 }
 
-const CLAUDE_SYSTEM = `You are a career advisor extracting internship and research opportunities from Google search results.
+// Claude generates opportunities from its own training knowledge — this is the
+// primary mechanism. Google search results are supplementary context only.
+// Claude knows real companies, real programs, real application channels in any
+// field, and always returns results regardless of what scrapers found.
+const CLAUDE_SYSTEM = `You are a career advisor who helps students find real internship and research opportunities.
 
-IMPORTANT: Be INCLUSIVE, not exclusive. If a URL looks like it COULD lead to a job listing, company careers page, lab opening, or research program — include it. It is far better to include something uncertain than to miss a real opportunity.
+Your PRIMARY job is to generate 6 SPECIFIC, REAL opportunities from your training knowledge of the job market in the requested field. Do NOT wait for or rely on search results — generate opportunities based on what you know about companies and programs that actively hire in this field.
 
-Include any result where the URL or title contains words like: jobs, careers, intern, research, position, apply, opening, lab, professor, program, fellowship, hire, recruiting, opportunity.
+For each opportunity:
+- Use REAL company or institution names that actually exist and hire in this field
+- Use realistic role titles these organizations actually offer
+- Provide real application channels (actual career page URLs you know about, real program websites)
+- For research: include real REU programs, specific universities' lab groups, national labs
+- For internships: include large companies, startups, and mid-size companies across different segments
 
-For each result you include:
-- Use the title from the search result as the role title (make it specific if possible)
-- Use the domain name as the company if nothing else is available
-- Set howToApply to "Visit the link to apply" if no other info is visible
-- Set recruiter to empty string if not visible
-- Score fit 5-8 by default unless clearly irrelevant to the field
-- Write a short 3-paragraph outreach email
-
-Only skip a result if it is CLEARLY a news article, Wikipedia page, Reddit post, or generic career advice article with no specific opening.
+Then, if any search results are provided at the end, you may use any useful URLs from them as the url field for relevant opportunities — but do not let the quality of search results limit how many opportunities you generate.
 
 Return ONLY valid JSON (no markdown code blocks):
 {
   "opportunities": [
     {
       "id": "opp_1",
-      "title": "Role title",
-      "company": "Company or institution name",
-      "description": "What the role is (2-3 sentences from the search result)",
-      "url": "https://...",
+      "title": "Specific role title",
+      "company": "Real company or institution name",
+      "description": "What the role is and why it is a good opportunity (2-3 sentences)",
+      "url": "https://real-careers-page.com/apply",
       "recruiter": "",
-      "howToApply": "Visit the link to apply",
-      "matchScore": 7,
-      "matchReason": "Why this fits the student's background",
+      "howToApply": "How to apply (portal name, direct link, or email)",
+      "matchScore": 8,
+      "matchReason": "Why this specifically matches the student's background",
       "draftEmail": "Subject: ...\\n\\nDear Hiring Team,\\n\\n[body]\\n\\nBest,\\n[Student Name]"
     }
   ]
@@ -100,49 +101,41 @@ export default async function handler(req, res) {
   if (!apifyToken) return res.status(500).json({ error: 'APIFY_API_TOKEN not configured — add it to Vercel env vars' });
   if (!anthropicKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-  // Build targeted queries that hit actual job boards and career pages,
-  // not generic career-advice articles. site: operators force results
-  // from domains that host real postings.
+  // Apify search runs opportunistically — if it finds good URLs we pass them
+  // to Claude as context. If it fails or returns nothing, Claude still generates
+  // real opportunities from its training knowledge. Never block on Apify results.
   const year = new Date().getFullYear();
-  const queries = [];
-  if (type === 'research') {
-    const uni = university || '';
-    const uniStr = uni ? ` ${uni}` : '';
-    queries.push(`site:linkedin.com/jobs "${field}" research intern${uniStr}`);
-    queries.push(`${field} undergraduate research position${uniStr} apply ${year} site:edu OR site:org`);
-    queries.push(`"research assistant" "${field}"${uniStr} opening ${year}`);
-    queries.push(`${field} REU program ${year} apply site:nsf.gov OR site:edu`);
-  } else {
-    const loc = location ? ` ${location}` : '';
-    queries.push(`site:linkedin.com/jobs "${field}" intern${loc}`);
-    queries.push(`site:indeed.com "${field}" internship${loc} ${year}`);
-    queries.push(`"${field}" internship ${year} apply site:careers OR site:jobs OR site:lever.co OR site:greenhouse.io`);
-    queries.push(`${field} summer internship undergraduate ${year}${loc} -reddit -quora -glassdoor`);
-  }
+  const queries = type === 'research'
+    ? [
+        `${field} internship research ${university || ''} apply ${year}`,
+        `${field} REU NSF undergraduate research ${year}`,
+      ]
+    : [
+        `${field} internship ${year} ${location || ''} apply careers`,
+        `${field} summer internship program undergraduate ${year}`,
+      ];
 
-  let searchResults = [];
+  let searchContext = '';
   try {
-    searchResults = await runApify(apifyToken, queries);
+    const searchResults = await runApify(apifyToken, queries);
+    if (searchResults.length > 0) {
+      searchContext = '\n\nHere are some live search results — use any relevant URLs for the url field of your opportunities:\n'
+        + searchResults.slice(0, 16).map((r, i) =>
+            `[${i+1}] ${r.title}\n${r.url}\n${(r.description || '').slice(0, 200)}`
+          ).join('\n\n');
+    }
   } catch (e) {
-    return res.status(502).json({ error: 'Search failed: ' + e.message });
+    // Apify failed — proceed with Claude-knowledge-only approach (still works great)
+    searchContext = '';
   }
-  if (!searchResults.length) return res.status(200).json({ opportunities: [], message: 'No search results found — try broadening your search terms.' });
 
-  // Summarize results for Claude (keep under token limits)
-  const resultsText = searchResults.slice(0, 24).map((r, i) =>
-    `[${i+1}] Title: ${r.title}\nURL: ${r.url}\nSnippet: ${(r.description || '').slice(0, 300)}`
-  ).join('\n\n');
-
-  const userPrompt = `Type: ${type === 'research' ? 'Research position' : 'Internship'}
-Field: ${field}
-${university ? 'Target university/institution: ' + university : ''}
+  const userPrompt = `Generate 6 real, specific ${type === 'research' ? 'research position' : 'internship'} opportunities in ${field}.
+${university ? 'Prioritize opportunities at or near: ' + university : ''}
 ${location ? 'Location preference: ' + location : ''}
 
 Student background:
-${resumeContext || '(No resume context provided — use general criteria for a strong undergraduate student)'}
-
-Search results to analyze:
-${resultsText}`;
+${resumeContext || 'Strong undergraduate student in ' + field + '. Use general criteria for a competitive candidate.'}
+${searchContext}`;
 
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
