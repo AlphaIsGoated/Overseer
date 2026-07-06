@@ -123,6 +123,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // ---- Load credentials ----
   const creds = loadJSON(OBS_CREDS_KEY, { url: '', key: '' });
   if (creds.url) { document.getElementById('obsUrl').value = creds.url; }
+  if (creds.key) { document.getElementById('obsKey').value = creds.key; }
 
   // ---- Gather note data from both sources ----
   function gatherNodes() {
