@@ -351,23 +351,36 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   });
   window.addEventListener('resize', () => { resize(); if (layout) { layout.px; } });
 
-  // ---- Obsidian Local REST API ----
+  // ---- Obsidian Local REST API — routed via server proxy ----
+  // Browsers block HTTPS → HTTP requests (mixed content), so we can't
+  // call localhost:27124 directly from the dashboard page. Instead, we
+  // send requests through /api/obsidian-proxy which runs server-side in
+  // Node.js and isn't subject to the browser's mixed-content restriction.
+  function obsProxyUrl(obsBase, path, accept) {
+    const qs = new URLSearchParams({ obsBase, path, accept: accept || 'application/json' });
+    return '/api/obsidian-proxy?' + qs.toString();
+  }
+
   async function syncObsidian() {
     const url = document.getElementById('obsUrl').value.trim().replace(/\/+$/, '');
     const key = document.getElementById('obsKey').value.trim();
     if (!url || !key) { setStatus('Enter URL and API key first.', 'err'); return; }
     saveJSON(OBS_CREDS_KEY, { url, key });
     setStatus('Connecting to Obsidian…', '');
+    const authHeader = { 'Authorization': 'Bearer ' + key, 'x-app-secret': (window.DASH_APP_SECRET || '') };
     try {
-      const headers = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' };
-      const listRes = await fetch(url + '/vault/', { headers });
-      if (!listRes.ok) { setStatus('Could not reach Obsidian (is it open and the plugin running?)', 'err'); return; }
+      const listRes = await fetch(obsProxyUrl(url, '/vault/'), { headers: authHeader });
+      if (!listRes.ok) {
+        const err = await listRes.json().catch(() => ({}));
+        setStatus(err.error || 'Could not reach Obsidian — is it open with Local REST API enabled?', 'err');
+        return;
+      }
       const files = await listRes.json();
       const mdFiles = (files.files || []).filter(f => f.endsWith('.md')).slice(0, 100);
       const notes = [];
       for (const path of mdFiles) {
         try {
-          const r = await fetch(url + '/vault/' + encodeURIComponent(path), { headers: { ...headers, Accept: 'text/plain' } });
+          const r = await fetch(obsProxyUrl(url, '/vault/' + encodeURIComponent(path), 'text/plain'), { headers: authHeader });
           const body = r.ok ? (await r.text()).slice(0, 1000) : '';
           notes.push({ path, body });
         } catch (e) { notes.push({ path, body: '' }); }
