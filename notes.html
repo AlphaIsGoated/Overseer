@@ -84,137 +84,139 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 @media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
 
 /* ===== Note import animation — JARVIS acquisition sequence ===== */
+@keyframes nimFadeIn  { from { opacity: 0; } to   { opacity: 1; } }
+@keyframes nimFadeOut { from { opacity: 1; } to   { opacity: 0; } }
+@keyframes nimSpin    { to   { transform: rotate(360deg);  } }
+@keyframes nimSpinRev { to   { transform: rotate(-360deg); } }
+@keyframes nimPulse   { 0%,100% { opacity: 0.12; } 50% { opacity: 0.28; } }
+@keyframes nimScanline {
+  0%   { transform: translateY(-2px); opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 0.7; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
 .nim-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: radial-gradient(ellipse 70% 55% at 50% 48%, #061009 0%, #020402 55%, #010201 100%);
   display: none; flex-direction: column; align-items: center; justify-content: center;
-  gap: 14px; cursor: default; padding: 20px; overflow: hidden;
-  animation: nimFadeIn 0.22s ease forwards;
+  gap: 12px; padding: 24px;
+  background: radial-gradient(ellipse 70% 55% at 50% 48%, #061009 0%, #020402 55%, #010201 100%);
 }
-@media (max-width: 480px) { .nim-overlay { gap: 10px; } }
-.nim-overlay.exiting { animation: nimFadeOut 0.35s ease forwards; }
+.nim-overlay.show { display: flex; animation: nimFadeIn 0.22s ease both; }
+.nim-overlay.exiting { animation: nimFadeOut 0.35s ease both; }
+
+/* Dot grid + scanline via pseudo-elements — completely non-interactive, no layout impact */
 .nim-overlay::before {
   content: ''; position: absolute; inset: 0; pointer-events: none;
   background-image: radial-gradient(rgba(110,231,183,0.055) 1px, transparent 1px);
   background-size: 26px 26px;
 }
 .nim-overlay::after {
-  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1.5px;
-  background: linear-gradient(90deg, transparent, rgba(103,232,249,0.55) 45%, rgba(110,231,183,0.9) 50%, rgba(103,232,249,0.55) 55%, transparent);
-  animation: nimScanline 1.1s linear infinite;
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1.5px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(103,232,249,0.5) 40%, rgba(110,231,183,0.9) 50%, rgba(103,232,249,0.5) 60%, transparent);
+  animation: nimScanline 1.2s linear infinite;
 }
-@keyframes nimFadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes nimFadeOut { from { opacity: 1; } to { opacity: 0; } }
-@keyframes nimScanline { 0% { transform: translateY(0); opacity: 0; } 5% { opacity: 1; } 95% { opacity: 0.7; } 100% { transform: translateY(100vh); opacity: 0; } }
-@keyframes nimSpin    { to { transform: rotate(360deg); } }
-@keyframes nimSpinRev { to { transform: rotate(-360deg); } }
-@keyframes nimPulse   { 0%,100% { filter: drop-shadow(0 0 5px rgba(110,231,183,0.55)); } 50% { filter: drop-shadow(0 0 18px rgba(110,231,183,1)); } }
-@keyframes nimOrbit   { to { transform: rotate(360deg); } }
 
-.nim-rings-wrap { position: relative; width: min(220px, 56vw); height: min(220px, 56vw); }
-.nim-svg { width: 100%; height: 100%; overflow: visible; }
-.nim-ring { fill: none; transform-origin: 110px 110px; }
-.nim-r-outer { stroke: #6EE7B7; stroke-width: 1; stroke-dasharray: 3 9; opacity: 0.45; animation: nimSpin 12s linear infinite; }
-.nim-r-mid   { stroke: #67E8F9; stroke-width: 1.8; stroke-dasharray: 22 6 3 6; opacity: 0.7; animation: nimSpinRev 7s linear infinite; }
-.nim-r-inner { stroke: #6EE7B7; stroke-width: 1; stroke-dasharray: 1.5 5; opacity: 0.45; animation: nimSpin 4.5s linear infinite; }
-.nim-progress { fill: none; stroke: #6EE7B7; stroke-width: 1.5; opacity: 0.75;
-  stroke-dasharray: 670; stroke-dashoffset: 670;
-  transform: rotate(-90deg); transform-origin: 110px 110px;
-  filter: drop-shadow(0 0 5px rgba(110,231,183,0.7));
+/* Ring SVG — overflow hidden so SVG content stays inside the container */
+.nim-rings-wrap { position: relative; width: min(200px, 52vw); height: min(200px, 52vw); flex-shrink: 0; }
+.nim-svg { width: 100%; height: 100%; overflow: hidden; display: block; }
+.nim-ring { fill: none; transform-origin: 100px 100px; }
+.nim-r-outer { stroke: #6EE7B7; stroke-width: 1;   stroke-dasharray: 3 9;       opacity: 0.45; animation: nimSpin    12s linear infinite; }
+.nim-r-mid   { stroke: #67E8F9; stroke-width: 1.8; stroke-dasharray: 22 6 3 6;  opacity: 0.7;  animation: nimSpinRev  7s linear infinite; }
+.nim-r-inner { stroke: #6EE7B7; stroke-width: 1;   stroke-dasharray: 1.5 5;    opacity: 0.45; animation: nimSpin    4.5s linear infinite; }
+
+/* Progress arc — sweeps from 0 → ~96% via JS stroke-dashoffset transition */
+.nim-progress {
+  fill: none; stroke: #6EE7B7; stroke-width: 1.5; opacity: 0.7;
+  stroke-dasharray: 610; stroke-dashoffset: 610;
+  transform: rotate(-90deg); transform-origin: 100px 100px;
   transition: stroke-dashoffset 0.75s cubic-bezier(0.25,0.8,0.25,1);
 }
-.nim-sweep { stroke: #67E8F9; stroke-width: 1.5; transform-origin: 110px 110px; animation: nimSpin 1.8s linear infinite; filter: drop-shadow(0 0 6px rgba(103,232,249,0.95)); }
-.nim-sweep-trail { fill: none; stroke: rgba(103,232,249,0.09); stroke-width: 50; transform-origin: 110px 110px; animation: nimSpin 1.8s linear infinite; }
-.nim-core-glow { fill: #6EE7B7; opacity: 0.14; animation: nimPulse 1.4s ease-in-out infinite; }
-.nim-core { fill: #020404; stroke: #6EE7B7; stroke-width: 1.3; animation: nimPulse 1.4s ease-in-out infinite; }
-.nim-hex { fill: none; stroke: #67E8F9; stroke-width: 0.8; opacity: 0.6; transform-origin: 110px 110px; animation: nimSpinRev 18s linear infinite; }
-.nim-orbital { fill: #67E8F9; transform-origin: 110px 110px; filter: drop-shadow(0 0 3px #67E8F9); animation: nimOrbit 3.8s linear infinite; opacity: 0.9; }
-.nim-tick { stroke: #6EE7B7; stroke-width: 1.2; opacity: 0.28; }
 
-.nim-sys-label {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 9px; font-weight: 700;
-  letter-spacing: 0.10em; text-transform: uppercase; color: rgba(110,231,183,0.45);
-  max-width: min(320px, 86vw); text-align: center;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+/* Radar sweep — just a line, no stroke-width hacks */
+.nim-sweep { stroke: #67E8F9; stroke-width: 1.5; transform-origin: 100px 100px; animation: nimSpin 1.8s linear infinite; }
+
+/* Sweep trail — filled wedge at low opacity (NOT a stroke) */
+.nim-sweep-trail { fill: rgba(103,232,249,0.07); transform-origin: 100px 100px; animation: nimSpin 1.8s linear infinite; }
+
+.nim-core-glow { fill: #6EE7B7; animation: nimPulse 1.4s ease-in-out infinite; }
+.nim-core      { fill: #020404; stroke: #6EE7B7; stroke-width: 1.3; }
+.nim-hex       { fill: none; stroke: #67E8F9; stroke-width: 0.8; opacity: 0.6; transform-origin: 100px 100px; animation: nimSpinRev 20s linear infinite; }
+.nim-tick      { stroke: #6EE7B7; stroke-width: 1; opacity: 0.25; }
+.nim-orbital   { fill: #67E8F9; opacity: 0.85; transform-origin: 100px 100px; animation: nimSpin 4s linear infinite; }
+
+/* Text — all constrained, centered, no overflow */
+.nim-label {
+  font: 700 9px/1 ui-monospace, monospace;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(110,231,183,0.4); text-align: center;
 }
 .nim-status {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase; color: #8eeebf;
-  min-height: 18px; text-align: center; max-width: min(280px, 86vw);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font: 700 11px/1 ui-monospace, monospace;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: #8eeebf; text-align: center; min-height: 16px;
 }
-.nim-title-display {
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
-  font-size: clamp(13px, 3.8vw, 19px); font-weight: 700; color: #eafff6;
-  text-shadow: 0 0 20px rgba(110,231,183,0.7), 0 0 50px rgba(110,231,183,0.3);
-  letter-spacing: -0.01em; text-align: center;
-  max-width: min(320px, 86vw);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.nim-title {
+  font: 700 clamp(13px,3.5vw,18px)/1.2 -apple-system, sans-serif;
+  color: #eafff6; text-align: center;
+  text-shadow: 0 0 18px rgba(110,231,183,0.65);
   opacity: 0; transition: opacity 0.4s ease 0.5s;
+  max-width: min(300px, 82vw);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.nim-title-display.show { opacity: 1; }
+.nim-title.show { opacity: 1; }
 .nim-footer {
-  font-family: ui-monospace, monospace; font-size: 9px; letter-spacing: 0.08em;
-  color: rgba(110,231,183,0.28); text-transform: uppercase; text-align: center;
-  max-width: min(280px, 86vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  opacity: 0; transition: opacity 0.3s ease 0.8s;
+  font: 9px/1 ui-monospace, monospace;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(110,231,183,0.25); text-align: center;
+  opacity: 0; transition: opacity 0.3s ease 0.85s;
 }
 .nim-footer.show { opacity: 1; }
-.nim-data-stream { position: absolute; top: 50%; transform: translateY(-50%); font-family: ui-monospace, monospace; font-size: 8px; letter-spacing: 0.04em; color: rgba(110,231,183,0.22); line-height: 1.9; white-space: nowrap; user-select: none; pointer-events: none; }
-.nim-data-left  { left: 10px; }
-.nim-data-right { right: 10px; }
-@media (max-width: 480px) { .nim-data-stream { display: none; } }
-@keyframes nimScanBarSlide { 0% { left: -40%; } 100% { left: 110%; } }
 </style>
 </head>
 <body>
-<!-- Note import acquisition animation -->
+<!-- Note import acquisition animation — clean flex column, no absolute children -->
 <div class="nim-overlay" id="nimOverlay">
-  <div class="nim-data-stream nim-data-left" id="nimDataLeft"></div>
-  <div class="nim-data-stream nim-data-right" id="nimDataRight"></div>
 
-  <div class="nim-sys-label">OVERSEER · NOTE CAPTURE</div>
+  <div class="nim-label">OVERSEER · NOTE CAPTURE</div>
 
   <div class="nim-rings-wrap">
-    <svg class="nim-svg" viewBox="0 0 220 220">
+    <!-- SVG viewBox 200×200, overflow hidden — nothing paints outside this box -->
+    <svg class="nim-svg" viewBox="0 0 200 200">
+      <!-- Tick marks (JS-generated) -->
       <g id="nimTicks"></g>
-      <!-- Sweep trail -->
-      <path class="nim-sweep-trail" d="M110 110 L110 15 A95 95 0 0 1 205 110 Z" transform-origin="110px 110px" style="animation: nimSpin 1.8s linear infinite;"/>
-      <!-- Rings -->
-      <circle class="nim-ring nim-r-outer" cx="110" cy="110" r="100"/>
-      <!-- Progress arc tracks acquisition completion -->
-      <circle class="nim-progress" id="nimProgressArc" cx="110" cy="110" r="100"/>
-      <!-- Radar sweep -->
-      <line class="nim-sweep" x1="110" y1="110" x2="110" y2="15"/>
-      <circle class="nim-ring nim-r-mid" cx="110" cy="110" r="75"/>
-      <!-- Crosshair lines — "locking on" to target -->
-      <line stroke="rgba(110,231,183,0.35)" stroke-width="0.8" x1="45" y1="110" x2="72" y2="110"/>
-      <line stroke="rgba(110,231,183,0.35)" stroke-width="0.8" x1="148" y1="110" x2="175" y2="110"/>
-      <line stroke="rgba(110,231,183,0.35)" stroke-width="0.8" x1="110" y1="45" x2="110" y2="72"/>
-      <line stroke="rgba(110,231,183,0.35)" stroke-width="0.8" x1="110" y1="148" x2="110" y2="175"/>
-      <!-- Corner brackets — targeting reticle -->
-      <path d="M60 75 L60 60 L75 60" fill="none" stroke="#6EE7B7" stroke-width="1.5" opacity="0.6"/>
-      <path d="M160 75 L160 60 L145 60" fill="none" stroke="#6EE7B7" stroke-width="1.5" opacity="0.6"/>
-      <path d="M60 145 L60 160 L75 160" fill="none" stroke="#6EE7B7" stroke-width="1.5" opacity="0.6"/>
-      <path d="M160 145 L160 160 L145 160" fill="none" stroke="#6EE7B7" stroke-width="1.5" opacity="0.6"/>
-      <circle class="nim-ring nim-r-inner" cx="110" cy="110" r="50"/>
-      <!-- Orbital satellite -->
-      <circle class="nim-orbital" cx="110" cy="15" r="2.5"/>
+      <!-- Sweep trail: filled wedge at low opacity — correct approach, no huge stroke -->
+      <path class="nim-sweep-trail" d="M100 100 L100 5 A95 95 0 0 1 195 100 Z"/>
+      <!-- Outer progress arc -->
+      <circle class="nim-progress" id="nimProgressArc" cx="100" cy="100" r="97"/>
+      <!-- Three concentric rings -->
+      <circle class="nim-ring nim-r-outer" cx="100" cy="100" r="90"/>
+      <!-- Radar sweep line -->
+      <line class="nim-sweep" x1="100" y1="100" x2="100" y2="10"/>
+      <circle class="nim-ring nim-r-mid"   cx="100" cy="100" r="68"/>
+      <!-- Crosshairs -->
+      <line stroke="rgba(110,231,183,0.3)" stroke-width="0.7" x1="38" y1="100" x2="62" y2="100"/>
+      <line stroke="rgba(110,231,183,0.3)" stroke-width="0.7" x1="138" y1="100" x2="162" y2="100"/>
+      <line stroke="rgba(110,231,183,0.3)" stroke-width="0.7" x1="100" y1="38" x2="100" y2="62"/>
+      <line stroke="rgba(110,231,183,0.3)" stroke-width="0.7" x1="100" y1="138" x2="100" y2="162"/>
+      <!-- Corner brackets -->
+      <path d="M52 68 L52 52 L68 52" fill="none" stroke="#6EE7B7" stroke-width="1.4" opacity="0.55"/>
+      <path d="M148 68 L148 52 L132 52" fill="none" stroke="#6EE7B7" stroke-width="1.4" opacity="0.55"/>
+      <path d="M52 132 L52 148 L68 148" fill="none" stroke="#6EE7B7" stroke-width="1.4" opacity="0.55"/>
+      <path d="M148 132 L148 148 L132 148" fill="none" stroke="#6EE7B7" stroke-width="1.4" opacity="0.55"/>
+      <!-- Inner ring + orbital -->
+      <circle class="nim-ring nim-r-inner" cx="100" cy="100" r="45"/>
+      <circle class="nim-orbital" cx="100" cy="10" r="2.2"/>
       <!-- Core -->
-      <circle class="nim-core-glow" cx="110" cy="110" r="25"/>
-      <circle class="nim-core" cx="110" cy="110" r="16"/>
-      <polygon class="nim-hex" points="110,97 121,103.5 121,116.5 110,123 99,116.5 99,103.5"/>
-      <circle cx="110" cy="110" r="2.5" fill="#67E8F9" style="filter:drop-shadow(0 0 5px #67E8F9)"/>
+      <circle class="nim-core-glow" cx="100" cy="100" r="22"/>
+      <circle class="nim-core" cx="100" cy="100" r="14"/>
+      <polygon class="nim-hex" points="100,88 110,94 110,106 100,112 90,106 90,94"/>
+      <circle cx="100" cy="100" r="2.2" fill="#67E8F9"/>
     </svg>
   </div>
 
-  <!-- Scan bar — sweeps across like a document scanner -->
-  <div style="width:min(300px,75vw);height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;position:relative">
-    <div id="nimScanBar" style="position:absolute;top:0;left:-40%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(110,231,183,0.8),rgba(103,232,249,1),rgba(110,231,183,0.8),transparent);border-radius:2px;animation:nimScanBarSlide 0.6s ease-in-out 3"></div>
-  </div>
-
   <div class="nim-status" id="nimStatus">SCANNING…</div>
-  <div class="nim-title-display" id="nimTitleDisplay"></div>
+  <div class="nim-title" id="nimTitleDisplay"></div>
   <div class="nim-footer" id="nimFooter">ENCRYPTED · SAVED · INDEXED</div>
 </div>
 
@@ -546,75 +548,59 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     const statusEl = document.getElementById('nimStatus');
     const footerEl = document.getElementById('nimFooter');
     const arc      = document.getElementById('nimProgressArc');
-    const leftEl   = document.getElementById('nimDataLeft');
-    const rightEl  = document.getElementById('nimDataRight');
 
-    // Reset state
-    overlay.classList.remove('exiting');
+    // Reset — remove classes, reset arc, clear text states
+    overlay.classList.remove('exiting', 'show');
     titleEl.classList.remove('show'); footerEl.classList.remove('show');
-    titleEl.textContent = title.length > 40 ? title.slice(0, 38) + '…' : title;
+    titleEl.textContent = title.length > 36 ? title.slice(0, 34) + '…' : title;
     statusEl.textContent = 'SCANNING…';
     arc.style.transition = 'none';
-    arc.style.strokeDashoffset = '670';
+    arc.style.strokeDashoffset = '610'; // matches CSS stroke-dasharray: 610
 
-    // Generate tick marks around the ring
+    // Generate tick marks once (32 marks around the ring at r=97)
     const ticksG = document.getElementById('nimTicks');
     if (!ticksG.children.length) {
       for (let i = 0; i < 32; i++) {
-        const a = (i / 32) * Math.PI * 2;
-        const rInner = i % 4 === 0 ? 104 : 102;
+        const a = (i / 32) * Math.PI * 2, cx = 100, cy = 100;
+        const rI = 93, rO = i % 4 === 0 ? 98 : 96;
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', 110 + Math.cos(a) * rInner); line.setAttribute('y1', 110 + Math.sin(a) * rInner);
-        line.setAttribute('x2', 110 + Math.cos(a) * 108);     line.setAttribute('y2', 110 + Math.sin(a) * 108);
+        line.setAttribute('x1', cx + Math.cos(a) * rI);
+        line.setAttribute('y1', cy + Math.sin(a) * rI);
+        line.setAttribute('x2', cx + Math.cos(a) * rO);
+        line.setAttribute('y2', cy + Math.sin(a) * rO);
         line.setAttribute('class', 'nim-tick');
         ticksG.appendChild(line);
       }
     }
 
-    // Live hex data stream — simulates reading the note's raw data
-    const HEX = '0123456789ABCDEF';
-    const rand16 = () => Array.from({length:4}, () => HEX[Math.floor(Math.random()*16)]).join('');
-    function genStream() { return Array.from({length:8}, () => '0x'+rand16()+' '+rand16()).join('\n'); }
-    leftEl.textContent = genStream(); rightEl.textContent = genStream();
-    const streamTimer = setInterval(() => {
-      const ll = leftEl.textContent.split('\n');
-      ll[Math.floor(Math.random()*ll.length)] = '0x'+rand16()+' '+rand16();
-      leftEl.textContent = ll.join('\n');
-      const rl = rightEl.textContent.split('\n');
-      rl[Math.floor(Math.random()*rl.length)] = '0x'+rand16()+' '+rand16();
-      rightEl.textContent = rl.join('\n');
-    }, 80);
+    // Show overlay (class triggers the CSS fade-in animation)
+    overlay.classList.add('show');
 
-    // Show the overlay
-    overlay.style.display = 'flex';
-
-    // After a brief scan delay, sweep the progress arc and lock on
+    // Sweep progress arc after a short scan pause
     setTimeout(() => {
-      arc.style.transition = 'stroke-dashoffset 0.65s cubic-bezier(0.25,0.8,0.25,1)';
-      arc.style.strokeDashoffset = '27'; // ~96% filled = acquisition complete
-    }, 120);
+      arc.style.transition = 'stroke-dashoffset 0.7s cubic-bezier(0.25,0.8,0.25,1)';
+      arc.style.strokeDashoffset = '24'; // ~96% filled
+    }, 130);
 
-    // Reveal title (the "target is locked")
+    // Lock on: flip status + reveal title
     setTimeout(() => {
       statusEl.textContent = '✓ NOTE ACQUIRED';
       titleEl.classList.add('show');
-    }, 650);
+    }, 660);
 
-    // Show the indexed/encrypted footer
-    setTimeout(() => { footerEl.classList.add('show'); }, 950);
+    // Footer
+    setTimeout(() => { footerEl.classList.add('show'); }, 960);
 
     // Dismiss
     setTimeout(() => {
-      clearInterval(streamTimer);
+      overlay.classList.remove('show');
       overlay.classList.add('exiting');
       setTimeout(() => {
-        overlay.style.display = 'none';
         overlay.classList.remove('exiting');
-        // Reset arc for next time
         arc.style.transition = 'none';
-        arc.style.strokeDashoffset = '670';
+        arc.style.strokeDashoffset = '610';
       }, 380);
-    }, 1800);
+    }, 1850);
   }
 
   render();
