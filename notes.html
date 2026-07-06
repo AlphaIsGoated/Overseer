@@ -99,10 +99,24 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       <input class="notes-search" id="notesSearch" type="text" placeholder="Search notes…" autocomplete="off">
       <button class="notes-new" id="notesNew" type="button">+ New note</button>
     </div>
+    <!-- Quick paste zone for Apple Notes — no export needed -->
+    <div id="applePasteZone" style="border:1.5px dashed rgba(110,231,183,0.25);border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:text;transition:border-color 0.15s">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:15px">🍎</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary)">Paste Apple Note</span>
+        <span style="font-size:10px;color:rgba(255,255,255,0.2);margin-left:auto">or drag &amp; drop text</span>
+      </div>
+      <textarea id="applePasteArea" placeholder="Open a note in Apple Notes → Cmd+A → Cmd+C → click here → Cmd+V" style="width:100%;min-height:60px;resize:none;background:transparent;border:none;color:var(--text-primary);font-family:inherit;font-size:13px;outline:none;line-height:1.5" rows="3"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <input id="applePasteTitle" type="text" placeholder="Note title (optional — defaults to first line)" style="flex:1;min-width:0;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:7px 10px;color:var(--text-primary);font-family:inherit;font-size:12.5px;outline:none">
+        <button id="applePasteImport" type="button" style="padding:7px 14px;border:0;border-radius:8px;background:linear-gradient(180deg,#fff,#e8e5dd);color:#0a0a0b;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">Import note</button>
+      </div>
+    </div>
+
     <div class="notes-import-row" id="notesImportRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="notes-import-btn" id="importAppleBtn" type="button" title="Import Apple Notes .txt export">🍎 Apple Notes</button>
-      <button class="notes-import-btn" id="importClaudeBtn" type="button" title="Import Claude conversations.json">💬 Claude</button>
-      <button class="notes-import-btn" id="importChatGPTBtn" type="button" title="Import ChatGPT conversations.json">🤖 ChatGPT</button>
+      <button class="notes-import-btn" id="importClaudeBtn" type="button" title="Import Claude conversations.json">💬 Claude export</button>
+      <button class="notes-import-btn" id="importChatGPTBtn" type="button" title="Import ChatGPT conversations.json">🤖 ChatGPT export</button>
+      <button class="notes-import-btn" id="importAppleBtn" type="button" title="Import Apple Notes .txt export (multiple files)">📁 Apple Notes files</button>
       <div id="importStatus" style="font-size:11px;color:#6BE3A4;align-self:center;padding-left:4px"></div>
     </div>
     <input type="file" id="importAppleFile" accept=".txt,.html,text/plain,text/html" multiple style="display:none">
@@ -258,6 +272,45 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     render();
     return added;
   }
+
+  // ---- Apple Notes quick paste (no export needed) ----
+  // The paste zone accepts text pasted or dragged directly from Apple Notes.
+  // User flow: open note → Cmd+A → Cmd+C → click textarea → Cmd+V → Import.
+  const pasteZone = $('applePasteZone');
+  const pasteArea = $('applePasteArea');
+  const pasteTitleInput = $('applePasteTitle');
+
+  // Highlight border when focused
+  pasteArea.addEventListener('focus', () => pasteZone.style.borderColor = 'rgba(110,231,183,0.6)');
+  pasteArea.addEventListener('blur', () => pasteZone.style.borderColor = 'rgba(110,231,183,0.25)');
+
+  // Drag-and-drop text from Apple Notes
+  pasteZone.addEventListener('dragover', (e) => { e.preventDefault(); pasteZone.style.borderColor = 'rgba(110,231,183,0.8)'; });
+  pasteZone.addEventListener('dragleave', () => pasteZone.style.borderColor = 'rgba(110,231,183,0.25)');
+  pasteZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    pasteZone.style.borderColor = 'rgba(110,231,183,0.25)';
+    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text');
+    if (text) pasteArea.value = text;
+  });
+
+  $('applePasteImport').addEventListener('click', () => {
+    const body = pasteArea.value.trim();
+    if (!body) { importStatus('Paste a note first.', false); return; }
+    // Use first non-empty line as title if no explicit title given
+    const firstLine = body.split('\n').find(l => l.trim()) || 'Apple Note';
+    const title = pasteTitleInput.value.trim() || firstLine.slice(0, 60);
+    const added = mergeNotes([{ title, body }]);
+    if (added) {
+      importStatus('Note imported ✓', true);
+      pasteArea.value = '';
+      pasteTitleInput.value = '';
+    } else {
+      importStatus('A note with that title already exists.', false);
+    }
+  });
+  // Also import on Enter in the title field
+  pasteTitleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('applePasteImport').click(); });
 
   // Apple Notes — supports .txt export (File → Export as Text)
   // Each file becomes one note; filename becomes the title.
