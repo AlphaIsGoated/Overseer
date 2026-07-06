@@ -24,7 +24,9 @@ import { requireAppSecret, rejectIfTooLarge } from './_lib/security.js';
 const APIFY_ACTOR = 'apify~google-search-scraper';
 
 async function runApify(apiToken, queries) {
-  const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apiToken}&timeout=55&maxItems=30`;
+  // maxTotalChargeUsd caps what Apify can charge per run — must be ≥ $0.50.
+  // Actual cost per search is typically a few cents; the cap just prevents surprises.
+  const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apiToken}&timeout=55&maxItems=30&maxTotalChargeUsd=1`;
   const r = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
