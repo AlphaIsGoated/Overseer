@@ -67,6 +67,8 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
 .opp-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
 .opp-company { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
 .opp-match { font-size: 11.5px; color: var(--text-secondary); margin-top: 5px; font-style: italic; }
+.opp-qual { font-size: 11px; color: var(--success); margin-top: 5px; line-height: 1.4; }
+.opp-qual::before { content: '✓ '; }
 .opp-apply-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #7DD3FC; text-decoration: none; font-weight: 600; margin-top: 8px; }
 .opp-apply-link:hover { text-decoration: underline; }
 .opp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -139,6 +141,15 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
       <button class="gm-ghost" id="srchDownload" type="button" style="display:none">⬇ Download master file</button>
     </div>
     <div class="search-status" id="srchStatus"></div>
+
+    <!-- Phase 1: dynamically-generated qualifying questions -->
+    <div id="srchQuestionsWrap" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.07)">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:10px">
+        A few more details to find the right matches
+      </div>
+      <div id="srchQuestions"></div>
+      <button class="gm-add" id="srchSearch" type="button" style="margin-top:10px">✦ Search with this profile</button>
+    </div>
   </div>
 
   <!-- Search results -->
@@ -232,6 +243,7 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
             <div class="opp-title">${escapeHtml(opp.title)}</div>
             <div class="opp-company">${escapeHtml(opp.company)}</div>
             <div class="opp-match">${escapeHtml(opp.matchReason || '')}</div>
+            ${opp.qualificationNotes ? `<div class="opp-qual">${escapeHtml(opp.qualificationNotes)}</div>` : ''}
             ${opp.url ? `<a class="opp-apply-link" href="${escapeHtml(opp.url)}" target="_blank" rel="noopener">🔗 View / Apply</a>` : ''}
             ${opp.recruiter ? `<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Contact: ${escapeHtml(opp.recruiter)}</div>` : ''}
             ${opp.howToApply ? `<div style="font-size:11px;color:var(--text-tertiary)">How to apply: ${escapeHtml(opp.howToApply)}</div>` : ''}
@@ -274,45 +286,104 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
     });
   }
 
+  // ---- Phase 1: fetch qualifying questions ----
+  let savedQuestions = [];
   $('srchGo').addEventListener('click', async () => {
-    if (!window.DASH_APIFY_ENABLED) {
-      setStatus('APIFY_API_TOKEN not set — add it to Vercel to enable search.', 'err');
-      return;
-    }
     const field = $('srchField').value.trim();
     if (!field) { setStatus('Enter a field/area first.', 'err'); return; }
-    const btn = $('srchGo');
-    btn.disabled = true;
-    btn.textContent = '⏳ Searching…';
-    setStatus('Searching the web and analyzing results with AI — this takes about 30-60 seconds…', 'running');
-
-    // Save resume context to localStorage for future use
     const rc = $('srchResume').value.trim();
     if (rc) localStorage.setItem(RESUME_KEY, rc);
+
+    const btn = $('srchGo');
+    btn.disabled = true; btn.textContent = '⏳ Analyzing your profile…';
+    setStatus('Figuring out what information we need to find the best matches…', 'running');
+    $('srchQuestionsWrap').style.display = 'none';
 
     try {
       const res = await fetch('/api/search-opportunities', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-        body: JSON.stringify({
-          type: searchType,
-          field,
-          university: $('srchUni').value.trim(),
-          location: $('srchLoc').value.trim(),
-          resumeContext: rc,
-        }),
+        body: JSON.stringify({ type: searchType, field, university: $('srchUni').value.trim(), location: $('srchLoc').value.trim(), resumeContext: rc }),
       });
       if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
       const data = await res.json();
       if (!res.ok || data.error) { setStatus('Error: ' + (data.error || 'Something went wrong.'), 'err'); return; }
-      foundOpps = (data.opportunities || []);
-      setStatus('Found ' + foundOpps.length + ' opportunities, ranked by resume fit.', 'done');
+
+      if (data.needsInfo && data.questions && data.questions.length) {
+        // Phase 1 result — show questions
+        savedQuestions = data.questions;
+        renderQuestions(data.questions);
+        $('srchQuestionsWrap').style.display = 'block';
+        setStatus('Answer these questions so we can find opportunities that match your actual qualifications.', '');
+      } else if (data.opportunities) {
+        // Skipped directly to results (no questions needed)
+        foundOpps = data.opportunities || [];
+        setStatus('Found ' + foundOpps.length + ' qualified opportunities.', 'done');
+        renderFoundOpps();
+      }
+    } catch (e) {
+      setStatus('Could not reach the search service: ' + e.message, 'err');
+    }
+    btn.disabled = false; btn.textContent = '🔍 Find opportunities';
+  });
+
+  // ---- Render the qualifying questions dynamically ----
+  function renderQuestions(questions) {
+    const wrap = $('srchQuestions');
+    wrap.innerHTML = questions.map(q => {
+      const reason = q.reason ? `<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${escapeHtml(q.reason)}</div>` : '';
+      if (q.type === 'select' && q.options) {
+        const opts = q.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+        return `<div style="margin-bottom:10px"><label class="field-label" style="font-size:10px">${escapeHtml(q.question)}</label>${reason}<select class="gm-select" id="q_${q.id}" style="width:100%;margin-top:4px"><option value="">Select…</option>${opts}</select></div>`;
+      }
+      if (q.type === 'boolean') {
+        return `<div style="margin-bottom:10px"><label class="field-label" style="font-size:10px">${escapeHtml(q.question)}</label>${reason}<div style="display:flex;gap:8px;margin-top:4px">${(q.options||['Yes','No']).map(o=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="q_${q.id}" value="${escapeHtml(o)}"> ${escapeHtml(o)}</label>`).join('')}</div></div>`;
+      }
+      // text or number
+      return `<div style="margin-bottom:10px"><label class="field-label" style="font-size:10px">${escapeHtml(q.question)}</label>${reason}<input class="gm-input" id="q_${q.id}" type="${q.type||'text'}" placeholder="${escapeHtml(q.placeholder||'')}" style="margin-top:4px;margin-bottom:0"></div>`;
+    }).join('');
+  }
+
+  // ---- Phase 2: run search with answers ----
+  $('srchSearch').addEventListener('click', async () => {
+    const field = $('srchField').value.trim();
+    const rc = $('srchResume').value.trim();
+    // Collect answers
+    const additionalInfo = {};
+    savedQuestions.forEach(q => {
+      if (q.type === 'boolean') {
+        const sel = document.querySelector(`input[name="q_${q.id}"]:checked`);
+        if (sel) additionalInfo[q.question] = sel.value;
+      } else if (q.type === 'select') {
+        const el = $('q_' + q.id);
+        if (el && el.value) additionalInfo[q.question] = el.value;
+      } else {
+        const el = $('q_' + q.id);
+        if (el && el.value.trim()) additionalInfo[q.question] = el.value.trim();
+      }
+    });
+
+    const searchBtn = $('srchSearch');
+    searchBtn.disabled = true; searchBtn.textContent = '⏳ Searching…';
+    setStatus('Finding opportunities matched to your qualifications — this takes about 30-60 seconds…', 'running');
+
+    try {
+      const res = await fetch('/api/search-opportunities', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ type: searchType, field, university: $('srchUni').value.trim(), location: $('srchLoc').value.trim(), resumeContext: rc, additionalInfo }),
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'internship');
+      const data = await res.json();
+      if (!res.ok || data.error) { setStatus('Error: ' + (data.error || 'Something went wrong.'), 'err'); return; }
+      foundOpps = data.opportunities || [];
+      $('srchQuestionsWrap').style.display = 'none';
+      setStatus('Found ' + foundOpps.length + ' opportunities matched to your qualifications.', 'done');
       renderFoundOpps();
     } catch (e) {
       setStatus('Could not reach the search service: ' + e.message, 'err');
     }
-    btn.disabled = false;
-    btn.textContent = '🔍 Find opportunities';
+    searchBtn.disabled = false; searchBtn.textContent = '✦ Search with this profile';
   });
 
   // ---- Download master file ----
@@ -324,6 +395,7 @@ textarea.gm-input { resize: vertical; min-height: 100px; line-height: 1.5; margi
       `Recruiter: ${opp.recruiter || 'N/A'}`,
       `How to apply: ${opp.howToApply || 'N/A'}`,
       `Match reason: ${opp.matchReason || ''}`,
+      opp.qualificationNotes ? `Qualification match: ${opp.qualificationNotes}` : '',
       appliedSet[opp.id] ? '[ APPLIED ]' : '[ NOT YET APPLIED ]',
       '',
       'EMAIL DRAFT:',
