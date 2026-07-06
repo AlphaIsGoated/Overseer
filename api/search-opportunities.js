@@ -43,15 +43,23 @@ async function runApify(apiToken, queries) {
   return Array.isArray(items) ? items.filter(i => i.title && i.url) : [];
 }
 
-const CLAUDE_SYSTEM = `You are a career advisor analyzing job search results for a student seeking opportunities.
-Given a list of Google search results and the student's resume/background, your task is:
-1. Identify which results are actual opportunities (positions, programs, labs, postings) — skip news articles, general info pages, etc.
-2. For each real opportunity, extract: company/institution, role title, application URL, any visible recruiter or contact info, and how to apply.
-3. Score each for resume fit (0-10) based on the student's background.
-4. Draft a concise, personalized outreach email for each (3 short paragraphs max).
-5. Return the top 6 opportunities sorted by fit score.
+const CLAUDE_SYSTEM = `You are a career advisor extracting internship and research opportunities from Google search results.
 
-Return ONLY a valid JSON object in this exact format (no markdown):
+IMPORTANT: Be INCLUSIVE, not exclusive. If a URL looks like it COULD lead to a job listing, company careers page, lab opening, or research program — include it. It is far better to include something uncertain than to miss a real opportunity.
+
+Include any result where the URL or title contains words like: jobs, careers, intern, research, position, apply, opening, lab, professor, program, fellowship, hire, recruiting, opportunity.
+
+For each result you include:
+- Use the title from the search result as the role title (make it specific if possible)
+- Use the domain name as the company if nothing else is available
+- Set howToApply to "Visit the link to apply" if no other info is visible
+- Set recruiter to empty string if not visible
+- Score fit 5-8 by default unless clearly irrelevant to the field
+- Write a short 3-paragraph outreach email
+
+Only skip a result if it is CLEARLY a news article, Wikipedia page, Reddit post, or generic career advice article with no specific opening.
+
+Return ONLY valid JSON (no markdown code blocks):
 {
   "opportunities": [
     {
@@ -60,9 +68,9 @@ Return ONLY a valid JSON object in this exact format (no markdown):
       "company": "Company or institution name",
       "description": "What the role is (2-3 sentences from the search result)",
       "url": "https://...",
-      "recruiter": "Name or email if visible, else empty string",
-      "howToApply": "Brief instructions (portal link, email address, etc.)",
-      "matchScore": 8,
+      "recruiter": "",
+      "howToApply": "Visit the link to apply",
+      "matchScore": 7,
       "matchReason": "Why this fits the student's background",
       "draftEmail": "Subject: ...\\n\\nDear Hiring Team,\\n\\n[body]\\n\\nBest,\\n[Student Name]"
     }
@@ -92,19 +100,24 @@ export default async function handler(req, res) {
   if (!apifyToken) return res.status(500).json({ error: 'APIFY_API_TOKEN not configured — add it to Vercel env vars' });
   if (!anthropicKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-  // Build targeted search queries
+  // Build targeted queries that hit actual job boards and career pages,
+  // not generic career-advice articles. site: operators force results
+  // from domains that host real postings.
   const year = new Date().getFullYear();
   const queries = [];
   if (type === 'research') {
-    const uni = university || 'top universities';
-    queries.push(`undergraduate research opportunities ${field} ${uni} ${year}`);
-    queries.push(`research assistant position ${field} ${uni} application`);
-    queries.push(`summer research program ${field} ${uni} students apply`);
+    const uni = university || '';
+    const uniStr = uni ? ` ${uni}` : '';
+    queries.push(`site:linkedin.com/jobs "${field}" research intern${uniStr}`);
+    queries.push(`${field} undergraduate research position${uniStr} apply ${year} site:edu OR site:org`);
+    queries.push(`"research assistant" "${field}"${uniStr} opening ${year}`);
+    queries.push(`${field} REU program ${year} apply site:nsf.gov OR site:edu`);
   } else {
-    const loc = location || 'remote United States';
-    queries.push(`${field} internship ${year} apply now ${loc}`);
-    queries.push(`${field} summer internship undergraduate ${year} application`);
-    queries.push(`${field} internship program students ${year} apply`);
+    const loc = location ? ` ${location}` : '';
+    queries.push(`site:linkedin.com/jobs "${field}" intern${loc}`);
+    queries.push(`site:indeed.com "${field}" internship${loc} ${year}`);
+    queries.push(`"${field}" internship ${year} apply site:careers OR site:jobs OR site:lever.co OR site:greenhouse.io`);
+    queries.push(`${field} summer internship undergraduate ${year}${loc} -reddit -quora -glassdoor`);
   }
 
   let searchResults = [];
