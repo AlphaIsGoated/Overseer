@@ -1406,38 +1406,49 @@ body::after {
     resize2();
     window.addEventListener('resize', resize2);
 
-    const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so']);
-    function keywords(text) { return new Set((text||'').toLowerCase().match(/\b[a-z]{4,}\b/g)?.filter(w=>!STOPWORDS.has(w))||[]); }
+    // This graph is purely decorative — it doesn't need all 300 notes.
+    // Cap at 40 nodes (pinned first, then most recent) so O(N²) ops stay
+    // at ~800 pairs instead of 44,850. Edge threshold raised to 2 so we
+    // don't get a hairball. Loop stops after settling; no wasted CPU.
+    const BG_MAX = 40;
+    const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so','just','like','know','think','want','need','make','using','used','also','very','more','some','when','they','them']);
+    function keywords(text) { return new Set((text||'').toLowerCase().match(/\b[a-z]{5,}\b/g)?.filter(w=>!STOPWORDS.has(w)).slice(0,40)||[]); }
 
     function loadNodes() {
       try {
-        const notes = JSON.parse(localStorage.getItem('notes:items')) || [];
-        const obsNotes = JSON.parse(localStorage.getItem('brain:obs_notes')) || [];
-        const all = notes.map(n => ({ label: n.title||'', body: n.body||'', src: 0 }))
-          .concat(obsNotes.map(n => ({ label: n.path.replace(/\.md$/,'').split('/').pop(), body: n.body||'', src: 1 })));
-        return all;
+        const raw = JSON.parse(localStorage.getItem('notes:items')) || [];
+        const pinned   = raw.filter(n => n.pinned);
+        const unpinned = raw.filter(n => !n.pinned).sort((a,b) => (b.updatedAt||0)-(a.updatedAt||0));
+        const selected = [...pinned, ...unpinned].slice(0, BG_MAX);
+        const obsRaw   = JSON.parse(localStorage.getItem('brain:obs_notes')) || [];
+        return selected.map(n => ({ label: n.title||'', body: (n.body||'').slice(0,300), src: 0 }))
+          .concat(obsRaw.slice(0,10).map(n => ({ label: n.path.replace(/\.md$/,'').split('/').pop(), body: (n.body||'').slice(0,300), src: 1 })));
       } catch(e) { return []; }
     }
 
-    let nodes = [], edges = [], px = [], py = [], vx = [], vy = [], settled = false, bgTick = 0;
+    let nodes = [], edges = [], px = [], py = [], vx = [], vy = [], bgTick = 0, bgSettled = false, bgRunning = false;
     function rebuild2() {
       nodes = loadNodes();
       const n = nodes.length;
       if (!n) return;
       const kws = nodes.map(nd => keywords(nd.label + ' ' + nd.body));
       edges = [];
+      const edgeCnt = new Int32Array(n);
       for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
-        const shared = [...kws[i]].filter(w=>kws[j].has(w));
-        if (shared.length >= 1) edges.push({ a: i, b: j, w: Math.min(shared.length, 5) });
+        if (edgeCnt[i] >= 5 || edgeCnt[j] >= 5) continue;
+        let shared = 0;
+        for (const w of kws[i]) { if (kws[j].has(w) && ++shared >= 2) break; }
+        if (shared >= 2) { edges.push({ a: i, b: j, w: 2 }); edgeCnt[i]++; edgeCnt[j]++; }
       }
       px = nodes.map(() => W * 0.1 + Math.random() * W * 0.8);
       py = nodes.map(() => H * 0.1 + Math.random() * H * 0.8);
       vx = new Array(n).fill(0); vy = new Array(n).fill(0);
-      settled = false; bgTick = 0;
+      bgTick = 0; bgSettled = false;
+      if (!bgRunning) startLoop2();
     }
     function tick2() {
       const n = nodes.length;
-      const fx = new Array(n).fill(0), fy = new Array(n).fill(0);
+      const fx = new Float64Array(n), fy = new Float64Array(n);
       const K = 4000, L = Math.min(W, H) / (Math.sqrt(n) + 0.5) * 2.2, G = 0.006;
       const cx2 = W * 0.5, cy2 = H * 0.48;
       for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
@@ -1464,23 +1475,27 @@ body::after {
       if (!nodes.length) return;
       edges.forEach(e => {
         ctx2.beginPath(); ctx2.moveTo(px[e.a], py[e.a]); ctx2.lineTo(px[e.b], py[e.b]);
-        ctx2.strokeStyle = e.w >= 3 ? 'rgba(103,232,249,0.18)' : 'rgba(110,231,183,0.07)';
-        ctx2.lineWidth = e.w >= 3 ? 1.2 : 0.6; ctx2.stroke();
+        ctx2.strokeStyle = 'rgba(110,231,183,0.07)'; ctx2.lineWidth = 0.6; ctx2.stroke();
       });
       nodes.forEach((nd, i) => {
-        const r = 5;
         const col = nd.src === 1 ? [167,139,250] : [110,231,183];
-        ctx2.beginPath(); ctx2.arc(px[i], py[i], r+6, 0, Math.PI*2);
-        ctx2.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.08)`; ctx2.fill();
-        ctx2.beginPath(); ctx2.arc(px[i], py[i], r, 0, Math.PI*2);
+        ctx2.beginPath(); ctx2.arc(px[i], py[i], 5, 0, Math.PI*2);
         ctx2.fillStyle = '#020304'; ctx2.fill();
-        ctx2.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},0.5)`; ctx2.lineWidth = 1; ctx2.stroke();
+        ctx2.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},0.4)`; ctx2.lineWidth = 1; ctx2.stroke();
       });
     }
-    function loop2() { if (nodes.length) tick2(); draw2(); requestAnimationFrame(loop2); }
-    rebuild2();
-    loop2();
-    window.addEventListener('storage', (e) => { if (e.key==='notes:items'||e.key==='brain:obs_notes') rebuild2(); });
+    function startLoop2() {
+      bgRunning = true;
+      function frame() {
+        if (!bgSettled) { tick2(); if (bgTick >= 180) { bgSettled = true; bgRunning = false; draw2(); return; } }
+        draw2();
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+    // Defer rebuild until after the JARVIS animation has had time to start
+    setTimeout(() => { rebuild2(); }, 800);
+    window.addEventListener('storage', (e) => { if (e.key==='notes:items'||e.key==='brain:obs_notes') setTimeout(rebuild2, 800); });
   })();
 })();
 </script>
