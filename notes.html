@@ -467,47 +467,63 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   // ── Main render ───────────────────────────────────────────────
   function render() {
-    const q = $('notesSearch').value.trim().toLowerCase();
-    let items = load();
-
-    // Folder filter
-    if (activeFolder !== null) items = items.filter(n => n.category === activeFolder);
-
-    // Search filter
-    if (q) items = items.filter(n => (n.title || '').toLowerCase().includes(q) || (n.body || '').toLowerCase().includes(q));
-
-    // Sort
-    items.sort((a, b) => {
-      if (b.pinned !== a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
-      if (sortMode === 'created') return (b.createdAt || b.updatedAt) - (a.createdAt || a.updatedAt);
-      if (sortMode === 'az')      return (a.title || '').localeCompare(b.title || '');
-      return b.updatedAt - a.updatedAt; // 'edited' default
-    });
-
     const list = $('notesList');
-    if (!items.length) {
-      list.innerHTML = '<div class=”empty-state”>' + (q ? 'No notes match “' + escapeHtml(q) + '”.' : activeFolder ? 'No notes in this folder yet.' : 'No notes yet — tap “+ New note” to start.') + '</div>';
-      return;
+    if (!list) return; // safety guard
+
+    try {
+      const q = ($('notesSearch') || {}).value ? $('notesSearch').value.trim().toLowerCase() : '';
+      let items = load();
+
+      // Cache categories once per render — getCat was calling loadCats() per note
+      const cats = loadCats();
+      const catById = {};
+      cats.forEach(c => { catById[c.id] = c; });
+
+      // Folder filter
+      if (activeFolder !== null) items = items.filter(n => n.category === activeFolder);
+
+      // Search filter — only check title for performance with large notes
+      if (q) items = items.filter(n =>
+        (n.title || '').toLowerCase().includes(q) ||
+        (n.body || '').slice(0, 500).toLowerCase().includes(q)
+      );
+
+      // Sort
+      items.sort((a, b) => {
+        if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+        if (sortMode === 'created') return (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
+        if (sortMode === 'az')      return (a.title || '').localeCompare(b.title || '');
+        return (b.updatedAt || 0) - (a.updatedAt || 0);
+      });
+
+      if (!items.length) {
+        list.innerHTML = '<div class=”empty-state”>' + (q ? 'No notes match “' + escapeHtml(q) + '”.' : activeFolder ? 'No notes in this folder yet.' : 'No notes yet — tap “+ New note” to start.') + '</div>';
+        return;
+      }
+
+      const html = items.map(n => {
+        const cat = n.category ? catById[n.category] : null;
+        const catPill = cat
+          ? '<span class=”note-cat-pill” style=”background:' + escapeHtml(cat.color) + '22;color:' + escapeHtml(cat.color) + '”><span class=”note-cat-dot” style=”background:' + escapeHtml(cat.color) + '”></span>' + escapeHtml(cat.name) + '</span>'
+          : '';
+        const ts = sortMode === 'created' ? (n.createdAt || n.updatedAt || 0) : (n.updatedAt || 0);
+        const meta = (ts ? fmtDate(ts) : '—');
+        const prefix = sortMode === 'created' ? 'Created ' : 'Edited ';
+        return '<div class=”note-card' + (n.pinned ? ' pinned' : '') + '” data-id=”' + escapeHtml(String(n.id)) + '”>' +
+          '<div class=”note-row-top”><div class=”note-title”>' + escapeHtml(n.title || '') + '</div>' +
+            (n.pinned ? '<span class=”note-pin on”>📌</span>' : '') +
+          '</div>' +
+          '<div class=”note-snippet”>' + escapeHtml((n.body || '').slice(0, 160)) + '</div>' +
+          '<div class=”note-meta-row”><span class=”note-meta”>' + prefix + meta + '</span>' + catPill + '</div>' +
+        '</div>';
+      }).join('');
+
+      list.innerHTML = html;
+      list.querySelectorAll('.note-card').forEach(c => c.addEventListener('click', () => openNote(c.dataset.id)));
+    } catch (err) {
+      console.error('[Notes] render() failed:', err);
+      list.innerHTML = '<div class=”empty-state”>Error loading notes — check console.</div>';
     }
-
-    list.innerHTML = items.map(n => {
-      const cat = n.category ? getCat(n.category) : null;
-      const catPill = cat
-        ? `<span class=”note-cat-pill” style=”background:${cat.color}20;color:${cat.color}”><span class=”note-cat-dot” style=”background:${cat.color}”></span>${escapeHtml(cat.name)}</span>`
-        : '';
-      const sortMeta = sortMode === 'created'
-        ? 'Created ' + fmtDate(n.createdAt || n.updatedAt)
-        : 'Edited ' + fmtDate(n.updatedAt);
-      return '<div class=”note-card' + (n.pinned ? ' pinned' : '') + '” data-id=”' + escapeHtml(n.id) + '”>' +
-        '<div class=”note-row-top”><div class=”note-title”>' + escapeHtml(n.title || '') + '</div>' +
-          (n.pinned ? '<span class=”note-pin on”>📌</span>' : '') +
-        '</div>' +
-        '<div class=”note-snippet”>' + escapeHtml((n.body || '').slice(0, 200)) + '</div>' +
-        '<div class=”note-meta-row”><span class=”note-meta”>' + sortMeta + '</span>' + catPill + '</div>' +
-      '</div>';
-    }).join('');
-
-    list.querySelectorAll('.note-card').forEach(c => c.addEventListener('click', () => openNote(c.dataset.id)));
   }
 
   // ── Note modal ────────────────────────────────────────────────
@@ -952,20 +968,20 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     }, 1850);
   }
 
-  // Backfill createdAt on any existing notes that predate this feature.
-  // Defer to avoid blocking the initial page paint (especially with 300+ notes).
-  setTimeout(() => {
-    const items = load();
-    let dirty = false;
-    items.forEach(n => { if (!n.createdAt) { n.createdAt = n.updatedAt || Date.now(); dirty = true; } });
-    if (dirty) save(items);
-  }, 300);
+  // Backfill createdAt on existing notes in the background after first render
+  function backfillCreatedAt() {
+    try {
+      const items = load();
+      let dirty = false;
+      items.forEach(n => { if (!n.createdAt) { n.createdAt = n.updatedAt || Date.now(); dirty = true; } });
+      if (dirty) save(items);
+    } catch (e) {}
+  }
 
-  // Defer first render one frame so the page paints before processing notes
-  requestAnimationFrame(() => {
-    renderFolders();
-    render();
-  });
+  // Render immediately — no rAF deferral (silent failures inside rAF are hard to debug)
+  renderFolders();
+  render();
+  setTimeout(backfillCreatedAt, 500);
 
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY, CAT_KEY], onApplied: () => { renderFolders(); render(); } });

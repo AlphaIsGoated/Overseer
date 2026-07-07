@@ -915,15 +915,23 @@ body.topbar-modal-open {
         const vapidPublicKey = window.DASH_VAPID_PUBLIC_KEY;
         if (!vapidPublicKey || Notification.permission !== 'granted') return;
         reg.pushManager.getSubscription().then((existing) => {
-          if (existing) return; // already subscribed on this device
-          reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) }).then((sub) => {
-            fetch('/api/push-subscribe', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-              body: JSON.stringify({ subscription: sub.toJSON() }),
-            }).catch(() => {});
-          }).catch(() => {});
+          // Always re-save the subscription on page load to handle the case
+          // where the server's subscription record was lost or expired.
+          const sub = existing;
+          if (!sub) {
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) })
+              .then(newSub => savePushSub(newSub)).catch(() => {});
+          }
+          savePushSub(sub);
         });
+      }).catch(() => {});
+    }
+
+    function savePushSub(sub) {
+      fetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
       }).catch(() => {});
     }
   }

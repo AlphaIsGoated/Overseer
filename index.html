@@ -930,7 +930,11 @@ body::after {
         Sends a daily reminder at 9 am ET so you remember to check in. Only works when the app is added to your home screen.
       </div>
       <div id="pushStatus" style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">—</div>
-      <button class="whoop-btn" id="pushEnableBtn" type="button">Enable notifications</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="whoop-btn" id="pushEnableBtn" type="button">Enable notifications</button>
+        <button class="whoop-btn" id="pushTestBtn" type="button" style="background:rgba(255,255,255,0.04)">Send test</button>
+      </div>
+      <div id="pushTestStatus" style="font-size:11px;margin-top:6px;display:none"></div>
     </div>
   </div>
 </div>
@@ -1270,11 +1274,33 @@ body::after {
     btn.disabled = true; btn.textContent = 'Setting up…';
     try {
       if (window.requestPushPermission) await window.requestPushPermission();
+      $('pushStatus').textContent = 'Subscribed ✓';
     } catch (e) {
       $('pushStatus').textContent = e.message || 'Could not enable notifications.';
     }
-    btn.disabled = false; btn.textContent = 'Enable notifications';
+    btn.disabled = false; btn.textContent = 'Re-subscribe';
     renderPushStatus();
+  });
+
+  $('pushTestBtn').addEventListener('click', async () => {
+    const st = $('pushTestStatus');
+    st.style.display = 'block'; st.style.color = 'var(--text-tertiary)'; st.textContent = 'Sending test notification…';
+    try {
+      const r = await fetch('/api/push-send?type=morning&cron=1', {
+        headers: { 'X-App-Secret': window.DASH_APP_SECRET || '' },
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.sent > 0) {
+        st.style.color = '#6BE3A4'; st.textContent = '✓ Sent to ' + d.sent + ' device' + (d.sent > 1 ? 's' : '') + ' — check your notifications.';
+      } else if (d.message === 'no subscriptions') {
+        st.style.color = '#F2C063'; st.textContent = 'No subscriptions found — tap "Re-subscribe" first, then try again.';
+      } else {
+        st.style.color = '#FF8A8A'; st.textContent = d.error || ('Sent: ' + d.sent + ', Failed: ' + d.failed);
+      }
+    } catch (e) {
+      st.style.color = '#FF8A8A'; st.textContent = 'Error: ' + e.message;
+    }
+    setTimeout(() => { st.style.display = 'none'; }, 6000);
   });
 
   // Re-populate the settings form if a remote profile change (cloud sync,
