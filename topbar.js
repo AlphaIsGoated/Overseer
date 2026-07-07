@@ -916,7 +916,7 @@ body.topbar-modal-open {
         if (!vapidPublicKey || Notification.permission !== 'granted') return;
         reg.pushManager.getSubscription().then((existing) => {
           if (existing) return; // already subscribed on this device
-          reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidPublicKey }).then((sub) => {
+          reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) }).then((sub) => {
             fetch('/api/push-subscribe', {
               method: 'POST',
               headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
@@ -955,6 +955,18 @@ body.topbar-modal-open {
     try { return localStorage.getItem('settings:conservation_mode') === '1'; } catch (e) { return false; }
   };
 
+  // Converts a VAPID base64url public key string to the Uint8Array format
+  // required by pushManager.subscribe(). Without this, some browsers (older
+  // Chrome, Safari) silently reject the subscription with a DOMException.
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+
   window.requestPushPermission = function () {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       return Promise.reject(new Error('Push notifications not supported in this browser.'));
@@ -966,7 +978,7 @@ body.topbar-modal-open {
     return Notification.requestPermission().then((permission) => {
       if (permission !== 'granted') throw new Error('Permission denied.');
       return navigator.serviceWorker.ready;
-    }).then((reg) => reg.pushManager.getSubscription().then((existing) => existing || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidPublicKey })))
+    }).then((reg) => reg.pushManager.getSubscription().then((existing) => existing || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) })))
       .then((sub) => fetch('/api/push-subscribe', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },

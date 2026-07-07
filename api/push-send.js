@@ -40,103 +40,61 @@ async function buildPayload(type, supaUrl, supaKey) {
 
   switch (type) {
     case 'training': {
-      // Read marathon plan and find today's + tomorrow's workout
       const plan = await fetchModuleData(supaUrl, supaKey, 'marathon');
       const entries = (plan && plan.entries) || [];
       const todayEntry = entries.find(e => e.date === today);
       const tomorrowEntry = entries.find(e => e.date === tomorrow);
       if (todayEntry && todayEntry.type !== 'rest') {
         const dist = todayEntry.plannedDistanceMi ? ` (${todayEntry.plannedDistanceMi} mi)` : '';
-        return {
-          title: '🏃 Training · Marathon',
-          body: `Today: ${todayEntry.label || todayEntry.type}${dist}. ${todayEntry.completed ? 'Already marked done ✓' : 'Tap to log your run.'}`,
-          url: '/marathon.html',
-        };
+        return { tag: 'training', title: '🏃 Training · Marathon', body: `Today: ${todayEntry.label || todayEntry.type}${dist}. ${todayEntry.completed ? 'Already marked done ✓' : 'Tap to log your run.'}`, url: '/marathon.html' };
       }
       if (tomorrowEntry && tomorrowEntry.type !== 'rest') {
         const dist = tomorrowEntry.plannedDistanceMi ? ` (${tomorrowEntry.plannedDistanceMi} mi)` : '';
-        return {
-          title: '🏃 Training · Marathon',
-          body: `Tomorrow: ${tomorrowEntry.label || tomorrowEntry.type}${dist}. Plan your schedule accordingly.`,
-          url: '/marathon.html',
-        };
+        return { tag: 'training', title: '🏃 Training · Marathon', body: `Tomorrow: ${tomorrowEntry.label || tomorrowEntry.type}${dist}. Plan ahead.`, url: '/marathon.html' };
       }
-      return {
-        title: '💪 Training Reminder',
-        body: 'Check your Fitness and Marathon modules — stay consistent with your training.',
-        url: '/gym.html',
-      };
+      return { tag: 'training', title: '💪 Training Reminder', body: 'Stay consistent — check your Fitness and Marathon modules.', url: '/gym.html' };
     }
 
-    case 'nutrition': {
-      return {
-        title: '🥗 Nutrition · Log Check-in',
-        body: 'Have you logged your meals today? Track calories and macros in the Nutrition module to stay on target.',
-        url: '/nutrition.html',
-      };
-    }
+    case 'nutrition':
+      return { tag: 'nutrition', title: '🥗 Nutrition · Log Check-in', body: 'Have you logged meals today? Track calories and macros to stay on target.', url: '/nutrition.html' };
 
     case 'skincare': {
       const hour = new Date().getUTCHours();
       const isEvening = hour >= 20 || hour < 6;
-      return {
-        title: '🧖 Skincare · Routine Reminder',
-        body: isEvening
-          ? 'Time for your PM skincare routine. Open the app to check your evening steps.'
-          : 'Start the day right — complete your AM skincare routine.',
-        url: '/skincare.html',
-      };
+      return { tag: 'skincare', title: '🧖 Skincare · Routine Reminder', body: isEvening ? 'Time for your PM skincare routine.' : 'Start the day right — complete your AM skincare routine.', url: '/skincare.html' };
     }
 
     case 'reminders': {
-      // Check chores for any pending items
       const chores = await fetchModuleData(supaUrl, supaKey, 'chores');
       const items = (chores && (Array.isArray(chores) ? chores : chores['chores:items'])) || [];
       const pending = items.filter(c => {
         if (c.recurring === 'daily') return c.lastDoneKey !== today;
-        if (c.recurring === 'weekly') return true; // simplify
+        if (c.recurring === 'weekly') return true;
         return !c.done;
       });
       if (pending.length > 0) {
-        return {
-          title: '✅ Reminders · ' + pending.length + ' pending',
-          body: pending.length === 1
-            ? `"${pending[0].text}" is still on your list.`
-            : `${pending.length} tasks pending — "${pending[0].text}" and ${pending.length - 1} more.`,
-          url: '/chores.html',
-        };
+        return { tag: 'reminders', title: '✅ Reminders · ' + pending.length + ' pending', body: pending.length === 1 ? `"${pending[0].text}" is still on your list.` : `${pending.length} tasks pending — "${pending[0].text}" and ${pending.length - 1} more.`, url: '/chores.html' };
       }
-      return {
-        title: '✅ Reminders',
-        body: 'No overdue tasks today. Check your chores and goals to stay on track.',
-        url: '/chores.html',
-      };
+      return { tag: 'reminders', title: '✅ Reminders', body: 'No overdue tasks today. Keep up the streak!', url: '/chores.html' };
     }
 
     case 'morning':
     default: {
-      // Morning overview: check if there's a marathon workout today
       const plan = await fetchModuleData(supaUrl, supaKey, 'marathon');
       const todayRun = ((plan && plan.entries) || []).find(e => e.date === today && e.type !== 'rest');
       if (todayRun) {
         const dist = todayRun.plannedDistanceMi ? ` — ${todayRun.plannedDistanceMi} mi` : '';
-        return {
-          title: "Shrey's Dashboard · Good morning",
-          body: `Today: ${todayRun.label || todayRun.type}${dist}. Check your coach for a full day overview.`,
-          url: '/index.html',
-        };
+        return { tag: 'morning', title: "Shrey's Dashboard · Good morning", body: `Today: ${todayRun.label || todayRun.type}${dist}. Check your coach for the full overview.`, url: '/index.html' };
       }
-      return {
-        title: "Shrey's Dashboard · Good morning",
-        body: 'Your daily check-in is ready. Open the app to see your coach insights.',
-        url: '/index.html',
-      };
+      return { tag: 'morning', title: "Shrey's Dashboard · Good morning", body: 'Your daily check-in is ready. Open the app to see your coach insights.', url: '/index.html' };
     }
   }
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+  // Vercel Cron sends GET requests; manual triggers use POST.
+  // Both are valid — only enforce APP_SECRET for non-cron calls.
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
   const isCron = req.query && req.query.cron === '1';
   if (!isCron && !requireAppSecret(req, res)) return;
 

@@ -17,8 +17,8 @@ self.addEventListener('push', (e) => {
       body: payload.body,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: 'overseer-reminder',
-      renotify: false,
+      tag: payload.tag || 'overseer-' + (payload.type || 'general'),
+      renotify: true,
       data: { url: payload.url || '/' },
     })
   );
