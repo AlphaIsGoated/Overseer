@@ -423,7 +423,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   const CAT_COLORS = ['#6BE3A4','#7DD3FC','#F2C063','#FF8A8A','#C9B8FF','#67E8F9','#FCA5A5','#86EFAC'];
 
   // ── Helpers ───────────────────────────────────────────────────
-  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>”']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','”':'&quot;',”'”:'&#39;'}[c])); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtDate(ts) {
     const d = new Date(ts);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -437,14 +437,14 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     const countAll = items.length;
     const countFor = id => items.filter(n => n.category === id).length;
     const strip = $('notesFolders');
-    let html = `<button class=”folder-pill${activeFolder === null ? ' active' : ''}” data-folder=”__all__”>All <span class=”folder-count”>${countAll}</span></button>`;
+    let html = `<button class="folder-pill${activeFolder === null ? ' active' : ''}" data-folder="__all__">All <span class="folder-count">${countAll}</span></button>`;
     cats.forEach(c => {
       const n = countFor(c.id);
-      html += `<button class=”folder-pill${activeFolder === c.id ? ' active' : ''}” data-folder=”${escapeHtml(c.id)}”>
-        <span class=”folder-dot” style=”background:${escapeHtml(c.color)}”></span>${escapeHtml(c.name)}<span class=”folder-count”>${n}</span>
+      html += `<button class="folder-pill${activeFolder === c.id ? ' active' : ''}" data-folder="${escapeHtml(c.id)}">
+        <span class="folder-dot" style="background:${escapeHtml(c.color)}"></span>${escapeHtml(c.name)}<span class="folder-count">${n}</span>
       </button>`;
     });
-    html += `<button class=”folder-pill folder-pill-add” id=”folderManageBtn”>⊕ Manage</button>`;
+    html += `<button class="folder-pill folder-pill-add" id="folderManageBtn">⊕ Manage</button>`;
     strip.innerHTML = html;
     strip.querySelectorAll('.folder-pill[data-folder]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -497,24 +497,24 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       });
 
       if (!items.length) {
-        list.innerHTML = '<div class=”empty-state”>' + (q ? 'No notes match “' + escapeHtml(q) + '”.' : activeFolder ? 'No notes in this folder yet.' : 'No notes yet — tap “+ New note” to start.') + '</div>';
+        list.innerHTML = '<div class="empty-state">' + (q ? 'No notes match "' + escapeHtml(q) + '".' : activeFolder ? 'No notes in this folder yet.' : 'No notes yet — tap "+ New note" to start.') + '</div>';
         return;
       }
 
       const html = items.map(n => {
         const cat = n.category ? catById[n.category] : null;
         const catPill = cat
-          ? '<span class=”note-cat-pill” style=”background:' + escapeHtml(cat.color) + '22;color:' + escapeHtml(cat.color) + '”><span class=”note-cat-dot” style=”background:' + escapeHtml(cat.color) + '”></span>' + escapeHtml(cat.name) + '</span>'
+          ? '<span class="note-cat-pill" style="background:' + escapeHtml(cat.color) + '22;color:' + escapeHtml(cat.color) + '"><span class="note-cat-dot" style="background:' + escapeHtml(cat.color) + '"></span>' + escapeHtml(cat.name) + '</span>'
           : '';
         const ts = sortMode === 'created' ? (n.createdAt || n.updatedAt || 0) : (n.updatedAt || 0);
         const meta = (ts ? fmtDate(ts) : '—');
         const prefix = sortMode === 'created' ? 'Created ' : 'Edited ';
-        return '<div class=”note-card' + (n.pinned ? ' pinned' : '') + '” data-id=”' + escapeHtml(String(n.id)) + '”>' +
-          '<div class=”note-row-top”><div class=”note-title”>' + escapeHtml(n.title || '') + '</div>' +
-            (n.pinned ? '<span class=”note-pin on”>📌</span>' : '') +
+        return '<div class="note-card' + (n.pinned ? ' pinned' : '') + '" data-id="' + escapeHtml(String(n.id)) + '">' +
+          '<div class="note-row-top"><div class="note-title">' + escapeHtml(n.title || '') + '</div>' +
+            (n.pinned ? '<span class="note-pin on">📌</span>' : '') +
           '</div>' +
-          '<div class=”note-snippet”>' + escapeHtml((n.body || '').slice(0, 160)) + '</div>' +
-          '<div class=”note-meta-row”><span class=”note-meta”>' + prefix + meta + '</span>' + catPill + '</div>' +
+          '<div class="note-snippet">' + escapeHtml((n.body || '').slice(0, 160)) + '</div>' +
+          '<div class="note-meta-row"><span class="note-meta">' + prefix + meta + '</span>' + catPill + '</div>' +
         '</div>';
       }).join('');
 
@@ -522,7 +522,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       list.querySelectorAll('.note-card').forEach(c => c.addEventListener('click', () => openNote(c.dataset.id)));
     } catch (err) {
       console.error('[Notes] render() failed:', err);
-      list.innerHTML = '<div class=”empty-state”>Error loading notes — check console.</div>';
+      list.innerHTML = '<div class="empty-state">Error loading notes — check console.</div>';
     }
   }
 
@@ -532,11 +532,11 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     const n = items.find(x => x.id === activeId);
     if (!n) return;
     const cats = loadCats();
-    let html = '<span style=”font-size:11px;color:var(--text-tertiary);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;flex-shrink:0”>Folder</span>';
-    html += `<button class=”note-cat-btn note-cat-none${!n.category ? ' active' : ''}” data-catid=””>None</button>`;
+    let html = '<span style="font-size:11px;color:var(--text-tertiary);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;flex-shrink:0">Folder</span>';
+    html += `<button class="note-cat-btn note-cat-none${!n.category ? ' active' : ''}" data-catid="">None</button>`;
     cats.forEach(c => {
-      html += `<button class=”note-cat-btn${n.category === c.id ? ' active' : ''}” data-catid=”${escapeHtml(c.id)}” style=”${n.category === c.id ? 'background:' + c.color + '22;border-color:' + c.color + '55;color:' + c.color : ''}”>
-        <span class=”folder-dot” style=”background:${escapeHtml(c.color)};width:8px;height:8px;border-radius:50%;display:inline-block”></span>${escapeHtml(c.name)}
+      html += `<button class="note-cat-btn${n.category === c.id ? ' active' : ''}" data-catid="${escapeHtml(c.id)}" style="${n.category === c.id ? 'background:' + c.color + '22;border-color:' + c.color + '55;color:' + c.color : ''}">
+        <span class="folder-dot" style="background:${escapeHtml(c.color)};width:8px;height:8px;border-radius:50%;display:inline-block"></span>${escapeHtml(c.name)}
       </button>`;
     });
     const row = $('noteCatRow');
@@ -625,10 +625,10 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   function renderFolderList() {
     const list = $('folderList');
     list.innerHTML = draftCats.map((c, i) => `
-      <div class=”folder-edit-row” data-i=”${i}”>
-        <button class=”folder-color-btn” data-i=”${i}” style=”background:${escapeHtml(c.color)}” title=”Change color”></button>
-        <input type=”text” value=”${escapeHtml(c.name)}” placeholder=”Folder name” data-i=”${i}”>
-        <button class=”folder-del-btn” data-i=”${i}” title=”Delete folder”>×</button>
+      <div class="folder-edit-row" data-i="${i}">
+        <button class="folder-color-btn" data-i="${i}" style="background:${escapeHtml(c.color)}" title="Change color"></button>
+        <input type="text" value="${escapeHtml(c.name)}" placeholder="Folder name" data-i="${i}">
+        <button class="folder-del-btn" data-i="${i}" title="Delete folder">×</button>
       </div>`).join('');
 
     // Color pickers
@@ -697,7 +697,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
     // Prepare a compact note list for Claude (title + first 120 chars of body)
     const noteList = items.slice(0, 80).map((n, i) =>
-      `${i}: “${(n.title || 'Untitled').slice(0, 60)}” — ${(n.body || '').slice(0, 120).replace(/\n/g, ' ')}`
+      `${i}: "${(n.title || 'Untitled').slice(0, 60)}" — ${(n.body || '').slice(0, 120).replace(/\n/g, ' ')}`
     ).join('\n');
 
     try {
@@ -708,10 +708,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       });
 
       if (!res.ok) throw new Error('API error ' + res.status);
-      const data = await res.json();
-      const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim()
-        .replace(/^```json\s*/m,'').replace(/\s*```$/m,'');
-      const parsed = JSON.parse(text);
+      const parsed = await res.json(); // endpoint returns {folders, assignments} directly
 
       // Create the suggested folders (merge with existing, don't duplicate by name)
       const existing = loadCats();
