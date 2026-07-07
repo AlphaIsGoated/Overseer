@@ -952,16 +952,20 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     }, 1850);
   }
 
-  // Backfill createdAt on any existing notes that predate this feature
-  (function backfillCreatedAt() {
+  // Backfill createdAt on any existing notes that predate this feature.
+  // Defer to avoid blocking the initial page paint (especially with 300+ notes).
+  setTimeout(() => {
     const items = load();
     let dirty = false;
     items.forEach(n => { if (!n.createdAt) { n.createdAt = n.updatedAt || Date.now(); dirty = true; } });
     if (dirty) save(items);
-  })();
+  }, 300);
 
-  renderFolders();
-  render();
+  // Defer first render one frame so the page paints before processing notes
+  requestAnimationFrame(() => {
+    renderFolders();
+    render();
+  });
 
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY, CAT_KEY], onApplied: () => { renderFolders(); render(); } });

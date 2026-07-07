@@ -125,38 +125,62 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   if (creds.url) { document.getElementById('obsUrl').value = creds.url; }
   if (creds.key) { document.getElementById('obsKey').value = creds.key; }
 
+  // Cap: max nodes shown in the graph. With 300 notes the O(N²) simulation
+  // runs at ~90,000 ops/tick × 60 fps — unusable. At 75 nodes it's 5,625
+  // ops/tick — smooth. We prefer pinned + Obsidian notes + most recently
+  // edited so the most relevant content is always visible.
+  const MAX_NODES = 75;
+  let totalNoteCount = 0; // for the "X of Y" indicator
+
   // ---- Gather note data from both sources ----
   function gatherNodes() {
     const nodes = [];
-    // Overseer notes (from the Notes module's localStorage)
-    const overseers = loadJSON(NOTES_KEY, []);
-    overseers.forEach(n => {
-      nodes.push({ id: 'o_' + n.id, label: n.title || 'Untitled', body: n.body || '', source: 'overseer', pinned: n.pinned });
-    });
-    // Obsidian notes (cached metadata from last sync)
+
+    // Obsidian notes always included (usually ≤100, already capped in sync)
     const obsNotes = loadJSON(OBS_NOTES_KEY, []);
-    obsNotes.forEach(n => {
-      nodes.push({ id: 'obs_' + n.path, label: n.path.replace(/\.md$/, '').split('/').pop(), body: n.body || '', source: 'obsidian' });
+    obsNotes.slice(0, 40).forEach(n => {
+      nodes.push({ id: 'obs_' + n.path, label: n.path.replace(/\.md$/, '').split('/').pop(), body: (n.body || '').slice(0, 600), source: 'obsidian' });
     });
+
+    // Overseer notes — prefer pinned, then most recently edited
+    const overseers = loadJSON(NOTES_KEY, []);
+    totalNoteCount = overseers.length;
+    const remaining = MAX_NODES - nodes.length;
+    const pinned    = overseers.filter(n => n.pinned);
+    const unpinned  = overseers.filter(n => !n.pinned).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const selected  = [...pinned, ...unpinned].slice(0, remaining);
+    selected.forEach(n => {
+      // Truncate body to 400 chars — enough for keyword matching, avoids
+      // spending time tokenizing full ChatGPT conversation transcripts
+      nodes.push({ id: 'o_' + n.id, label: n.title || 'Untitled', body: (n.body || '').slice(0, 400), source: 'overseer', pinned: n.pinned });
+    });
+
     return nodes;
   }
 
-  // Build edges: connect notes that share meaningful words.
-  // This is a simple but effective approach — real graph software uses
-  // [[wikilinks]] for explicit connections, but keyword co-occurrence
-  // gives a reasonable approximation for notes that weren't explicitly linked.
+  // Build edges: require ≥2 shared keywords (threshold was 1 — that created
+  // an edge between almost every pair, resulting in thousands of edges and
+  // a dense hairball that's both slow to draw and visually meaningless).
+  // Also cap each node at 6 edges to prevent super-connected hub nodes.
   function buildEdges(nodes) {
-    const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so']);
+    const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so','just','like','know','think','want','need','make','using','used','also','very','more','some','when','they','them','then','than','your','you','can','will','what','which','how','why','where','get','got','into']);
     function keywords(text) {
-      return new Set((text || '').toLowerCase().match(/\b[a-z]{4,}\b/g)?.filter(w => !STOPWORDS.has(w)) || []);
+      return new Set((text || '').toLowerCase().match(/\b[a-z]{5,}\b/g)?.filter(w => !STOPWORDS.has(w)).slice(0, 60) || []);
     }
     const kws = nodes.map(n => keywords(n.label + ' ' + n.body));
     const edges = [];
+    const edgeCount = new Int32Array(nodes.length); // per-node edge count cap
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
-        const shared = [...kws[i]].filter(w => kws[j].has(w));
-        if (shared.length >= 1) {
-          edges.push({ a: i, b: j, weight: Math.min(shared.length, 5) });
+        if (edgeCount[i] >= 6 || edgeCount[j] >= 6) continue;
+        let shared = 0;
+        for (const w of kws[i]) { if (kws[j].has(w)) { shared++; if (shared >= 2) break; } }
+        if (shared >= 2) {
+          // Count full shared keywords for weight, but cap the loop
+          let fullShared = 0;
+          for (const w of kws[i]) { if (kws[j].has(w)) fullShared++; }
+          edges.push({ a: i, b: j, weight: Math.min(fullShared, 5) });
+          edgeCount[i]++; edgeCount[j]++;
         }
       }
     }
@@ -299,25 +323,71 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     ctx.restore();
   }
 
+  // Count indicator — shown when the node cap trims some notes
+  function updateCountIndicator() {
+    let el = document.getElementById('brainNodeCount');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'brainNodeCount';
+      el.style.cssText = 'position:absolute;top:10px;left:12px;font-size:10px;font-weight:700;letter-spacing:0.06em;color:rgba(110,231,183,0.45);pointer-events:none;text-transform:uppercase';
+      canvas.parentElement.appendChild(el);
+    }
+    if (totalNoteCount > nodes.length && nodes.length > 0) {
+      const overseerShown = nodes.filter(n => n.source === 'overseer').length;
+      el.textContent = overseerShown + ' of ' + totalNoteCount + ' notes shown';
+    } else {
+      el.textContent = '';
+    }
+  }
+
   function rebuild() {
     nodes = gatherNodes();
     edges = buildEdges(nodes);
     resize();
+    updateCountIndicator();
     if (!nodes.length) { draw(); return; }
     layout = createLayout(nodes, edges, W, H);
     tick = 0;
+    settled = false;
+    if (!animRunning) startAnimate();
   }
 
-  // Run layout + redraw at 60fps. Cooling slows the simulation after
-  // ~120 frames so it settles, then very slow "breathing" updates continue.
-  function animate() {
-    if (layout) {
-      const cooling = tick < 80 ? 1 : tick < 160 ? 0.4 : 0.05;
-      layout.tick(cooling);
-      tick++;
+  // ---- Animation loop with auto-settle --------------------------------
+  // Runs at 60 fps during the simulation (first ~220 ticks), then stops.
+  // Mouse events (hover, drag, zoom) request a single redraw via schedDraw()
+  // so the canvas stays responsive without a constant loop eating CPU.
+  let animRunning = false;
+  let settled     = false;
+  let rafId       = null;
+  let drawPending = false;
+
+  function startAnimate() {
+    if (animRunning) return;
+    animRunning = true;
+    function frame() {
+      if (layout && !settled) {
+        const cooling = tick < 80 ? 1 : tick < 160 ? 0.5 : 0.1;
+        layout.tick(cooling);
+        tick++;
+        if (tick >= 240) {
+          settled = true;
+          animRunning = false;
+          draw(); // final frame
+          return;  // stop the loop
+        }
+      }
+      draw();
+      rafId = requestAnimationFrame(frame);
     }
-    draw();
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(frame);
+  }
+
+  // Schedule a single redraw for interaction events (hover, drag, zoom)
+  function schedDraw() {
+    if (!drawPending) {
+      drawPending = true;
+      requestAnimationFrame(() => { drawPending = false; draw(); });
+    }
   }
 
   // ---- Mouse / touch interaction (with zoom-aware hit detection) ----
@@ -361,6 +431,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       hovered = getHitNode(ex, ey);
       canvas.style.cursor = hovered >= 0 ? 'pointer' : 'grab';
     }
+    if (settled) schedDraw();
   });
   canvas.addEventListener('mouseup', (e) => {
     isDragging = false;
@@ -383,10 +454,11 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     panX = ex - (ex - panX) * (newZoom / zoom);
     panY = ey - (ey - panY) * (newZoom / zoom);
     zoom = newZoom;
+    schedDraw();
   }, { passive: false });
 
   // Double-click: reset zoom/pan
-  canvas.addEventListener('dblclick', () => { zoom = 1; panX = 0; panY = 0; });
+  canvas.addEventListener('dblclick', () => { zoom = 1; panX = 0; panY = 0; schedDraw(); });
 
   // Touch: tap to select, drag to pan, pinch to zoom
   let touchStartX = 0, touchStartY = 0, touchMoved = false;
@@ -417,6 +489,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       panX += dx; panY += dy;
       touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
     }
+    if (settled) schedDraw();
   }, { passive: false });
   canvas.addEventListener('touchend', (e) => {
     if (!touchMoved && e.changedTouches.length === 1) {
@@ -430,11 +503,6 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   });
 
   window.addEventListener('resize', () => { resize(); });
-
-  // Zoom button wiring
-  document.getElementById('zoomIn').addEventListener('click', () => { zoom = Math.min(6, zoom * 1.3); });
-  document.getElementById('zoomOut').addEventListener('click', () => { zoom = Math.max(0.25, zoom * 0.77); });
-  document.getElementById('zoomReset').addEventListener('click', () => { zoom = 1; panX = 0; panY = 0; });
 
   // ---- Obsidian Local REST API — called directly from browser ----
   // Browsers exempt http://localhost from mixed-content restrictions, so
@@ -487,13 +555,18 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   document.getElementById('obsSave').addEventListener('click', syncObsidian);
   document.getElementById('obsSync').addEventListener('click', syncObsidian);
 
-  // Kick off
+  // Zoom button wiring (schedDraw after settled)
+  document.getElementById('zoomIn').addEventListener('click', () => { zoom = Math.min(6, zoom * 1.3); schedDraw(); });
+  document.getElementById('zoomOut').addEventListener('click', () => { zoom = Math.max(0.25, zoom * 0.77); schedDraw(); });
+  document.getElementById('zoomReset').addEventListener('click', () => { zoom = 1; panX = 0; panY = 0; schedDraw(); });
+
+  // Kick off — defer one frame so the page paints before the build starts
   resize();
-  rebuild();
-  animate();
+  requestAnimationFrame(() => { rebuild(); });
 
   // Rebuild if Overseer notes change in another tab
-  window.addEventListener('storage', (e) => { if (e.key === NOTES_KEY) rebuild(); });
+  window.addEventListener('storage', (e) => { if (e.key === NOTES_KEY || e.key === OBS_NOTES_KEY) rebuild(); });
+  window.addEventListener('resize', () => { resize(); schedDraw(); });
 })();
 </script>
 </body>
