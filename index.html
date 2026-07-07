@@ -927,7 +927,7 @@ body::after {
     <label class="field-label">Notifications</label>
     <div class="whoop-box">
       <div style="font-size:12px;color:var(--text-secondary);line-height:1.45;margin-bottom:10px">
-        Each device and browser subscribes separately. If you want notifications on your MacBook, open Settings here in that browser and tap <strong>Re-subscribe</strong>.
+        Each device subscribes separately. <strong>MacBook (Chrome):</strong> tap Re-subscribe here in Chrome, then allow in the Chrome permission prompt. Check macOS System Settings → Notifications → Google Chrome is allowed. <strong>MacBook (Safari):</strong> Safari requires installing the site first — go to File → Add to Dock, open from the dock, then subscribe.
       </div>
       <div id="pushStatus" style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">—</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1284,23 +1284,33 @@ body::after {
 
   $('pushTestBtn').addEventListener('click', async () => {
     const st = $('pushTestStatus');
-    st.style.display = 'block'; st.style.color = 'var(--text-tertiary)'; st.textContent = 'Sending test notification…';
+    st.style.display = 'block'; st.style.color = 'var(--text-tertiary)'; st.textContent = 'Sending…';
     try {
       const r = await fetch('/api/push-send?type=morning&cron=1', {
         headers: { 'X-App-Secret': window.DASH_APP_SECRET || '' },
       });
       const d = await r.json().catch(() => ({}));
-      if (d.sent > 0) {
-        st.style.color = '#6BE3A4'; st.textContent = '✓ Sent to ' + d.sent + ' device' + (d.sent > 1 ? 's' : '') + ' — check your notifications.';
+      if (d.sent > 0 && !d.failed) {
+        st.style.color = '#6BE3A4';
+        st.textContent = '✓ Sent to ' + d.sent + ' device' + (d.sent > 1 ? 's' : '') + '. Check your notification tray.';
       } else if (d.message === 'no subscriptions') {
-        st.style.color = '#F2C063'; st.textContent = 'No subscriptions found — tap "Re-subscribe" first, then try again.';
+        st.style.color = '#F2C063';
+        st.textContent = 'No subscriptions found — tap Re-subscribe on each device, then try again.';
+      } else if (d.sent > 0 && d.failed > 0) {
+        st.style.color = '#F2C063';
+        const err = d.failures && d.failures[0] ? d.failures[0].error : '';
+        st.textContent = '✓ ' + d.sent + ' sent, ' + d.failed + ' failed. ' + (err ? 'Error: ' + err.slice(0, 80) : '');
+      } else if (d.failed > 0) {
+        st.style.color = '#FF8A8A';
+        const err = d.failures && d.failures[0] ? d.failures[0].error : '';
+        st.textContent = 'All ' + d.failed + ' failed. ' + (err ? err.slice(0, 100) : 'Check VAPID keys in Vercel.');
       } else {
-        st.style.color = '#FF8A8A'; st.textContent = d.error || ('Sent: ' + d.sent + ', Failed: ' + d.failed);
+        st.style.color = '#FF8A8A'; st.textContent = d.error || 'Unknown error — check Vercel function logs.';
       }
     } catch (e) {
-      st.style.color = '#FF8A8A'; st.textContent = 'Error: ' + e.message;
+      st.style.color = '#FF8A8A'; st.textContent = 'Network error: ' + e.message;
     }
-    setTimeout(() => { st.style.display = 'none'; }, 6000);
+    setTimeout(() => { st.style.display = 'none'; }, 9000);
   });
 
   // Re-populate the settings form if a remote profile change (cloud sync,

@@ -81,6 +81,18 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .note-body-input { width: 100%; min-height: 60vh; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 15px; line-height: 1.6; outline: none; resize: none; }
 .note-body-input::placeholder { color: var(--text-tertiary); }
 
+/* ===== Source badges on note cards ===== */
+.note-source-badge {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
+}
+.note-source-badge.src-overseer { background: rgba(107,227,164,0.14); color: #6BE3A4; }
+.note-source-badge.src-claude    { background: rgba(242,192,99,0.14);  color: #F2C063; }
+.note-source-badge.src-chatgpt   { background: rgba(125,211,252,0.14); color: #7DD3FC; }
+.note-source-badge.src-apple     { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.45); }
+.note-source-badge.src-imported  { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); }
+.note-card.is-native { border-color: rgba(107,227,164,0.2); }
+
 /* ===== Folder strip ===== */
 .notes-folders-wrap { position: relative; margin-bottom: 12px; }
 .notes-folders {
@@ -331,6 +343,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       <span class="notes-sort-label">Sort by</span>
       <div class="notes-sort-seg">
         <button class="sort-btn active" data-sort="edited" type="button">Last edited</button>
+        <button class="sort-btn" data-sort="imported" type="button">Date imported</button>
         <button class="sort-btn" data-sort="created" type="button">Date created</button>
         <button class="sort-btn" data-sort="az" type="button">A–Z</button>
       </div>
@@ -488,12 +501,15 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         (n.body || '').slice(0, 500).toLowerCase().includes(q)
       );
 
-      // Sort
+      // Sort — native (created in app) notes always float above imported ones
+      const isNative = n => n.source === 'overseer';
       items.sort((a, b) => {
-        if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
-        if (sortMode === 'created') return (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
-        if (sortMode === 'az')      return (a.title || '').localeCompare(b.title || '');
-        return (b.updatedAt || 0) - (a.updatedAt || 0);
+        if (!!b.pinned !== !!a.pinned)   return b.pinned ? 1 : -1;
+        if (isNative(b) !== isNative(a)) return isNative(b) ? 1 : -1;
+        if (sortMode === 'imported') return (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
+        if (sortMode === 'created')  return (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
+        if (sortMode === 'az')       return (a.title || '').localeCompare(b.title || '');
+        return (b.updatedAt || 0) - (a.updatedAt || 0); // 'edited'
       });
 
       if (!items.length) {
@@ -501,20 +517,29 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         return;
       }
 
+      // Source badge labels and CSS classes
+      const SRC_LABEL = { overseer: '✏ Created', claude: 'Claude', chatgpt: 'ChatGPT', apple: 'Apple Notes', imported: 'Imported' };
+      const SRC_CLASS = { overseer: 'src-overseer', claude: 'src-claude', chatgpt: 'src-chatgpt', apple: 'src-apple', imported: 'src-imported' };
+
       const html = items.map(n => {
         const cat = n.category ? catById[n.category] : null;
         const catPill = cat
           ? '<span class="note-cat-pill" style="background:' + escapeHtml(cat.color) + '22;color:' + escapeHtml(cat.color) + '"><span class="note-cat-dot" style="background:' + escapeHtml(cat.color) + '"></span>' + escapeHtml(cat.name) + '</span>'
           : '';
-        const ts = sortMode === 'created' ? (n.createdAt || n.updatedAt || 0) : (n.updatedAt || 0);
-        const meta = (ts ? fmtDate(ts) : '—');
-        const prefix = sortMode === 'created' ? 'Created ' : 'Edited ';
-        return '<div class="note-card' + (n.pinned ? ' pinned' : '') + '" data-id="' + escapeHtml(String(n.id)) + '">' +
+        // Date label — for "imported" sort show import date, otherwise show edit date
+        const showImportDate = sortMode === 'imported' || sortMode === 'created';
+        const ts  = showImportDate ? (n.createdAt || n.updatedAt || 0) : (n.updatedAt || 0);
+        const meta = ts ? fmtDate(ts) : '—';
+        const prefix = showImportDate ? (isNative(n) ? 'Created ' : 'Imported ') : 'Edited ';
+        // Source badge — show for all notes; created-in-app gets a distinct highlighted style
+        const src = n.source || 'imported';
+        const srcBadge = '<span class="note-source-badge ' + (SRC_CLASS[src] || 'src-imported') + '">' + (SRC_LABEL[src] || 'Imported') + '</span>';
+        return '<div class="note-card' + (n.pinned ? ' pinned' : '') + (isNative(n) ? ' is-native' : '') + '" data-id="' + escapeHtml(String(n.id)) + '">' +
           '<div class="note-row-top"><div class="note-title">' + escapeHtml(n.title || '') + '</div>' +
             (n.pinned ? '<span class="note-pin on">📌</span>' : '') +
           '</div>' +
           '<div class="note-snippet">' + escapeHtml((n.body || '').slice(0, 160)) + '</div>' +
-          '<div class="note-meta-row"><span class="note-meta">' + prefix + meta + '</span>' + catPill + '</div>' +
+          '<div class="note-meta-row"><span class="note-meta">' + prefix + meta + '</span>' + srcBadge + catPill + '</div>' +
         '</div>';
       }).join('');
 
@@ -569,7 +594,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   function newNote() {
     const items = load();
     const now = Date.now();
-    const n = { id: 'n_' + now, title: '', body: '', pinned: false, category: activeFolder || null, createdAt: now, updatedAt: now };
+    const n = { id: 'n_' + now, title: '', body: '', pinned: false, source: 'overseer', category: activeFolder || null, createdAt: now, updatedAt: now };
     items.unshift(n);
     save(items);
     openNote(n.id);
@@ -760,15 +785,15 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     el.style.color = ok ? '#6BE3A4' : '#FF8A8A';
     if (ok) setTimeout(() => { el.textContent = ''; }, 3000);
   }
-  function mergeNotes(incoming) {
+  function mergeNotes(incoming, defaultSource) {
     const existing = load();
     const titles = new Set(existing.map(n => (n.title || '').toLowerCase().trim()));
     let added = 0;
-    incoming.forEach(({ title, body, category }) => {
+    incoming.forEach(({ title, body, category, source }) => {
       const t = (title || '').trim() || 'Imported note';
       if (titles.has(t.toLowerCase())) return;
       const now = Date.now();
-      existing.unshift({ id: 'n_' + now + '_' + Math.random().toString(36).slice(2), title: t, body: (body || '').trim(), pinned: false, category: category || activeFolder || null, createdAt: now, updatedAt: now });
+      existing.unshift({ id: 'n_' + now + '_' + Math.random().toString(36).slice(2), title: t, body: (body || '').trim(), pinned: false, source: source || defaultSource || 'imported', category: category || activeFolder || null, createdAt: now, updatedAt: now });
       titles.add(t.toLowerCase());
       added++;
     });
@@ -804,7 +829,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     // Use first non-empty line as title if no explicit title given
     const firstLine = body.split('\n').find(l => l.trim()) || 'Apple Note';
     const title = pasteTitleInput.value.trim() || firstLine.slice(0, 60);
-    const added = mergeNotes([{ title, body }]);
+    const added = mergeNotes([{ title, body }], 'apple');
     if (added) {
       showNoteAcquiredAnim(title);
       pasteArea.value = '';
@@ -830,7 +855,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         incoming.push({ title: file.name.replace(/\.(txt|html?)$/i, ''), body: ev.target.result });
         done++;
         if (done === files.length) {
-          const added = mergeNotes(incoming);
+          const added = mergeNotes(incoming, 'apple');
           importStatus('Added ' + added + ' of ' + files.length + ' Apple Notes ✓', true);
         }
       };
@@ -860,7 +885,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
           }).filter(Boolean).join('\n\n');
           return { title, body };
         });
-        const added = mergeNotes(incoming);
+        const added = mergeNotes(incoming, 'claude');
         importStatus('Added ' + added + ' Claude conversations ✓', true);
       } catch (err) { importStatus('Could not read Claude export: ' + err.message, false); }
     };
@@ -893,7 +918,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
           }).filter(Boolean).join('\n\n');
           return { title, body };
         });
-        const added = mergeNotes(incoming);
+        const added = mergeNotes(incoming, 'chatgpt');
         importStatus('Added ' + added + ' ChatGPT conversations ✓', true);
       } catch (err) { importStatus('Could not read ChatGPT export: ' + err.message, false); }
     };
@@ -1029,7 +1054,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   }
 
   function importFromNotes(incoming) {
-    const added = mergeNotes(incoming);
+    const added = mergeNotes(incoming, 'apple'); // drag-and-drop from Apple Notes / files
     if (added > 0) {
       // Play the acquisition animation with the first imported note's title
       const firstTitle = (incoming[0] && incoming[0].title) || 'Note';
