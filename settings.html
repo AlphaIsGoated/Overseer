@@ -228,7 +228,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
         <div style="font-size:16px;font-weight:700;color:var(--text-primary)">Shrey's Dashboard (Overseer)</div>
-        <div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">Version 3.6 — built with Claude Code</div>
+        <div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">Version 3.7 — built with Claude Code</div>
       </div>
       <a href="help.html" style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:1px solid rgba(255,255,255,0.10);border-radius:11px;background:rgba(255,255,255,0.04);color:var(--text-primary);font-size:12.5px;font-weight:700;text-decoration:none">📖 How to use</a>
     </div>
@@ -429,6 +429,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.7', date: '2026-07-08', items: ['fix(calendar): align DOW headers with grid cells, fix month navigation stagnation'] },
+
     { ver: '3.6', date: '2026-07-08', items: ['Disable CDN caching for HTML files', 'Add account naming and month calendar grid view', 'Fix missing Add Google Account button on calendar page', 'Support multiple Google accounts on master calendar', 'Simplify water tracker to bottles-only with oz/ml bottle size input', 'Surface bottle size directly on main water screen; keep tracker in bottles mode', 'Add bottle size picker with oz/ml toggle, presets, and live preview to water module'] },
 
     { ver: '3.5', date: '2026-07-07', items: ['Fitness: Overload-style per-exercise weight chart with W/M/3M/6M/Y/ALL range toggle, draggable scrubber + tooltip, sets strip, stats row (Sessions / Last 30 Days / Best), overload rule card ("beat your best"), session history table with tap-to-edit', 'Fitness: Full log editor modal — weight/reps/sets steppers, per-set rep boxes (tap to lower, tap past 1 = missed), rest/deload toggle, date picker', 'Fitness: New-best celebration — full-screen canvas confetti burst on a personal record', 'Fitness: Plan import now accepts .md / .txt file upload in addition to photos and pasted text', 'Marathon: All 3 charts (weekly mileage, completion rate, pace trend) converted to Apple-style smooth bezier area charts with gradient fills replacing bar charts', 'Opportunities: Resume file upload — PDF extracted server-side via Claude document API, .txt/.md read directly', 'Opportunities: Count picker — choose 3 / 5 / 7 / 10 / 15 opportunities before searching'] },
