@@ -98,9 +98,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .cal-grid-nav-btn:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
 .cal-grid-today-btn { background: rgba(107,227,164,0.10); border: 1px solid rgba(107,227,164,0.2); border-radius: 8px; color: var(--success); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; padding: 5px 10px; transition: background 0.12s; }
 .cal-grid-today-btn:hover { background: rgba(107,227,164,0.18); }
-.cal-grid-dow { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 3px; }
-.cal-grid-dow span { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); text-align: center; padding: 4px 0; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cgc-dow { text-align: center; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); padding: 4px 0 6px; }
 .cgc { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; min-height: 80px; padding: 7px 6px 5px; transition: background 0.1s; cursor: default; }
 .cgc.empty { background: rgba(0,0,0,0.08); border-color: transparent; min-height: 80px; }
 .cgc.today { background: rgba(107,227,164,0.07); border-color: rgba(107,227,164,0.18); }
@@ -194,9 +193,6 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       </div>
       <span class="cal-grid-nav-title" id="calGridTitle"></span>
       <button class="cal-grid-today-btn" id="calGridGoToday">Today</button>
-    </div>
-    <div class="cal-grid-dow">
-      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
     </div>
     <div class="cal-grid" id="calGrid"></div>
     <div class="cal-day-detail hidden" id="calDayDetail">
@@ -622,13 +618,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   // ---- Month calendar grid -------------------------------------------
   var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var calGridDate = new Date();
-  calGridDate.setDate(1);
+  var gridYear  = new Date().getFullYear();
+  var gridMonth = new Date().getMonth();
   var selectedDayKey = null;
 
   function renderCalendarGrid() {
-    var year  = calGridDate.getFullYear();
-    var month = calGridDate.getMonth();
+    var year  = gridYear;
+    var month = gridMonth;
     $('calGridTitle').textContent = MONTHS[month] + ' ' + year;
 
     var firstDow  = new Date(year, month, 1).getDay();
@@ -643,7 +639,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     var byDay  = {};
     all.forEach(function(it) { if (!byDay[it.dateKey]) byDay[it.dateKey] = []; byDay[it.dateKey].push(it); });
 
-    var html = '';
+    var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var html = DOW.map(function(d) { return '<div class="cgc-dow">' + d + '</div>'; }).join('');
     for (var i = 0; i < firstDow; i++) html += '<div class="cgc empty"></div>';
 
     for (var d = 1; d <= daysInMon; d++) {
@@ -706,17 +703,17 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   }
 
   $('calGridPrev').addEventListener('click', function() {
-    calGridDate.setMonth(calGridDate.getMonth() - 1);
+    gridMonth--; if (gridMonth < 0) { gridMonth = 11; gridYear--; }
     selectedDayKey = null;
     renderCalendarGrid();
   });
   $('calGridNext').addEventListener('click', function() {
-    calGridDate.setMonth(calGridDate.getMonth() + 1);
+    gridMonth++; if (gridMonth > 11) { gridMonth = 0; gridYear++; }
     selectedDayKey = null;
     renderCalendarGrid();
   });
   $('calGridGoToday').addEventListener('click', function() {
-    calGridDate = new Date(); calGridDate.setDate(1);
+    gridYear = new Date().getFullYear(); gridMonth = new Date().getMonth();
     selectedDayKey = null;
     renderCalendarGrid();
   });
