@@ -1448,7 +1448,7 @@ body::after {
     // don't get a hairball. Loop stops after settling; no wasted CPU.
     const BG_MAX = 40;
     const STOPWORDS = new Set(['the','a','an','is','it','in','to','and','of','for','on','with','this','that','as','at','by','from','be','are','was','were','have','has','had','not','but','or','if','so','just','like','know','think','want','need','make','using','used','also','very','more','some','when','they','them']);
-    function keywords(text) { return new Set((text||'').toLowerCase().match(/\b[a-z]{5,}\b/g)?.filter(w=>!STOPWORDS.has(w)).slice(0,40)||[]); }
+    function keywords(text) { return new Set((text||'').toLowerCase().match(/\b[a-z]{4,}\b/g)?.filter(w=>!STOPWORDS.has(w)).slice(0,40)||[]); }
 
     function loadNodes() {
       try {
@@ -1473,8 +1473,8 @@ body::after {
       for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
         if (edgeCnt[i] >= 5 || edgeCnt[j] >= 5) continue;
         let shared = 0;
-        for (const w of kws[i]) { if (kws[j].has(w) && ++shared >= 2) break; }
-        if (shared >= 2) { edges.push({ a: i, b: j, w: 2 }); edgeCnt[i]++; edgeCnt[j]++; }
+        for (const w of kws[i]) { if (kws[j].has(w) && ++shared >= 1) break; }
+        if (shared >= 1) { edges.push({ a: i, b: j, w: 1 }); edgeCnt[i]++; edgeCnt[j]++; }
       }
       px = nodes.map(() => W * 0.1 + Math.random() * W * 0.8);
       py = nodes.map(() => H * 0.1 + Math.random() * H * 0.8);
@@ -1511,7 +1511,7 @@ body::after {
       if (!nodes.length) return;
       edges.forEach(e => {
         ctx2.beginPath(); ctx2.moveTo(px[e.a], py[e.a]); ctx2.lineTo(px[e.b], py[e.b]);
-        ctx2.strokeStyle = 'rgba(110,231,183,0.07)'; ctx2.lineWidth = 0.6; ctx2.stroke();
+        ctx2.strokeStyle = 'rgba(110,231,183,0.22)'; ctx2.lineWidth = 0.7; ctx2.stroke();
       });
       nodes.forEach((nd, i) => {
         const col = nd.src === 1 ? [167,139,250] : [110,231,183];
