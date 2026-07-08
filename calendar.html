@@ -79,6 +79,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
 .legend-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 20px 0; }
+.hidden { display: none !important; }
 
 @media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
 </style>
@@ -306,15 +307,15 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       section.innerHTML = '';
       $('calSyncBtn').style.display = 'none';
       $('calSyncTime').textContent  = '';
-      $('calAddAccount').textContent = GOOGLE_CLIENT_ID ? 'Connect Google Calendar' : 'Set GOOGLE_CLIENT_ID in Vercel';
-      $('calAddAccount').disabled    = !GOOGLE_CLIENT_ID;
+      $('calAddAccount').textContent = '+ Connect Google Account';
+      $('calAddAccount').disabled    = false;
       return;
     }
 
     $('calSyncBtn').style.display = '';
     $('calSyncTime').textContent  = 'Last synced ' + relTime(Number(localStorage.getItem(SYNC_KEY)) || 0);
     $('calAddAccount').textContent = '+ Add Google Account';
-    $('calAddAccount').disabled    = !GOOGLE_CLIENT_ID;
+    $('calAddAccount').disabled    = false;
 
     section.innerHTML = accounts.map(function(a) {
       var label = (a.name && a.name !== a.email) ? escapeHtml(a.name) + ' <span style="color:var(--text-tertiary);font-weight:400">(' + escapeHtml(a.email) + ')</span>' : escapeHtml(a.email);
@@ -545,7 +546,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   // ---- Button listeners -----------------------------------------------
   $('calAddAccount').addEventListener('click', function() {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!GOOGLE_CLIENT_ID) { calErr('GOOGLE_CLIENT_ID is not configured in Vercel environment variables.'); return; }
     var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
       '?client_id='    + encodeURIComponent(GOOGLE_CLIENT_ID) +
       '&redirect_uri=' + encodeURIComponent(GOOGLE_REDIRECT) +
@@ -624,8 +625,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   // ---- Init -----------------------------------------------------------
   async function init() {
-    await migrateOldAccount();
-    await handleOAuthCallback();
+    try { await migrateOldAccount(); } catch(e) { console.warn('migration error:', e); }
+    try { await handleOAuthCallback(); } catch(e) { console.warn('oauth callback error:', e); }
     renderAll();
     var accounts = getAccounts();
     if (accounts.length) {
