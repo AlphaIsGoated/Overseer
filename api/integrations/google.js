@@ -30,7 +30,9 @@ async function handleData(req, res) {
     if (k !== 'path') fwd.set(k, String(v));
   }
   const qs = fwd.toString();
-  const url = 'https://www.googleapis.com/calendar/v3' + path + (qs ? '?' + qs : '');
+  // /userinfo uses the OAuth2 API, all other paths use the Calendar API
+  const baseUrl = path === '/userinfo' ? 'https://www.googleapis.com/oauth2/v3' : 'https://www.googleapis.com/calendar/v3';
+  const url = baseUrl + path + (qs ? '?' + qs : '');
 
   try {
     const r = await fetch(url, {

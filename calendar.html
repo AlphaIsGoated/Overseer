@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
-<title>Calendar · Dashboard</title>
+<title>Calendar &middot; Dashboard</title>
 <script src="/api/config"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -33,30 +33,34 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
 .gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
 
-.cal-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
-.cal-status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
+/* Account rows */
+.cal-account-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; margin-bottom: 6px; }
+.cal-status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); flex-shrink: 0; }
 .cal-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); }
 .cal-status.on .dot { background: var(--success); box-shadow: 0 0 8px rgba(107,227,164,0.6); }
-.cal-sync { font-size: 11px; color: var(--text-tertiary); }
-.cal-btn { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+.cal-account-email { font-size: 13px; color: var(--text-primary); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.cal-sync { font-size: 11px; color: var(--text-tertiary); flex: 1; }
+.cal-btn { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
 .cal-btn:hover { background: rgba(255,255,255,0.08); }
 .cal-btn:disabled { opacity: 0.4; cursor: default; }
-.cal-btn-ghost { background: transparent; border: none; color: var(--danger); font-family: inherit; font-size: 12px; cursor: pointer; padding: 6px 0; text-decoration: underline; }
+.cal-btn-ghost { background: transparent; border: none; color: var(--danger); font-family: inherit; font-size: 11.5px; cursor: pointer; padding: 4px 0; text-decoration: underline; flex-shrink: 0; }
 .cal-err { font-size: 12px; color: var(--danger); margin-top: 8px; }
 
 /* Calendar list */
 .cal-list-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.07); }
 .cal-list-title { font-size: 10px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
 .cal-list { display: flex; flex-direction: column; gap: 6px; }
+.cal-account-header { font-size: 10px; color: var(--text-tertiary); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 4px 4px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); }
+.cal-account-header:first-child { margin-top: 0; border-top: none; padding-top: 0; }
 .cal-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.12s; }
 .cal-item:hover { background: rgba(255,255,255,0.06); }
 .cal-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--success); flex-shrink: 0; cursor: pointer; }
 .cal-item-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .cal-item-name { font-size: 13px; color: var(--text-primary); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-item-primary { font-size: 10px; color: var(--text-tertiary); flex-shrink: 0; }
-.cal-list-actions { display: flex; gap: 10px; margin-top: 10px; }
 .cal-list-link { font-size: 11px; color: var(--success); cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; text-decoration: underline; -webkit-tap-highlight-color: transparent; }
-.cal-list-empty { font-size: 12px; color: var(--text-tertiary); font-style: italic; }
+.cal-list-empty { font-size: 12px; color: var(--text-tertiary); font-style: italic; padding: 4px 0; }
 
 /* Agenda */
 .day-group { margin-bottom: 16px; }
@@ -88,31 +92,32 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   </a>
 
   <h1 class="dash-title">Calendar</h1>
-  <p class="dash-sub">Everything with a date, in one place — Google Calendars, marathon training, Canvas, and your daily goals.</p>
+  <p class="dash-sub">Everything with a date, in one place -- Google Calendars, marathon training, Canvas, and your daily goals.</p>
 
   <div class="gm-card">
-    <div class="cal-status-row">
-      <span class="cal-status" id="calStatus"><span class="dot"></span><span id="calStatusText">Not connected</span></span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="cal-btn" id="calAction" type="button">Connect Google Calendar</button>
-        <button class="cal-btn-ghost" id="calDisconnect" style="display:none" type="button">Disconnect</button>
-      </div>
+    <!-- Connected accounts list (populated by JS) -->
+    <div id="calAccountsSection"></div>
+
+    <div class="cal-actions-row">
+      <button class="cal-btn" id="calAddAccount" type="button">Connect Google Calendar</button>
+      <button class="cal-btn" id="calSyncBtn" type="button" style="display:none">Sync now</button>
+      <span class="cal-sync" id="calSyncTime"></span>
     </div>
-    <div class="cal-sync" id="calSync"></div>
+
     <div class="cal-err hidden" id="calErr"></div>
 
-    <!-- Calendar selector — shown after connecting -->
+    <!-- Calendar selector -- shown after connecting -->
     <div class="cal-list-section hidden" id="calListSection">
       <div class="cal-list-title">
         <span>Your calendars</span>
         <div style="display:flex;gap:10px">
           <button class="cal-list-link" id="calSelectAll">All</button>
           <button class="cal-list-link" id="calSelectNone">None</button>
-          <button class="cal-list-link" id="calRefreshList">↻ Refresh</button>
+          <button class="cal-list-link" id="calRefreshList">&#8635; Refresh</button>
         </div>
       </div>
       <div class="cal-list" id="calList">
-        <div class="cal-list-empty">Loading calendars…</div>
+        <div class="cal-list-empty">Loading calendars&hellip;</div>
       </div>
     </div>
   </div>
@@ -131,344 +136,507 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 <script>
 (function () {
   'use strict';
-  const $ = (id) => document.getElementById(id);
-  const TOKEN_KEY    = 'google_tokens_v1';
-  const SYNC_KEY     = 'google_last_sync';
-  const CALS_KEY     = 'google_calendars_v2';   // { list: [{id,name,color,primary}], selected: ['id',...] }
-  const GOOGLE_CLIENT_ID = window.DASH_GOOGLE_CLIENT_ID || '';
-  const GOOGLE_REDIRECT  = window.location.origin + '/api/google-callback';
-  const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+  var $ = function(id) { return document.getElementById(id); };
 
-  function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } }
+  // Storage keys
+  var ACCOUNTS_KEY = 'google_accounts_v1'; // [{email, name, access, refresh, expires}]
+  var CALS_KEY     = 'google_calendars_v3'; // {[email]: {list:[{id,name,color,primary}], selected:[ids]}}
+  var SYNC_KEY     = 'google_last_sync';
+
+  var GOOGLE_CLIENT_ID = window.DASH_GOOGLE_CLIENT_ID || '';
+  var GOOGLE_REDIRECT  = window.location.origin + '/api/google-callback';
+  var SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+  var APP_SECRET = window.DASH_APP_SECRET || '';
+
+  function loadJSON(k, f) { try { var v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch(e) { return f; } }
   function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
-  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
 
-  // ── OAuth token handling ──────────────────────────────────────
-  if (location.hash && location.hash.includes('google_access')) {
-    const h = new URLSearchParams(location.hash.slice(1));
-    const access = h.get('google_access'), refresh = h.get('google_refresh');
-    const expires = Number(h.get('google_expires')) || Date.now() + 3500e3;
-    if (access) {
-      saveJSON(TOKEN_KEY, { access, refresh, expires });
-      history.replaceState(null, '', location.pathname + location.search);
+  // ---- Account helpers -------------------------------------------------
+  function getAccounts() { return loadJSON(ACCOUNTS_KEY, []); }
+  function saveAccounts(a) { saveJSON(ACCOUNTS_KEY, a); }
+
+  async function refreshAccount(account) {
+    if (!account.refresh) return null;
+    try {
+      var r = await fetch('/api/integrations/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+        body: JSON.stringify({ refresh_token: account.refresh }),
+      });
+      var j = await r.json();
+      if (j.access_token) {
+        var updated = Object.assign({}, account, {
+          access:  j.access_token,
+          refresh: j.refresh_token || account.refresh,
+          expires: Date.now() + (j.expires_in || 3500) * 1000,
+        });
+        var accounts = getAccounts();
+        var idx = accounts.findIndex(function(a) { return a.email === account.email; });
+        if (idx >= 0) accounts[idx] = updated; else accounts.push(updated);
+        saveAccounts(accounts);
+        return updated;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  async function getValidToken(account) {
+    if (!account || !account.access) return null;
+    if (account.expires && Date.now() > account.expires - 60000) {
+      return await refreshAccount(account);
+    }
+    return account;
+  }
+
+  async function googleFetch(path, account) {
+    var t = await getValidToken(account);
+    if (!t) throw new Error('not authenticated');
+    var parts = path.split('?');
+    var p = parts[0], qs = parts[1] || '';
+    var params = new URLSearchParams(qs);
+    params.set('path', p);
+    var r = await fetch('/api/integrations/google?' + params.toString(), {
+      headers: { 'Authorization': 'Bearer ' + t.access, 'Accept': 'application/json', 'X-App-Secret': APP_SECRET },
+    });
+    if (r.status === 401) {
+      var refreshed = await refreshAccount(account);
+      if (refreshed) return googleFetch(path, refreshed);
+      throw new Error('unauthorized -- reconnect');
+    }
+    if (!r.ok) throw new Error('Google ' + r.status);
+    return r.json();
+  }
+
+  // ---- OAuth callback: new token arrived in URL hash ------------------
+  async function handleOAuthCallback() {
+    if (!location.hash || location.hash.indexOf('google_access') === -1) return;
+    var h = new URLSearchParams(location.hash.slice(1));
+    var access  = h.get('google_access');
+    var refresh = h.get('google_refresh');
+    var expires = Number(h.get('google_expires')) || Date.now() + 3500000;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!access) return;
+
+    // Fetch userinfo to identify which Google account this is
+    try {
+      var r = await fetch('/api/integrations/google?path=/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + access, 'Accept': 'application/json', 'X-App-Secret': APP_SECRET },
+      });
+      var info = r.ok ? await r.json() : {};
+      var email = info.email || ('account-' + Date.now());
+      var name  = info.name  || email;
+      var accounts = getAccounts();
+      var idx = accounts.findIndex(function(a) { return a.email === email; });
+      var updated = { email: email, name: name, access: access, refresh: refresh, expires: expires };
+      if (idx >= 0) accounts[idx] = updated; else accounts.push(updated);
+      saveAccounts(accounts);
+      await fetchCalendarListForAccount(updated);
+    } catch(e) {
+      // Fallback if userinfo fails
+      var email2 = 'account-' + Date.now();
+      var accounts2 = getAccounts();
+      accounts2.push({ email: email2, name: 'Google Account', access: access, refresh: refresh, expires: expires });
+      saveAccounts(accounts2);
+    }
+    renderAll();
+    syncCalendar();
+  }
+
+  // ---- Calendar list per account -------------------------------------
+  async function fetchCalendarListForAccount(account) {
+    try {
+      var data = await googleFetch('/users/me/calendarList?minAccessRole=reader', account);
+      var list = (data.items || []).map(function(c) {
+        return { id: c.id, name: c.summary || c.id, color: c.backgroundColor || '#6BE3A4', primary: !!c.primary };
+      });
+      var cals = loadJSON(CALS_KEY, {});
+      var existing = cals[account.email] || { list: [], selected: [] };
+      var knownIds = new Set((existing.list || []).map(function(c) { return c.id; }));
+      var newIds   = list.filter(function(c) { return !knownIds.has(c.id); }).map(function(c) { return c.id; });
+      var allSel   = existing.selected || list.map(function(c) { return c.id; });
+      var selected = Array.from(new Set(allSel.concat(newIds)));
+      cals[account.email] = { list: list, selected: selected };
+      saveJSON(CALS_KEY, cals);
+      renderCalendarList();
+    } catch(e) {
+      console.warn('Could not fetch calendar list for', account.email, e.message);
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────
-  function calErr(msg) { $('calErr').textContent = msg || ''; $('calErr').classList.toggle('hidden', !msg); }
+  async function fetchAllCalendarLists() {
+    var accounts = getAccounts();
+    await Promise.all(accounts.map(fetchCalendarListForAccount));
+  }
+
+  function getSelectedCalendarsForAccount(account) {
+    var cals   = loadJSON(CALS_KEY, {});
+    var stored = cals[account.email] || { list: [], selected: [] };
+    var list   = stored.list || [];
+    var sel    = new Set(stored.selected || list.map(function(c) { return c.id; }));
+    if (!list.length) return [{ id: 'primary', name: 'Primary', color: '#6BE3A4', primary: true }];
+    return list.filter(function(c) { return sel.has(c.id); });
+  }
+
+  // ---- UI helpers -----------------------------------------------------
+  function calErr(msg) {
+    var el = $('calErr');
+    el.textContent = msg || '';
+    el.classList.toggle('hidden', !msg);
+  }
+
   function relTime(ts) {
     if (!ts) return 'never';
-    const sec = Math.floor((Date.now() - ts) / 1000);
-    if (sec < 60) return 'just now';
-    if (sec < 3600) return Math.floor(sec / 60) + ' min ago';
+    var sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 60)    return 'just now';
+    if (sec < 3600)  return Math.floor(sec / 60) + ' min ago';
     if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
     return Math.floor(sec / 86400) + ' d ago';
   }
-  function dateKeyLocal(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+  function renderAccounts() {
+    var accounts = getAccounts();
+    var section  = $('calAccountsSection');
+
+    if (!accounts.length) {
+      section.innerHTML = '';
+      $('calSyncBtn').style.display = 'none';
+      $('calSyncTime').textContent  = '';
+      $('calAddAccount').textContent = GOOGLE_CLIENT_ID ? 'Connect Google Calendar' : 'Set GOOGLE_CLIENT_ID in Vercel';
+      $('calAddAccount').disabled    = !GOOGLE_CLIENT_ID;
+      return;
+    }
+
+    $('calSyncBtn').style.display = '';
+    $('calSyncTime').textContent  = 'Last synced ' + relTime(Number(localStorage.getItem(SYNC_KEY)) || 0);
+    $('calAddAccount').textContent = '+ Add Google Account';
+    $('calAddAccount').disabled    = !GOOGLE_CLIENT_ID;
+
+    section.innerHTML = accounts.map(function(a) {
+      var label = (a.name && a.name !== a.email) ? escapeHtml(a.name) + ' <span style="color:var(--text-tertiary);font-weight:400">(' + escapeHtml(a.email) + ')</span>' : escapeHtml(a.email);
+      return '<div class="cal-account-row">' +
+        '<span class="cal-status on"><span class="dot"></span></span>' +
+        '<span class="cal-account-email">' + label + '</span>' +
+        '<button class="cal-btn-ghost" data-email="' + escapeHtml(a.email) + '" onclick="window._calDisconnect(this.dataset.email)">Disconnect</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  window._calDisconnect = function(email) {
+    if (!confirm('Disconnect ' + email + '? Their calendars will be removed from this device.')) return;
+    var accounts = getAccounts().filter(function(a) { return a.email !== email; });
+    saveAccounts(accounts);
+    var cals = loadJSON(CALS_KEY, {});
+    delete cals[email];
+    saveJSON(CALS_KEY, cals);
+    lastGoogleItems = lastGoogleItems.filter(function(ev) { return ev._accountEmail !== email; });
+    if (!accounts.length) localStorage.removeItem(SYNC_KEY);
+    renderAll();
+    renderAgenda();
+  };
+
+  function renderCalendarList() {
+    var accounts  = getAccounts();
+    var section   = $('calListSection');
+    var container = $('calList');
+
+    if (!accounts.length) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+
+    var cals = loadJSON(CALS_KEY, {});
+    var html = '';
+    var first = true;
+    accounts.forEach(function(a) {
+      var stored = cals[a.email] || { list: [], selected: [] };
+      var list   = stored.list || [];
+      var sel    = new Set(stored.selected || list.map(function(c) { return c.id; }));
+
+      html += '<div class="cal-account-header' + (first ? ' first' : '') + '">' + escapeHtml(a.email) + '</div>';
+      first = false;
+
+      if (!list.length) {
+        html += '<div class="cal-list-empty">No calendars found for this account.</div>';
+      } else {
+        html += list.map(function(c) {
+          return '<label class="cal-item">' +
+            '<input type="checkbox" data-email="' + escapeHtml(a.email) + '" data-id="' + escapeHtml(c.id) + '"' + (sel.has(c.id) ? ' checked' : '') + '>' +
+            '<span class="cal-item-dot" style="background:' + escapeHtml(c.color) + '"></span>' +
+            '<span class="cal-item-name">' + escapeHtml(c.name) + '</span>' +
+            (c.primary ? '<span class="cal-item-primary">PRIMARY</span>' : '') +
+            '</label>';
+        }).join('');
+      }
+    });
+    container.innerHTML = html;
+
+    container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var email = cb.dataset.email, id = cb.dataset.id;
+        var c = loadJSON(CALS_KEY, {});
+        var stored = c[email] || { list: [], selected: [] };
+        var newSel = new Set(stored.selected || []);
+        if (cb.checked) newSel.add(id); else newSel.delete(id);
+        c[email] = Object.assign({}, stored, { selected: Array.from(newSel) });
+        saveJSON(CALS_KEY, c);
+        syncCalendar();
+      });
+    });
+  }
+
+  function renderAll() {
+    renderAccounts();
+    renderCalendarList();
+  }
+
+  // ---- Data aggregation -----------------------------------------------
+  function dateKeyLocal(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
   function fmtTime(d) { return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
   function dayLabel(d, todayKey) {
-    const key = dateKeyLocal(d);
+    var key = dateKeyLocal(d);
     if (key === todayKey) return 'Today';
-    const tmrw = new Date(); tmrw.setDate(tmrw.getDate() + 1);
+    var tmrw = new Date(); tmrw.setDate(tmrw.getDate() + 1);
     if (key === dateKeyLocal(tmrw)) return 'Tomorrow';
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
-  // ── Google API fetch (proxied through server) ─────────────────
-  async function googleRefresh(t) {
-    if (!t.refresh) return null;
-    try {
-      const r = await fetch('/api/integrations/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
-        body: JSON.stringify({ refresh_token: t.refresh }),
-      });
-      const j = await r.json();
-      if (j.access_token) {
-        const next = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: Date.now() + (j.expires_in || 3500) * 1000 };
-        saveJSON(TOKEN_KEY, next); return next;
-      }
-    } catch {}
-    return null;
-  }
-  async function googleFetch(path, t) {
-    const [p, qs] = path.split('?');
-    const params = new URLSearchParams(qs || ''); params.set('path', p);
-    const r = await fetch('/api/integrations/google?' + params.toString(), {
-      headers: { Authorization: 'Bearer ' + t.access, Accept: 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
-    });
-    if (r.status === 401) { const n = await googleRefresh(t); if (n) return googleFetch(path, n); throw new Error('unauthorized — reconnect'); }
-    if (!r.ok) throw new Error('Google ' + r.status);
-    return r.json();
-  }
-  async function getToken() {
-    let t = loadJSON(TOKEN_KEY, null);
-    if (!t || !t.access) return null;
-    if (t.expires && Date.now() > t.expires - 60000) { const n = await googleRefresh(t); if (n) t = n; }
-    return t;
-  }
-
-  // ── Calendar list management ──────────────────────────────────
-  async function fetchCalendarList() {
-    const t = await getToken(); if (!t) return;
-    try {
-      const data = await googleFetch('/users/me/calendarList?minAccessRole=reader', t);
-      const list = (data.items || []).map(c => ({
-        id:      c.id,
-        name:    c.summary || c.id,
-        color:   c.backgroundColor || '#6BE3A4',
-        primary: !!c.primary,
-      }));
-      const stored = loadJSON(CALS_KEY, { list: [], selected: [] });
-      // Preserve existing selection; default-select all calendars on first fetch
-      const knownIds = new Set((stored.list || []).map(c => c.id));
-      const newIds   = list.filter(c => !knownIds.has(c.id)).map(c => c.id);
-      const selected = [...new Set([...(stored.selected || list.map(c => c.id)), ...newIds])];
-      saveJSON(CALS_KEY, { list, selected });
-      renderCalendarList();
-    } catch (e) {
-      console.warn('Could not fetch calendar list:', e.message);
-    }
-  }
-
-  function getSelectedCalendars() {
-    const stored = loadJSON(CALS_KEY, { list: [], selected: [] });
-    const list   = stored.list || [];
-    const sel    = new Set(stored.selected || list.map(c => c.id));
-    // Fallback: if no list yet, use primary
-    return list.length ? list.filter(c => sel.has(c.id)) : [{ id: 'primary', name: 'Primary', color: '#6BE3A4', primary: true }];
-  }
-
-  function renderCalendarList() {
-    const stored = loadJSON(CALS_KEY, { list: [], selected: [] });
-    const list   = stored.list || [];
-    const sel    = new Set(stored.selected || list.map(c => c.id));
-    const section = $('calListSection');
-    const container = $('calList');
-    section.classList.remove('hidden');
-    if (!list.length) {
-      container.innerHTML = '<div class="cal-list-empty">No calendars found.</div>';
-      return;
-    }
-    container.innerHTML = list.map(c => `
-      <label class="cal-item">
-        <input type="checkbox" data-id="${escapeHtml(c.id)}" ${sel.has(c.id) ? 'checked' : ''}>
-        <span class="cal-item-dot" style="background:${escapeHtml(c.color)}"></span>
-        <span class="cal-item-name">${escapeHtml(c.name)}</span>
-        ${c.primary ? '<span class="cal-item-primary">PRIMARY</span>' : ''}
-      </label>`).join('');
-
-    // Wire checkbox changes
-    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const s = loadJSON(CALS_KEY, { list, selected: list.map(c => c.id) });
-        const newSel = new Set(s.selected || []);
-        if (cb.checked) newSel.add(cb.dataset.id); else newSel.delete(cb.dataset.id);
-        saveJSON(CALS_KEY, { ...s, selected: [...newSel] });
-        syncCalendar(); // re-sync immediately when selection changes
-      });
-    });
-  }
-
-  function renderStatus() {
-    const t = loadJSON(TOKEN_KEY, null);
-    const statusEl = $('calStatus'), txt = $('calStatusText'), action = $('calAction');
-    const disconnect = $('calDisconnect');
-    if (!t || !t.access) {
-      statusEl.classList.remove('on'); txt.textContent = 'Not connected';
-      $('calSync').textContent = ''; $('calListSection').classList.add('hidden');
-      action.textContent = GOOGLE_CLIENT_ID ? 'Connect Google Calendar' : 'Set GOOGLE_CLIENT_ID in Vercel';
-      action.disabled = !GOOGLE_CLIENT_ID;
-      disconnect.style.display = 'none';
-      return;
-    }
-    statusEl.classList.add('on');
-    const stored = loadJSON(CALS_KEY, { list: [] });
-    const count  = (stored.list || []).length;
-    txt.textContent = count > 1 ? count + ' calendars connected' : 'Connected';
-    $('calSync').textContent = 'Last synced ' + relTime(Number(localStorage.getItem(SYNC_KEY)) || 0);
-    action.textContent = 'Sync now'; action.disabled = false;
-    disconnect.style.display = '';
-  }
-
-  // ── Calendar list toggle buttons ──────────────────────────────
-  $('calSelectAll').addEventListener('click', () => {
-    const s = loadJSON(CALS_KEY, { list: [] });
-    saveJSON(CALS_KEY, { ...s, selected: (s.list || []).map(c => c.id) });
-    renderCalendarList(); syncCalendar();
-  });
-  $('calSelectNone').addEventListener('click', () => {
-    const s = loadJSON(CALS_KEY, { list: [] });
-    saveJSON(CALS_KEY, { ...s, selected: [] });
-    renderCalendarList(); renderAgenda();
-  });
-  $('calRefreshList').addEventListener('click', fetchCalendarList);
-  $('calDisconnect').addEventListener('click', () => {
-    if (!confirm('Disconnect Google Calendar? Your calendar data will be removed from this device.')) return;
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(CALS_KEY);
-    localStorage.removeItem(SYNC_KEY);
-    lastGoogleItems = [];
-    renderStatus(); renderAgenda();
-  });
-
-  // ── Other-module data aggregation ─────────────────────────────
   function gatherMarathonEntries() {
-    const plan = loadJSON('marathon_plan_v1', null);
+    var plan = loadJSON('marathon_plan_v1', null);
     if (!plan || !Array.isArray(plan.entries)) return [];
-    return plan.entries.filter(e => e.date && e.type !== 'rest').map(e => ({
-      dateKey: e.date, time: null, allDay: true,
-      title: (e.label || e.type || 'Run') + (e.plannedDistanceMi ? ' (' + e.plannedDistanceMi + ' mi)' : ''),
-      source: 'marathon', done: !!e.completed, href: 'marathon.html',
-    }));
+    return plan.entries.filter(function(e) { return e.date && e.type !== 'rest'; }).map(function(e) {
+      return {
+        dateKey: e.date, time: null, allDay: true,
+        title: (e.label || e.type || 'Run') + (e.plannedDistanceMi ? ' (' + e.plannedDistanceMi + ' mi)' : ''),
+        source: 'marathon', done: !!e.completed, href: 'marathon.html',
+      };
+    });
   }
+
   function gatherCanvasTasks() {
-    const byCourse = loadJSON('canvas_tasks_v1', []);
-    const out = [];
-    (byCourse || []).forEach(group => (group.tasks || []).forEach(t => {
-      const d = new Date(t.dueAt);
-      out.push({ dateKey: dateKeyLocal(d), time: d, allDay: false, title: t.name + ' (' + group.course + ')', source: 'canvas', done: false, href: 'college.html' });
-    }));
+    var byCourse = loadJSON('canvas_tasks_v1', []);
+    var out = [];
+    (byCourse || []).forEach(function(group) {
+      (group.tasks || []).forEach(function(t) {
+        var d = new Date(t.dueAt);
+        out.push({ dateKey: dateKeyLocal(d), time: d, allDay: false, title: t.name + ' (' + group.course + ')', source: 'canvas', done: false, href: 'college.html' });
+      });
+    });
     return out;
   }
+
   function gatherGoals() {
-    const out = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith('goals:')) continue;
-      const dateKey = k.slice('goals:'.length);
+    var out = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k || k.indexOf('goals:') !== 0) continue;
+      var dateKey = k.slice('goals:'.length);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
-      const goals = loadJSON(k, []);
-      (goals || []).forEach(g => out.push({ dateKey, time: null, allDay: true, title: g.text, source: 'goal', done: !!g.done, href: 'main.html' }));
+      var goals = loadJSON(k, []);
+      (goals || []).forEach(function(g) {
+        out.push({ dateKey: dateKey, time: null, allDay: true, title: g.text, source: 'goal', done: !!g.done, href: 'main.html' });
+      });
     }
     return out;
   }
+
   function gatherGoogleEvents(events) {
-    return (events || []).map(ev => {
-      const startRaw = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
+    return (events || []).map(function(ev) {
+      var startRaw = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
       if (!startRaw) return null;
-      const d = new Date(startRaw);
+      var d = new Date(startRaw);
       return {
-        dateKey: dateKeyLocal(d),
-        time:    ev.start.dateTime ? d : null,
-        allDay:  !ev.start.dateTime,
-        title:   ev.summary || '(no title)',
-        source:  'google-cal',
-        calName: ev._calName || 'Google',
+        dateKey:  dateKeyLocal(d),
+        time:     ev.start.dateTime ? d : null,
+        allDay:   !ev.start.dateTime,
+        title:    ev.summary || '(no title)',
+        source:   'google-cal',
+        calName:  ev._calName  || 'Google',
         calColor: ev._calColor || '#6BE3A4',
-        done:    false,
-        href:    null,
+        done:     false,
+        href:     null,
       };
     }).filter(Boolean);
   }
 
-  // ── Agenda renderer ───────────────────────────────────────────
-  let lastGoogleItems = [];
+  // ---- Agenda renderer ------------------------------------------------
+  var lastGoogleItems = [];
   function renderAgenda() {
-    const todayKey = dateKeyLocal(new Date());
-    const horizon  = dateKeyLocal(new Date(Date.now() + 14 * 86400000));
-    const all = [
-      ...gatherGoogleEvents(lastGoogleItems),
-      ...gatherMarathonEntries(),
-      ...gatherCanvasTasks(),
-      ...gatherGoals(),
-    ].filter(it => it.dateKey >= todayKey && it.dateKey <= horizon);
+    var todayKey = dateKeyLocal(new Date());
+    var horizon  = dateKeyLocal(new Date(Date.now() + 14 * 86400000));
+    var all = [].concat(
+      gatherGoogleEvents(lastGoogleItems),
+      gatherMarathonEntries(),
+      gatherCanvasTasks(),
+      gatherGoals()
+    ).filter(function(it) { return it.dateKey >= todayKey && it.dateKey <= horizon; });
 
-    const groups = {};
-    all.forEach(it => (groups[it.dateKey] = groups[it.dateKey] || []).push(it));
-    const keys = Object.keys(groups).sort();
-    const wrap = $('calEvents');
+    var groups = {};
+    all.forEach(function(it) {
+      if (!groups[it.dateKey]) groups[it.dateKey] = [];
+      groups[it.dateKey].push(it);
+    });
+    var keys = Object.keys(groups).sort();
+    var wrap = $('calEvents');
+
     if (!keys.length) {
-      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">Nothing in the next 14 days — connect Google Calendar above, or check Marathon / College / Goals.</div></div>';
+      wrap.innerHTML = '<div class="gm-card"><div class="empty-state">Nothing in the next 14 days -- connect Google Calendar above, or check Marathon / College / Goals.</div></div>';
       return;
     }
-    wrap.innerHTML = keys.map(key => {
-      const items = groups[key].slice().sort((a, b) => {
+
+    wrap.innerHTML = keys.map(function(key) {
+      var items = groups[key].slice().sort(function(a, b) {
         if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-        return a.time && b.time ? a.time - b.time : 0;
+        return (a.time && b.time) ? a.time - b.time : 0;
       });
-      const rows = items.map(it => {
-        // Left accent border in the calendar's own color for Google events
-        const borderStyle = it.source === 'google-cal' ? ` style="border-left-color:${escapeHtml(it.calColor)}"` : '';
-        const srcLabel = it.source === 'google-cal' ? escapeHtml(it.calName) : it.source;
-        const inner =
-          '<span class="event-time">' + (it.allDay ? 'All day' : fmtTime(it.time)) + '</span>' +
+      var rows = items.map(function(it) {
+        var borderStyle = it.source === 'google-cal' ? ' style="border-left-color:' + escapeHtml(it.calColor) + '"' : '';
+        var srcLabel    = it.source === 'google-cal' ? escapeHtml(it.calName) : it.source;
+        var inner =
+          '<span class="event-time">'  + (it.allDay ? 'All day' : fmtTime(it.time)) + '</span>' +
           '<span class="event-title">' + escapeHtml(it.title) + '</span>' +
-          '<span class="event-src ' + it.source + '">' + srcLabel + '</span>';
+          '<span class="event-src '   + it.source + '">' + srcLabel + '</span>';
         return it.href
-          ? `<a class="event-row${it.done ? ' done' : ''}" href="${it.href}"${borderStyle}>${inner}</a>`
-          : `<div class="event-row${it.done ? ' done' : ''}"${borderStyle}>${inner}</div>`;
+          ? '<a class="event-row' + (it.done ? ' done' : '') + '" href="' + escapeHtml(it.href) + '"' + borderStyle + '>' + inner + '</a>'
+          : '<div class="event-row' + (it.done ? ' done' : '') + '"' + borderStyle + '>' + inner + '</div>';
       }).join('');
-      const d0 = new Date(key + 'T00:00');
-      return `<div class="day-group"><div class="day-label${key === todayKey ? ' today' : ''}">${dayLabel(d0, todayKey)}</div>${rows}</div>`;
+      var d0 = new Date(key + 'T00:00');
+      return '<div class="day-group"><div class="day-label' + (key === todayKey ? ' today' : '') + '">' + dayLabel(d0, todayKey) + '</div>' + rows + '</div>';
     }).join('');
   }
 
-  // ── Sync all selected Google Calendars in parallel ────────────
+  // ---- Sync all accounts ----------------------------------------------
   async function syncCalendar() {
-    const t = await getToken();
-    if (!t) { renderAgenda(); return; }
+    var accounts = getAccounts();
+    if (!accounts.length) { renderAgenda(); return; }
     calErr('');
-    const timeMin = new Date().toISOString();
-    const timeMax = new Date(Date.now() + 14 * 86400000).toISOString();
-    const cals = getSelectedCalendars();
+    var timeMin = new Date().toISOString();
+    var timeMax = new Date(Date.now() + 14 * 86400000).toISOString();
 
     try {
-      const results = await Promise.all(cals.map(async cal => {
-        const encodedId = encodeURIComponent(cal.id);
-        const data = await googleFetch(
-          `/calendars/${encodedId}/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&maxResults=100`,
-          t
-        );
-        // Tag each event with its calendar name + color for display
-        return (data.items || []).map(ev => ({ ...ev, _calName: cal.name, _calColor: cal.color }));
+      var perAccount = await Promise.all(accounts.map(async function(account) {
+        var cals = getSelectedCalendarsForAccount(account);
+        var calResults = await Promise.all(cals.map(async function(cal) {
+          var encodedId = encodeURIComponent(cal.id);
+          var data = await googleFetch(
+            '/calendars/' + encodedId + '/events?singleEvents=true&orderBy=startTime&timeMin=' + encodeURIComponent(timeMin) + '&timeMax=' + encodeURIComponent(timeMax) + '&maxResults=100',
+            account
+          );
+          return (data.items || []).map(function(ev) {
+            return Object.assign({}, ev, { _calName: cal.name, _calColor: cal.color, _accountEmail: account.email });
+          });
+        }));
+        return calResults.reduce(function(acc, arr) { return acc.concat(arr); }, []);
       }));
 
-      lastGoogleItems = results.flat();
+      lastGoogleItems = perAccount.reduce(function(acc, arr) { return acc.concat(arr); }, []);
       renderAgenda();
       localStorage.setItem(SYNC_KEY, String(Date.now()));
-      renderStatus();
-    } catch (e) {
-      calErr(e.message || 'Could not sync your calendars.');
+      $('calSyncTime').textContent = 'Last synced just now';
+    } catch(e) {
+      calErr(e.message || 'Could not sync calendars.');
       renderAgenda();
-      renderStatus();
     }
   }
 
-  // ── Connect / Sync button ─────────────────────────────────────
-  $('calAction').addEventListener('click', async () => {
-    const t = loadJSON(TOKEN_KEY, null);
-    if (t && t.access) {
-      $('calAction').textContent = 'Syncing…';
-      $('calAction').disabled = true;
-      await syncCalendar();
-      $('calAction').disabled = false;
-      return;
-    }
+  // ---- Button listeners -----------------------------------------------
+  $('calAddAccount').addEventListener('click', function() {
     if (!GOOGLE_CLIENT_ID) return;
-    const url = 'https://accounts.google.com/o/oauth2/v2/auth'
-      + '?client_id='    + encodeURIComponent(GOOGLE_CLIENT_ID)
-      + '&redirect_uri=' + encodeURIComponent(GOOGLE_REDIRECT)
-      + '&response_type=code'
-      + '&scope='        + encodeURIComponent(SCOPE)
-      + '&access_type=offline'
-      + '&prompt=consent';
+    var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
+      '?client_id='    + encodeURIComponent(GOOGLE_CLIENT_ID) +
+      '&redirect_uri=' + encodeURIComponent(GOOGLE_REDIRECT) +
+      '&response_type=code' +
+      '&scope='        + encodeURIComponent(SCOPE) +
+      '&access_type=offline' +
+      '&prompt=consent';
     window.location.href = url;
   });
 
-  // ── Init ──────────────────────────────────────────────────────
-  renderStatus();
-  if (loadJSON(TOKEN_KEY, null)) {
-    renderCalendarList();   // show saved calendar list immediately
-    syncCalendar().then(() => {
-      // After first sync, refresh the calendar list in the background
-      if (!(loadJSON(CALS_KEY, { list: [] }).list || []).length) fetchCalendarList();
+  $('calSyncBtn').addEventListener('click', async function() {
+    $('calSyncBtn').textContent = 'Syncing...';
+    $('calSyncBtn').disabled = true;
+    await syncCalendar();
+    $('calSyncBtn').textContent = 'Sync now';
+    $('calSyncBtn').disabled = false;
+  });
+
+  $('calSelectAll').addEventListener('click', function() {
+    var accounts = getAccounts();
+    var cals = loadJSON(CALS_KEY, {});
+    accounts.forEach(function(a) {
+      var stored = cals[a.email] || { list: [] };
+      cals[a.email] = Object.assign({}, stored, { selected: (stored.list || []).map(function(c) { return c.id; }) });
     });
-    // Always try to fetch/refresh calendar list on load
-    fetchCalendarList();
-  } else {
-    renderAgenda(); // show marathon/canvas/goals even before Google is connected
+    saveJSON(CALS_KEY, cals);
+    renderCalendarList(); syncCalendar();
+  });
+
+  $('calSelectNone').addEventListener('click', function() {
+    var accounts = getAccounts();
+    var cals = loadJSON(CALS_KEY, {});
+    accounts.forEach(function(a) {
+      var stored = cals[a.email] || { list: [] };
+      cals[a.email] = Object.assign({}, stored, { selected: [] });
+    });
+    saveJSON(CALS_KEY, cals);
+    renderCalendarList(); renderAgenda();
+  });
+
+  $('calRefreshList').addEventListener('click', fetchAllCalendarLists);
+
+  // ---- Migration from old single-account storage ----------------------
+  async function migrateOldAccount() {
+    var old = loadJSON('google_tokens_v1', null);
+    if (!old || !old.access) return;
+    var accounts = getAccounts();
+    if (accounts.length > 0) { localStorage.removeItem('google_tokens_v1'); return; }
+
+    try {
+      var r = await fetch('/api/integrations/google?path=/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + old.access, 'Accept': 'application/json', 'X-App-Secret': APP_SECRET },
+      });
+      var info = r.ok ? await r.json() : {};
+      var email = info.email || 'primary-account';
+      var name  = info.name  || email;
+      var updated = { email: email, name: name, access: old.access, refresh: old.refresh, expires: old.expires };
+      accounts.push(updated);
+      saveAccounts(accounts);
+
+      // Migrate calendar selections
+      var oldCals = loadJSON('google_calendars_v2', null);
+      if (oldCals && oldCals.list) {
+        var cals = loadJSON(CALS_KEY, {});
+        cals[email] = { list: oldCals.list, selected: oldCals.selected || oldCals.list.map(function(c) { return c.id; }) };
+        saveJSON(CALS_KEY, cals);
+        localStorage.removeItem('google_calendars_v2');
+      }
+    } catch(e) {
+      var email2 = 'primary-account';
+      accounts.push({ email: email2, name: 'Google Account', access: old.access, refresh: old.refresh, expires: old.expires });
+      saveAccounts(accounts);
+    }
+    localStorage.removeItem('google_tokens_v1');
   }
+
+  // ---- Init -----------------------------------------------------------
+  async function init() {
+    await migrateOldAccount();
+    await handleOAuthCallback();
+    renderAll();
+    var accounts = getAccounts();
+    if (accounts.length) {
+      syncCalendar();
+      fetchAllCalendarLists();
+    } else {
+      renderAgenda();
+    }
+  }
+
+  init();
   window.addEventListener('storage', renderAgenda);
 })();
 </script>
