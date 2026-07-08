@@ -522,6 +522,18 @@ html, body {
     </div>
     <div class="water-helper" id="waterHelper">Start the day — first one in.</div>
 
+    <!-- Bottle size inline selector — always visible on main screen -->
+    <div id="bottleSizeRow" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 4px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:var(--text-3)">Bottle size</span>
+      <input type="number" id="inlineBottleSize" min="1" max="5000" step="1"
+        style="width:72px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:8px;background:rgba(0,0,0,0.3);color:var(--text-1);font-family:inherit;font-size:14px;font-weight:700;text-align:center;outline:none;-moz-appearance:textfield">
+      <div style="display:flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden">
+        <button type="button" id="inlineUnitOz" style="padding:5px 10px;border:none;background:transparent;color:var(--text-3);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:0.15s">oz</button>
+        <button type="button" id="inlineUnitMl" style="padding:5px 10px;border:none;border-left:1px solid var(--border-strong);background:transparent;color:var(--text-3);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:0.15s">ml</button>
+      </div>
+      <span id="inlineBottleCalc" style="font-size:11px;color:var(--text-3)"></span>
+    </div>
+
     <button class="why-toggle" id="whyToggle" type="button" aria-expanded="false">
       <span>Why this target?</span>
       <span class="why-arrow">▾</span>
@@ -816,10 +828,21 @@ html, body {
     const count = todayCount();
     const unitName = unitLabelPlural();
 
-    $('waterUnitLabel').textContent = unitName.toUpperCase() + ' DRANK TODAY';
+    // When tracking in bottles, clarify the bottle size in the label
+    if (state.unit === 'bottle') {
+      const sizeLabel = state.bottleSizeUnit === 'oz'
+        ? mlToDisplayBottle(state.bottleMl) + ' oz'
+        : (state.bottleMl) + ' ml';
+      $('waterUnitLabel').textContent = 'BOTTLES DRANK TODAY (' + sizeLabel + ' each)';
+    } else {
+      $('waterUnitLabel').textContent = unitName.toUpperCase() + ' DRANK TODAY';
+    }
     $('waterNum').textContent = count;
     $('waterTarget').textContent = '/ ' + targetUnits;
     $('waterPlusLabel').textContent = 'Drank a ' + unitLabelSingular();
+
+    // Inline bottle size row — keep in sync with state
+    syncInlineBottleSize();
 
     // Progress bar with three zones: low (0-65%), healthy (65-100%), over (100-150%)
     const pctRaw = (count / targetUnits) * 100;
@@ -1005,6 +1028,54 @@ html, body {
       : (state.bottleMl + ' ml');
     el.textContent = 'At ' + unitLabel + ' per bottle → you need ' + bottlesNeeded + ' bottle' + (bottlesNeeded !== 1 ? 's' : '') + ' a day (' + fmtMl(calc.total) + ' total)';
   }
+
+  function syncInlineBottleSize() {
+    const inp   = $('inlineBottleSize');
+    const calcEl = $('inlineBottleCalc');
+    const ozBtn = $('inlineUnitOz');
+    const mlBtn = $('inlineUnitMl');
+    if (!inp) return;
+    const isOz = state.bottleSizeUnit === 'oz';
+    inp.value = mlToDisplayBottle(state.bottleMl);
+    // Highlight active unit button
+    const activeStyle = 'background:rgba(110,231,183,0.14);color:var(--good)';
+    const inactiveStyle = 'background:transparent;color:var(--text-3)';
+    ozBtn.style.cssText = ozBtn.style.cssText.replace(/background:[^;]+;color:[^;]+/, '') + (isOz ? activeStyle : inactiveStyle);
+    mlBtn.style.cssText = mlBtn.style.cssText.replace(/background:[^;]+;color:[^;]+/, '') + (isOz ? inactiveStyle : activeStyle);
+    // Recalculate needed bottles
+    const calc = computeTargetMl();
+    const needed = Math.ceil(calc.total / (state.bottleMl || 500));
+    const displaySize = mlToDisplayBottle(state.bottleMl);
+    calcEl.textContent = '= ' + needed + ' bottle' + (needed !== 1 ? 's' : '') + ' / day';
+  }
+
+  // ── Inline bottle size event wiring ──────────────────────────────
+  (function wireInline() {
+    const inp = $('inlineBottleSize');
+    if (!inp) return;
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      if (v > 0) { state.bottleMl = displayBottleToMl(v); saveState(); }
+      syncInlineBottleSize();
+      renderWater();
+      renderBottlePresets();
+      renderBottlePreview();
+    });
+    $('inlineUnitOz').addEventListener('click', () => {
+      state.bottleSizeUnit = 'oz';
+      saveState();
+      syncInlineBottleSize();
+      syncBottleSizeInput();
+      renderBottlePreview();
+    });
+    $('inlineUnitMl').addEventListener('click', () => {
+      state.bottleSizeUnit = 'ml';
+      saveState();
+      syncInlineBottleSize();
+      syncBottleSizeInput();
+      renderBottlePreview();
+    });
+  })();
 
   function renderSettings() {
     $('setWeight').value = state.weightUnit === 'lb'
