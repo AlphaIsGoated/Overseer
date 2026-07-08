@@ -42,6 +42,15 @@ export default async function middleware(req) {
   const { pathname } = new URL(req.url);
   if (PUBLIC_PATHS.includes(pathname)) return;
 
+  // Vercel Cron jobs are headless server requests — they have no session cookie.
+  // Vercel automatically sets CRON_SECRET and sends it as "Authorization: Bearer <secret>"
+  // on every cron invocation. Verify it here so cron calls bypass the login gate.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader === 'Bearer ' + cronSecret) return;
+  }
+
   const password = process.env.SITE_PASSWORD;
   if (!password) {
     return new Response(

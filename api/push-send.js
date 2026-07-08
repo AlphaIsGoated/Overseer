@@ -92,10 +92,15 @@ async function buildPayload(type, supaUrl, supaKey) {
 }
 
 export default async function handler(req, res) {
-  // Vercel Cron sends GET requests; manual triggers use POST.
-  // Both are valid — only enforce APP_SECRET for non-cron calls.
+  // Vercel Cron sends GET with "Authorization: Bearer <CRON_SECRET>".
+  // Manual test button (Settings) sends GET/POST with X-App-Secret.
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
-  const isCron = req.query && req.query.cron === '1';
+
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = (req.headers && req.headers.authorization) || '';
+  const isCron = (cronSecret && authHeader === 'Bearer ' + cronSecret)
+              || (req.query && req.query.cron === '1'); // fallback for manual test
+
   if (!isCron && !requireAppSecret(req, res)) return;
 
   const type = (req.query && req.query.type) || 'morning';
