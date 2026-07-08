@@ -125,11 +125,11 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   if (creds.url) { document.getElementById('obsUrl').value = creds.url; }
   if (creds.key) { document.getElementById('obsKey').value = creds.key; }
 
-  // Cap: max nodes shown in the graph. With 300 notes the O(N²) simulation
-  // runs at ~90,000 ops/tick × 60 fps — unusable. At 75 nodes it's 5,625
-  // ops/tick — smooth. We prefer pinned + Obsidian notes + most recently
-  // edited so the most relevant content is always visible.
-  const MAX_NODES = 75;
+  // Node cap — raised from 75 to 150 because the repulsion loop now uses a
+  // spatial hash grid (O(N×k) ≈ O(N)) instead of O(N²) pair comparisons.
+  // At N=150 with the hash the tick cost is ~3,000 ops vs 11,250 without it,
+  // comparable to the old N=75 O(N²) cost of 2,812 ops.
+  const MAX_NODES = 150;
   let totalNoteCount = 0; // for the "X of Y" indicator
 
   // ---- Gather note data from both sources ----
@@ -202,44 +202,83 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     const vx = new Float64Array(n);
     const vy = new Float64Array(n);
 
+    const K = 1000; // repulsion strength
+    const G = 0.02; // gravity toward centre
+
     function tick(cooling) {
       const fx = new Float64Array(n);
       const fy = new Float64Array(n);
-      const K = 1000; // repulsion strength
       const L = Math.min(W, H) / (Math.sqrt(n) + 1) * 1.4; // rest edge length
-      const G = 0.02; // gravity
 
-      // Repulsion
+      // ── Spatial-hash repulsion — O(N×k) instead of O(N²) ──────────────
+      // Divide the canvas into grid cells sized ~2× the rest edge length.
+      // Each node only repels nodes in its own cell plus the 8 neighbours,
+      // so the number of pairs checked per node stays roughly constant as
+      // N grows (≈ 9 cells × local_density), not proportional to N.
+      const cellSize = Math.max(L * 2, 60);
+      const cols = Math.max(1, Math.ceil(W / cellSize));
+      const rows = Math.max(1, Math.ceil(H / cellSize));
+      // Build grid: flat Uint16Array of node indices per cell
+      const cellOf = new Int32Array(n);
+      const cellCount = new Int32Array(cols * rows);
       for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-          let dx = px[i] - px[j], dy = py[i] - py[j];
-          const d2 = dx * dx + dy * dy + 1;
-          const f = K / d2;
-          const inv = 1 / Math.sqrt(d2);
-          fx[i] += f * dx * inv; fy[i] += f * dy * inv;
-          fx[j] -= f * dx * inv; fy[j] -= f * dy * inv;
+        const cx2 = Math.min(cols - 1, Math.max(0, Math.floor(px[i] / cellSize)));
+        const cy2 = Math.min(rows - 1, Math.max(0, Math.floor(py[i] / cellSize)));
+        cellOf[i] = cy2 * cols + cx2;
+        cellCount[cellOf[i]]++;
+      }
+      // Build per-cell node lists
+      const cellStart = new Int32Array(cols * rows + 1);
+      for (let c = 0; c < cols * rows; c++) cellStart[c + 1] = cellStart[c] + cellCount[c];
+      const cellNodes = new Int32Array(n);
+      const cellFill  = new Int32Array(cols * rows);
+      for (let i = 0; i < n; i++) {
+        const c = cellOf[i];
+        cellNodes[cellStart[c] + cellFill[c]++] = i;
+      }
+      // Compute repulsion against neighbours only
+      for (let i = 0; i < n; i++) {
+        const cxi = Math.min(cols-1, Math.max(0, Math.floor(px[i] / cellSize)));
+        const cyi = Math.min(rows-1, Math.max(0, Math.floor(py[i] / cellSize)));
+        for (let dcy = -1; dcy <= 1; dcy++) {
+          const ny = cyi + dcy;
+          if (ny < 0 || ny >= rows) continue;
+          for (let dcx = -1; dcx <= 1; dcx++) {
+            const nx2 = cxi + dcx;
+            if (nx2 < 0 || nx2 >= cols) continue;
+            const cid = ny * cols + nx2;
+            const end = cellStart[cid + 1];
+            for (let s = cellStart[cid]; s < end; s++) {
+              const j = cellNodes[s];
+              if (j <= i) continue; // avoid double-counting
+              let dx = px[i] - px[j], dy = py[i] - py[j];
+              const d2 = dx * dx + dy * dy + 1;
+              const f = K / d2, inv = 1 / Math.sqrt(d2);
+              fx[i] += f * dx * inv; fy[i] += f * dy * inv;
+              fx[j] -= f * dx * inv; fy[j] -= f * dy * inv;
+            }
+          }
         }
       }
-      // Attraction (edges)
-      edges.forEach(e => {
-        let dx = px[e.b] - px[e.a], dy = py[e.b] - py[e.a];
+
+      // Attraction (spring forces along edges)
+      for (let e = 0; e < edges.length; e++) {
+        const ea = edges[e].a, eb = edges[e].b, ew = edges[e].weight;
+        let dx = px[eb] - px[ea], dy = py[eb] - py[ea];
         const d = Math.max(Math.sqrt(dx * dx + dy * dy), 0.1);
-        const f = (d - L * 0.8) * 0.04 * e.weight;
-        const inv = 1 / d;
-        fx[e.a] += f * dx * inv; fy[e.a] += f * dy * inv;
-        fx[e.b] -= f * dx * inv; fy[e.b] -= f * dy * inv;
-      });
-      // Gravity + velocity update
+        const f = (d - L * 0.8) * 0.04 * ew, inv = 1 / d;
+        fx[ea] += f * dx * inv; fy[ea] += f * dy * inv;
+        fx[eb] -= f * dx * inv; fy[eb] -= f * dy * inv;
+      }
+
+      // Gravity + velocity + clamp
       for (let i = 0; i < n; i++) {
         fx[i] += (cx - px[i]) * G;
         fy[i] += (cy - py[i]) * G;
         vx[i] = (vx[i] + fx[i]) * 0.72 * cooling;
         vy[i] = (vy[i] + fy[i]) * 0.72 * cooling;
-        px[i] += vx[i];
-        py[i] += vy[i];
-        // Keep within bounds
-        px[i] = Math.max(20, Math.min(W - 20, px[i]));
-        py[i] = Math.max(20, Math.min(H - 20, py[i]));
+        px[i] = Math.max(20, Math.min(W - 20, px[i] + vx[i]));
+        py[i] = Math.max(20, Math.min(H - 20, py[i] + vy[i]));
       }
     }
 
@@ -342,7 +381,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   function rebuild() {
     nodes = gatherNodes();
-    edges = buildEdges(nodes);
+    edges = []; // show nodes immediately with no edges yet
     resize();
     updateCountIndicator();
     if (!nodes.length) { draw(); return; }
@@ -350,6 +389,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     tick = 0;
     settled = false;
     if (!animRunning) startAnimate();
+    // Build edges in the background — O(N²) but runs only once.
+    // Defer so the canvas first-paint happens before this blocks the thread.
+    setTimeout(() => {
+      edges = buildEdges(nodes);
+      // Restart simulation briefly so edge springs can take effect
+      if (settled) { settled = false; tick = 160; if (!animRunning) startAnimate(); }
+    }, 80);
   }
 
   // ---- Animation loop with auto-settle --------------------------------
