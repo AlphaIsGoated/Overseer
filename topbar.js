@@ -853,6 +853,12 @@ body.topbar-modal-open {
     fab.addEventListener('click', openPanel);
     document.getElementById('coachClose').addEventListener('click', closePanel);
     panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
+
+    // A subtle "something's worth a look" indicator before the panel's
+    // ever been opened this session — removed the instant it's opened.
+    if (!sessionStorage.getItem('coach_proactive_seen')) fab.classList.add('has-insight');
+
+    // ---- Voice ----
     function unlockAudio() {
       if (window._coachAudioCtx && window._coachAudioCtx.state !== 'closed') return;
       try {
@@ -860,27 +866,22 @@ body.topbar-modal-open {
         window._coachAudioCtx.resume().catch(() => {});
       } catch (_) {}
     }
-    // Unlock on every possible first gesture so AudioContext is ready before speak() fires.
-    fab.addEventListener('click', unlockAudio, { once: false });
-    voiceToggle.addEventListener('click', unlockAudio, { once: false });
-    document.getElementById('coachSend').addEventListener('click', () => { unlockAudio(); ask(input.value); });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { unlockAudio(); ask(input.value); } });
 
-    // A subtle "something's worth a look" indicator before the panel's
-    // ever been opened this session — removed the instant it's opened.
-    if (!sessionStorage.getItem('coach_proactive_seen')) fab.classList.add('has-insight');
-
-    // ---- Voice: same pattern as Nova Lite (browser-native, free) ----
     let voiceOn = false;
     const voiceToggle = document.getElementById('coachVoiceToggle');
     try { voiceOn = localStorage.getItem('coach_voice_on') === '1'; } catch (e) {}
     voiceToggle.classList.toggle('on', voiceOn);
     voiceToggle.addEventListener('click', () => {
+      unlockAudio();
       voiceOn = !voiceOn;
       voiceToggle.classList.toggle('on', voiceOn);
       try { localStorage.setItem('coach_voice_on', voiceOn ? '1' : '0'); } catch (e) {}
       if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
     });
+
+    fab.addEventListener('click', unlockAudio);
+    document.getElementById('coachSend').addEventListener('click', () => { unlockAudio(); ask(input.value); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { unlockAudio(); ask(input.value); } });
     function speak(text) {
       if (!voiceOn || !text) return;
       const clean = text.replace(/\*\*/g, '').replace(/^[-•*]\s+/gm, '').trim();
