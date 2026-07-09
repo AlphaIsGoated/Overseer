@@ -49,9 +49,12 @@ export default async function handler(req, res) {
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
       console.error('[elevenlabs-tts] API error', r.status, errText.slice(0, 500));
-      // Always return 400 (not the upstream status) so Vercel doesn't
-      // intercept 5xx responses and replace the body with HTML.
-      return res.status(400).json({ error: 'ElevenLabs ' + r.status + ': ' + errText.slice(0, 300) });
+      const friendly = r.status === 402
+        ? 'ElevenLabs requires a paid plan to use library voices via API. Upgrade at elevenlabs.io or remove ELEVENLABS_API_KEY from Vercel to use browser speech instead.'
+        : r.status === 401
+        ? 'ElevenLabs API key is invalid or expired. Check ELEVENLABS_API_KEY in Vercel settings.'
+        : 'ElevenLabs ' + r.status + ': ' + errText.slice(0, 200);
+      return res.status(400).json({ error: friendly });
     }
 
     res.setHeader('Content-Type', 'audio/mpeg');
