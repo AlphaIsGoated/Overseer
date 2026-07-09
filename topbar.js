@@ -908,7 +908,7 @@ body.topbar-modal-open {
           headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
           body: JSON.stringify({ text: clean }),
         }).then(r => {
-          if (!r.ok) throw new Error('ElevenLabs ' + r.status);
+          if (!r.ok) return r.json().catch(() => ({})).then(b => { throw new Error(b.error || ('ElevenLabs ' + r.status)); });
           return r.arrayBuffer();
         }).then(buf => {
           if (!buf || !voiceOn) return;

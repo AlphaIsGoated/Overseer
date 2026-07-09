@@ -13,7 +13,7 @@
 // ============================================================
 import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
 
-const DEFAULT_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam — clear, deep, neutral
+const DEFAULT_VOICE = 'onwK4e9ZLuTAKqWW03F9'; // Daniel — deep, British, authoritative
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_turbo_v2_5',
+        model_id: 'eleven_turbo_v2',
         voice_settings: { stability: 0.45, similarity_boost: 0.75 },
       }),
     });
