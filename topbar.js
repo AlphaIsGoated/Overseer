@@ -395,7 +395,7 @@ body.topbar-modal-open {
     const coachWrap = document.createElement('div');
     coachWrap.innerHTML = coachHtml.trim();
     document.body.appendChild(coachWrap);
-    initCoach();
+    try { initCoach(); } catch (e) { console.error('[coach]', e); }
   }
 
   // -------- Active-date helpers (match the goals page 6 AM rollover) --------
