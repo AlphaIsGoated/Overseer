@@ -666,9 +666,10 @@ body.topbar-modal-open {
       const SKIP = new Set([
         'strava_tokens_v1','whoop_tokens_v1','google_accounts_v1','brain:obs_creds',
         'canvas_creds_v1','apiusage:log','data-theme','coach_voice_on','nova_voice_on',
-        'settings:budget_alerted','google_last_sync','canvas_last_sync',
-        'strava_last_sync','whoop_last_sync','finance_active_tab',
-        'po_coach_units_migrated_lb_v1','po_coach_workout_done',
+        'settings:budget_alerted','settings:conservation_mode','settings:model',
+        'settings:theme','settings:monthly_budget',
+        'google_last_sync','canvas_last_sync','strava_last_sync','whoop_last_sync',
+        'finance_active_tab','po_coach_units_migrated_lb_v1','po_coach_workout_done',
         'wish-hero-pct-num',
       ]);
       const SKIP_PFX = ['photo_','google_tokens','tpl:','coach_proactive'];
@@ -750,7 +751,8 @@ body.topbar-modal-open {
 
     const CHAT_SYS =
       "You are the user's personal AI coach — sharp, direct, like talking to a knowledgeable friend who " +
-      "knows all their data. Dashboard data is provided as JSON below. Rules: " +
+      "knows all their data. Your replies are read aloud via ElevenLabs TTS when the user has voice mode on — " +
+      "never say you are 'text only' or disclaim voice capability. Dashboard data is below. Rules: " +
       "Never repeat what you said in a previous turn. Never re-introduce yourself. " +
       "Never restate data the user already knows or already mentioned. " +
       "Answer the exact question asked, short and specific — a sentence or two, or a tight bullet list. " +

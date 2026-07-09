@@ -112,10 +112,56 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
 
   // ---- read whatever the dashboard stored (for context) ----
   function dashboardData(){
+    const SKIP = new Set([
+      'strava_tokens_v1','whoop_tokens_v1','google_accounts_v1','brain:obs_creds',
+      'canvas_creds_v1','apiusage:log','data-theme','coach_voice_on','nova_voice_on',
+      'settings:budget_alerted','settings:conservation_mode','settings:model',
+      'settings:theme','settings:monthly_budget',
+      'google_last_sync','canvas_last_sync','strava_last_sync','whoop_last_sync',
+      'finance_active_tab','po_coach_units_migrated_lb_v1','po_coach_workout_done',
+      'wish-hero-pct-num',
+    ]);
+    const SKIP_PFX = ['photo_','google_tokens','tpl:','coach_proactive'];
+    const now = Date.now(), WINDOW = 35 * 86400000;
     const out = {};
     for (let i = 0; i < localStorage.length; i++){
       const k = localStorage.key(i);
-      try { out[k] = JSON.parse(localStorage.getItem(k)); } catch(e){ out[k] = localStorage.getItem(k); }
+      if (SKIP.has(k) || SKIP_PFX.some(p => k.startsWith(p))) continue;
+      let v;
+      try { v = JSON.parse(localStorage.getItem(k)); } catch(_){ v = localStorage.getItem(k); }
+      if (typeof v === 'string' && v.startsWith('data:')) continue;
+      if (k === 'marathon_plan_v1' && v && Array.isArray(v.entries)) {
+        out[k] = { ...v, entries: v.entries
+          .filter(e => Math.abs(new Date(e.date+'T00:00').getTime() - now) < WINDOW)
+          .map(e => ({ date:e.date, type:e.type, label:e.label,
+            plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
+            actualDistanceMi:e.actualDistanceMi })) };
+      } else if (k === 'notes:items' && Array.isArray(v)) {
+        out[k] = v.slice(0,25).map(n => ({ title:n.title, category:n.category, body:(n.body||'').slice(0,150), pinned:n.pinned }));
+      } else if (k === 'brain:obs_notes' && Array.isArray(v)) {
+        out[k] = v.slice(0,12).map(n => ({ path:n.path, body:(n.body||'').slice(0,80) }));
+      } else if (k === 'strava_activities_v1' && Array.isArray(v)) {
+        out[k] = v.slice(-10).map(a => ({ name:a.name, type:a.type, date:a.start_date_local, distance:a.distance, elapsed_time:a.elapsed_time, average_heartrate:a.average_heartrate }));
+      } else if (k === 'google_calendars_v3' && v && typeof v === 'object') {
+        const slim = {}; for (const id of Object.keys(v)) slim[id] = { name:v[id].name, color:v[id].color, enabled:v[id].enabled }; out[k] = slim;
+      } else if (k === 'internship:opportunities' && Array.isArray(v)) {
+        out[k] = v.slice(0,20).map(o => ({ company:o.company, role:o.role, status:o.status, deadline:o.deadline }));
+      } else if (k === 'nw:history' && Array.isArray(v)) {
+        out[k] = v.slice(-6);
+      } else if (k === 'po_coach_weights' && Array.isArray(v)) {
+        out[k] = v.slice(-20);
+      } else if ((k === 'po_coach_photos' || k === 'po_coach_inbody') && v) {
+        out[k] = '[photos omitted for size]';
+      } else if (typeof v === 'string' && v.length > 4000) {
+        out[k] = v.slice(0,400) + '…';
+      } else {
+        out[k] = v;
+      }
+    }
+    let json = JSON.stringify(out);
+    if (json.length > 40000) {
+      const bySize = Object.keys(out).sort((a,b) => JSON.stringify(out[b]).length - JSON.stringify(out[a]).length);
+      for (const k of bySize) { out[k] = '[trimmed]'; json = JSON.stringify(out); if (json.length <= 40000) break; }
     }
     return out;
   }
