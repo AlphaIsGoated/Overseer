@@ -32,6 +32,16 @@ async function fetchModuleData(supaUrl, supaKey, appKey) {
 function dateKey(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
+function isoWeekKey(d) {
+  const dt = new Date(d); dt.setHours(0, 0, 0, 0);
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7)); // back up to Monday
+  return dateKey(dt);
+}
+
+function readMarathonPlan(raw) {
+  if (!raw) return null;
+  return raw['marathon_plan_v1'] || raw; // sync.js nests data under the localStorage key name
+}
 
 async function buildPayload(type, supaUrl, supaKey) {
   const today = dateKey(new Date());
@@ -40,7 +50,7 @@ async function buildPayload(type, supaUrl, supaKey) {
 
   switch (type) {
     case 'training': {
-      const plan = await fetchModuleData(supaUrl, supaKey, 'marathon');
+      const plan = readMarathonPlan(await fetchModuleData(supaUrl, supaKey, 'marathon'));
       const entries = (plan && plan.entries) || [];
       const todayEntry = entries.find(e => e.date === today);
       const tomorrowEntry = entries.find(e => e.date === tomorrow);
@@ -65,22 +75,35 @@ async function buildPayload(type, supaUrl, supaKey) {
     }
 
     case 'reminders': {
-      const chores = await fetchModuleData(supaUrl, supaKey, 'chores');
-      const items = (chores && (Array.isArray(chores) ? chores : chores['chores:items'])) || [];
-      const pending = items.filter(c => {
+      const thisWeek = isoWeekKey(new Date());
+      const [choresData, pcData] = await Promise.all([
+        fetchModuleData(supaUrl, supaKey, 'chores'),
+        fetchModuleData(supaUrl, supaKey, 'personalcare'),
+      ]);
+
+      const choreItems = (choresData && (Array.isArray(choresData) ? choresData : choresData['chores:items'])) || [];
+      const chorePending = choreItems.filter(c => {
         if (c.recurring === 'daily') return c.lastDoneKey !== today;
-        if (c.recurring === 'weekly') return true;
+        if (c.recurring === 'weekly') return c.lastDoneKey !== thisWeek;
         return !c.done;
-      });
-      if (pending.length > 0) {
-        return { tag: 'reminders', title: '✅ Reminders · ' + pending.length + ' pending', body: pending.length === 1 ? `"${pending[0].text}" is still on your list.` : `${pending.length} tasks pending — "${pending[0].text}" and ${pending.length - 1} more.`, url: '/chores.html' };
+      }).map(c => c.text);
+
+      const pcItems = (pcData && pcData['personalcare:items']) || [];
+      const pcPending = pcItems.filter(i => i.kind === 'daily' && i.lastDoneKey !== today).map(i => i.name);
+
+      const allPending = [...chorePending, ...pcPending];
+      if (allPending.length > 0) {
+        const body = allPending.length === 1
+          ? `"${allPending[0]}" is still pending.`
+          : `${allPending.length} tasks pending — "${allPending[0]}" and ${allPending.length - 1} more.`;
+        return { tag: 'reminders', title: '✅ Reminders · ' + allPending.length + ' pending', body, url: '/chores.html' };
       }
       return { tag: 'reminders', title: '✅ Reminders', body: 'No overdue tasks today. Keep up the streak!', url: '/chores.html' };
     }
 
     case 'morning':
     default: {
-      const plan = await fetchModuleData(supaUrl, supaKey, 'marathon');
+      const plan = readMarathonPlan(await fetchModuleData(supaUrl, supaKey, 'marathon'));
       const todayRun = ((plan && plan.entries) || []).find(e => e.date === today && e.type !== 'rest');
       if (todayRun) {
         const dist = todayRun.plannedDistanceMi ? ` — ${todayRun.plannedDistanceMi} mi` : '';

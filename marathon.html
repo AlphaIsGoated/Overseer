@@ -1597,6 +1597,19 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   renderProgress();
   // If already connected, sync quietly on load so the page opens with fresh data.
   if (loadJSON(STRAVA_KEY, null)) syncStrava();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'marathon',
+      syncedKeys: [PLAN_KEY],
+      onApplied: function () {
+        plan = loadJSON(PLAN_KEY, defaultPlan());
+        if (!Array.isArray(plan.entries)) plan.entries = [];
+        renderCountdown(); renderPaceGrid(); renderProgress();
+        renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderSchedule();
+      }
+    });
+  }
 })();
 </script>
 </body>
