@@ -816,7 +816,7 @@ body.topbar-modal-open {
 
     async function runProactiveScan() {
       const cached = sessionStorage.getItem('coach_proactive_text');
-      if (cached) { addMsg('coach', cached, true); return; }
+      if (cached) { addMsg('coach', cached, true); speak(cached); return; }
       // Conservation mode skips this entirely — it's the single biggest
       // recurring cost (a full dashboard-data scan on every session) since
       // it fires automatically rather than being something you asked for.
@@ -885,7 +885,13 @@ body.topbar-modal-open {
       voiceOn = !voiceOn;
       voiceToggle.classList.toggle('on', voiceOn);
       try { localStorage.setItem('coach_voice_on', voiceOn ? '1' : '0'); } catch (e) {}
-      if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+      if (voiceOn) {
+        // Speak the most recent coach message so the user gets immediate audio feedback.
+        const lastCoachMsg = [...feed.querySelectorAll('.coach-msg.coach')].pop();
+        if (lastCoachMsg) speak(lastCoachMsg.textContent);
+      } else {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+      }
     });
 
     fab.addEventListener('click', unlockAudio);
@@ -909,6 +915,11 @@ body.topbar-modal-open {
           const blob = new Blob([buf], { type: 'audio/mpeg' });
           const url = URL.createObjectURL(blob);
           const cleanup = () => URL.revokeObjectURL(url);
+          const onPlayErr = (err) => {
+            cleanup();
+            console.warn('[coach voice]', err.message);
+            addMsg('coach', '⚠ Voice error: ' + err.message + ' — check browser volume and permissions.', false);
+          };
           if (_voiceEl) {
             // Reuse the pre-unlocked element — changing src on an already-played
             // Audio element bypasses iOS autoplay restrictions entirely.
@@ -916,14 +927,17 @@ body.topbar-modal-open {
             _voiceEl.src = url;
             _voiceEl.volume = 1;
             _voiceEl.onended = cleanup;
-            _voiceEl.play().catch(err => { cleanup(); console.warn('[coach voice]', err.message); });
+            _voiceEl.play().catch(onPlayErr);
           } else {
             // Fallback: no gesture was captured before speak() was called.
             const a = new Audio(url);
             a.onended = cleanup;
-            a.play().catch(err => { cleanup(); console.warn('[coach voice]', err.message); });
+            a.play().catch(onPlayErr);
           }
-        }).catch(err => console.warn('[coach voice]', err.message));
+        }).catch(err => {
+          console.warn('[coach voice]', err.message);
+          addMsg('coach', '⚠ Voice error: ' + err.message, false);
+        });
         return;
       }
       if (!window.speechSynthesis) return;
