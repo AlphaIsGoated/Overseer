@@ -749,11 +749,13 @@ body.topbar-modal-open {
     }
 
     const CHAT_SYS =
-      "You are the user's personal coach embedded across their entire life-tracking dashboard — fitness, " +
-      "health, finance, marathon training, college, nutrition, skincare, and more. You can see all of their " +
-      "saved data below. Be direct, sharp, and concise — a few sentences or short bullets, never an essay. " +
-      "Ground every answer in their actual data; if you don't have what you'd need, say so and ask one " +
-      "focused question. Dashboard data as JSON:\n";
+      "You are the user's personal AI coach — sharp, direct, like talking to a knowledgeable friend who " +
+      "knows all their data. Dashboard data is provided as JSON below. Rules: " +
+      "Never repeat what you said in a previous turn. Never re-introduce yourself. " +
+      "Never restate data the user already knows or already mentioned. " +
+      "Answer the exact question asked, short and specific — a sentence or two, or a tight bullet list. " +
+      "Build naturally on the conversation history. If you don't have what you need, ask one pointed question. " +
+      "Dashboard data as JSON:\n";
     const PROACTIVE_SYS =
       "You are the user's personal coach scanning their entire life-tracking dashboard for anything worth " +
       "flagging right now — overdue or upcoming deadlines, missed daily targets, low supplies, schedule " +
@@ -761,21 +763,35 @@ body.topbar-modal-open {
       "MOST relevant things only — not a status report of everything. If genuinely nothing stands out, say a " +
       "brief one-line all-clear instead of inventing concerns. Be direct and concise, a few short lines, no preamble.";
 
-    async function callAI(system, userText) {
+    // Conversation history — keeps the last 10 turns so the coach remembers
+    // what was said earlier in the session without ballooning token usage.
+    const chatHistory = [];
+    const DATA_SYS = CHAT_SYS + JSON.stringify(dashboardData());
+
+    async function callAI(system, userText, addToHistory) {
+      const msgs = addToHistory
+        ? [...chatHistory, { role: 'user', content: userText }]
+        : [{ role: 'user', content: userText }];
       const res = await fetch('/api/ai/ai-chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({
-          system: system + JSON.stringify(dashboardData()),
+          system,
           model: window.getPreferredModel ? window.getPreferredModel() : 'claude-opus-4-8',
           conservation: window.isConservationMode ? window.isConservationMode() : false,
-          messages: [{ role: 'user', content: userText }],
+          messages: msgs,
         }),
       });
       if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'coach');
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Something went wrong.');
-      return json.text || '(no response)';
+      const reply = json.text || '(no response)';
+      if (addToHistory) {
+        chatHistory.push({ role: 'user', content: userText });
+        chatHistory.push({ role: 'assistant', content: reply });
+        if (chatHistory.length > 20) chatHistory.splice(0, chatHistory.length - 20);
+      }
+      return reply;
     }
 
     let busy = false;
@@ -787,7 +803,7 @@ body.topbar-modal-open {
       input.value = '';
       const loading = addLoading();
       try {
-        const reply = await callAI(CHAT_SYS, text);
+        const reply = await callAI(DATA_SYS, text, true);
         loading.textContent = reply;
         speak(reply);
       } catch (e) {
@@ -808,7 +824,7 @@ body.topbar-modal-open {
       }
       const loading = addLoading();
       try {
-        const text = await callAI(PROACTIVE_SYS, 'Scan everything and tell me what is most worth knowing right now.');
+        const text = await callAI(PROACTIVE_SYS + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
         loading.textContent = text;
         loading.classList.add('proactive');
         sessionStorage.setItem('coach_proactive_text', text);
@@ -837,8 +853,15 @@ body.topbar-modal-open {
     fab.addEventListener('click', openPanel);
     document.getElementById('coachClose').addEventListener('click', closePanel);
     panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
-    document.getElementById('coachSend').addEventListener('click', () => ask(input.value));
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(input.value); });
+    function unlockAudio() {
+      if (window._coachAudioCtx) return;
+      try {
+        window._coachAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        window._coachAudioCtx.resume().catch(() => {});
+      } catch (_) {}
+    }
+    document.getElementById('coachSend').addEventListener('click', () => { unlockAudio(); ask(input.value); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { unlockAudio(); ask(input.value); } });
 
     // A subtle "something's worth a look" indicator before the panel's
     // ever been opened this session — removed the instant it's opened.
@@ -868,25 +891,27 @@ body.topbar-modal-open {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
           body: JSON.stringify({ text: clean }),
-        }).then(r => r.ok ? r.arrayBuffer() : null).then(buf => {
+        }).then(r => {
+          if (!r.ok) throw new Error('ElevenLabs ' + r.status);
+          return r.arrayBuffer();
+        }).then(buf => {
           if (!buf || !voiceOn) return;
           const blob = new Blob([buf], { type: 'audio/mpeg' });
           const url = URL.createObjectURL(blob);
           const audio = new Audio(url);
           audio.onended = () => URL.revokeObjectURL(url);
-          audio.play().catch(() => {
+          // AudioContext must be resumed (unlocked) before play() works after async gap.
+          // _audioCtx is pre-unlocked by the first user gesture handler below.
+          const tryPlay = () => audio.play().catch(err => {
             URL.revokeObjectURL(url);
-            if (window.speechSynthesis && voiceOn) {
-              window.speechSynthesis.cancel();
-              window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
-            }
+            console.warn('[coach voice]', err.message);
           });
-        }).catch(() => {
-          if (window.speechSynthesis && voiceOn) {
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+          if (window._coachAudioCtx && window._coachAudioCtx.state === 'suspended') {
+            window._coachAudioCtx.resume().then(tryPlay);
+          } else {
+            tryPlay();
           }
-        });
+        }).catch(err => console.warn('[coach voice]', err.message));
         return;
       }
       if (!window.speechSynthesis) return;
