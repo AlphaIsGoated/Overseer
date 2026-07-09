@@ -861,11 +861,18 @@ body.topbar-modal-open {
     if (!sessionStorage.getItem('coach_proactive_seen')) fab.classList.add('has-insight');
 
     // ---- Voice ----
+    // Pre-unlock an HTMLAudioElement during a user gesture so it can be reused
+    // for TTS later — even after async gaps. iOS Safari blocks AudioContext.resume()
+    // when called outside a gesture, but a pre-played Audio element stays unlocked.
+    let _voiceEl = null;
     function unlockAudio() {
-      if (window._coachAudioCtx && window._coachAudioCtx.state !== 'closed') return;
+      if (_voiceEl) return;
       try {
-        window._coachAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        window._coachAudioCtx.resume().catch(() => {});
+        _voiceEl = new Audio();
+        // Minimal silent WAV (44 bytes) — just enough to unlock the element on iOS.
+        _voiceEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+        _voiceEl.volume = 0;
+        _voiceEl.play().then(() => { _voiceEl.pause(); _voiceEl.volume = 1; }).catch(() => {});
       } catch (_) {}
     }
 
@@ -888,9 +895,6 @@ body.topbar-modal-open {
       if (!voiceOn || !text) return;
       const clean = text.replace(/\*\*/g, '').replace(/^[-•*]\s+/gm, '').trim();
       if (!clean) return;
-      // Prefer ElevenLabs when configured — much higher quality than the
-      // browser's built-in synthesis and suits the JARVIS aesthetic better.
-      // Falls back to Web Speech if ELEVENLABS_API_KEY isn't set in Vercel.
       if (window.DASH_ELEVENLABS_ENABLED) {
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         fetch('/api/elevenlabs-tts', {
@@ -902,21 +906,23 @@ body.topbar-modal-open {
           return r.arrayBuffer();
         }).then(buf => {
           if (!buf || !voiceOn) return;
-          // Use AudioContext (unlocked during gesture) instead of new Audio() —
-          // HTMLAudioElement.play() is blocked after async gaps on iOS/Chrome,
-          // but AudioContext.decodeAudioData + BufferSourceNode are not.
-          let ctx = window._coachAudioCtx;
-          if (!ctx || ctx.state === 'closed') {
-            ctx = window._coachAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const blob = new Blob([buf], { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          const cleanup = () => URL.revokeObjectURL(url);
+          if (_voiceEl) {
+            // Reuse the pre-unlocked element — changing src on an already-played
+            // Audio element bypasses iOS autoplay restrictions entirely.
+            _voiceEl.pause();
+            _voiceEl.src = url;
+            _voiceEl.volume = 1;
+            _voiceEl.onended = cleanup;
+            _voiceEl.play().catch(err => { cleanup(); console.warn('[coach voice]', err.message); });
+          } else {
+            // Fallback: no gesture was captured before speak() was called.
+            const a = new Audio(url);
+            a.onended = cleanup;
+            a.play().catch(err => { cleanup(); console.warn('[coach voice]', err.message); });
           }
-          const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-          return resume.then(() => ctx.decodeAudioData(buf)).then(audioBuf => {
-            if (!voiceOn) return;
-            const src = ctx.createBufferSource();
-            src.buffer = audioBuf;
-            src.connect(ctx.destination);
-            src.start(0);
-          });
         }).catch(err => console.warn('[coach voice]', err.message));
         return;
       }
