@@ -11,7 +11,7 @@
 //
 // Gated by APP_SECRET (see api/_lib/security.js) if configured.
 // ============================================================
-import { requireAppSecret, rejectIfTooLarge } from '../_lib/security.js';
+import { requireAppSecret, rejectIfTooLarge } from './_lib/security.js';
 
 const DEFAULT_VOICE = '21m00Tcm4TlvDq8ikWAM'; // Rachel — warm, clear, stable
 
