@@ -854,12 +854,15 @@ body.topbar-modal-open {
     document.getElementById('coachClose').addEventListener('click', closePanel);
     panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
     function unlockAudio() {
-      if (window._coachAudioCtx) return;
+      if (window._coachAudioCtx && window._coachAudioCtx.state !== 'closed') return;
       try {
         window._coachAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         window._coachAudioCtx.resume().catch(() => {});
       } catch (_) {}
     }
+    // Unlock on every possible first gesture so AudioContext is ready before speak() fires.
+    fab.addEventListener('click', unlockAudio, { once: false });
+    voiceToggle.addEventListener('click', unlockAudio, { once: false });
     document.getElementById('coachSend').addEventListener('click', () => { unlockAudio(); ask(input.value); });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { unlockAudio(); ask(input.value); } });
 
@@ -896,21 +899,21 @@ body.topbar-modal-open {
           return r.arrayBuffer();
         }).then(buf => {
           if (!buf || !voiceOn) return;
-          const blob = new Blob([buf], { type: 'audio/mpeg' });
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
-          audio.onended = () => URL.revokeObjectURL(url);
-          // AudioContext must be resumed (unlocked) before play() works after async gap.
-          // _audioCtx is pre-unlocked by the first user gesture handler below.
-          const tryPlay = () => audio.play().catch(err => {
-            URL.revokeObjectURL(url);
-            console.warn('[coach voice]', err.message);
-          });
-          if (window._coachAudioCtx && window._coachAudioCtx.state === 'suspended') {
-            window._coachAudioCtx.resume().then(tryPlay);
-          } else {
-            tryPlay();
+          // Use AudioContext (unlocked during gesture) instead of new Audio() —
+          // HTMLAudioElement.play() is blocked after async gaps on iOS/Chrome,
+          // but AudioContext.decodeAudioData + BufferSourceNode are not.
+          let ctx = window._coachAudioCtx;
+          if (!ctx || ctx.state === 'closed') {
+            ctx = window._coachAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
           }
+          const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+          return resume.then(() => ctx.decodeAudioData(buf)).then(audioBuf => {
+            if (!voiceOn) return;
+            const src = ctx.createBufferSource();
+            src.buffer = audioBuf;
+            src.connect(ctx.destination);
+            src.start(0);
+          });
         }).catch(err => console.warn('[coach voice]', err.message));
         return;
       }
