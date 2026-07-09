@@ -812,6 +812,7 @@ body.topbar-modal-open {
         loading.textContent = text;
         loading.classList.add('proactive');
         sessionStorage.setItem('coach_proactive_text', text);
+        speak(text);
       } catch (e) {
         loading.remove();
       }
@@ -826,7 +827,7 @@ body.topbar-modal-open {
           runProactiveScan();
         } else {
           const cached = sessionStorage.getItem('coach_proactive_text');
-          if (cached) addMsg('coach', cached, true);
+          if (cached) { addMsg('coach', cached, true); speak(cached); }
         }
       }
       setTimeout(() => input.focus(), 80);
@@ -873,8 +874,19 @@ body.topbar-modal-open {
           const url = URL.createObjectURL(blob);
           const audio = new Audio(url);
           audio.onended = () => URL.revokeObjectURL(url);
-          audio.play().catch(() => {});
-        }).catch(() => {});
+          audio.play().catch(() => {
+            URL.revokeObjectURL(url);
+            if (window.speechSynthesis && voiceOn) {
+              window.speechSynthesis.cancel();
+              window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+            }
+          });
+        }).catch(() => {
+          if (window.speechSynthesis && voiceOn) {
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+          }
+        });
         return;
       }
       if (!window.speechSynthesis) return;
