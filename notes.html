@@ -80,6 +80,9 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .note-title-input::placeholder { color: var(--text-tertiary); }
 .note-body-input { width: 100%; min-height: 60vh; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 15px; line-height: 1.6; outline: none; resize: none; }
 .note-body-input::placeholder { color: var(--text-tertiary); }
+.note-fmt-bar { display: flex; gap: 6px; margin: 8px 0 4px; }
+.note-fmt-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px; color: var(--text-secondary); font-size: 14px; padding: 3px 9px; cursor: pointer; line-height: 1.5; }
+.note-fmt-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
 
 /* ===== Source badges on note cards ===== */
 .note-source-badge {
@@ -419,6 +422,9 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     <div class="note-cat-row" id="noteCatRow">
       <!-- rendered by JS -->
     </div>
+    <div class="note-fmt-bar">
+      <button class="note-fmt-btn" id="fmtBullet" type="button" title="Bullet list (toggles selected lines)">• List</button>
+    </div>
     <textarea class="note-body-input" id="noteBodyInput" placeholder="Start typing…"></textarea>
   </div>
 </div>
@@ -693,6 +699,50 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   });
   [$('noteTitleInput'), $('noteBodyInput')].forEach(el => {
     el.addEventListener('input', () => { clearTimeout(saveT); saveT = setTimeout(persistActive, 400); });
+  });
+
+  // ── Bullet list button ────────────────────────────────────────
+  $('fmtBullet').addEventListener('click', () => {
+    const ta = $('noteBodyInput');
+    const val = ta.value;
+    const start = ta.selectionStart;
+    const end   = ta.selectionEnd;
+    // Expand selection to full line boundaries
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const afterEnd  = end === start ? val.indexOf('\n', end) : val.indexOf('\n', end - 1);
+    const lineEnd   = afterEnd === -1 ? val.length : afterEnd;
+    const block     = val.slice(lineStart, lineEnd);
+    const lines     = block.split('\n');
+    const allOn     = lines.every(l => l === '' || l.startsWith('• '));
+    const newLines  = lines.map(l => {
+      if (l === '') return l;
+      return allOn ? (l.startsWith('• ') ? l.slice(2) : l) : (l.startsWith('• ') ? l : '• ' + l);
+    });
+    const replacement = newLines.join('\n');
+    ta.setRangeText(replacement, lineStart, lineEnd, 'select');
+    ta.focus();
+    clearTimeout(saveT); saveT = setTimeout(persistActive, 400);
+  });
+
+  // Auto-continue bullet on Enter
+  $('noteBodyInput').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const bod = $('noteBodyInput');
+    const pos = bod.selectionStart;
+    const val = bod.value;
+    const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+    const line = val.slice(lineStart, pos);
+    if (line.startsWith('• ')) {
+      if (line === '• ') {
+        // Empty bullet — remove it and stop
+        e.preventDefault();
+        bod.setRangeText('', lineStart, pos, 'end');
+      } else {
+        e.preventDefault();
+        bod.setRangeText('\n• ', pos, pos, 'end');
+      }
+      clearTimeout(saveT); saveT = setTimeout(persistActive, 400);
+    }
   });
 
   // ── Folder management modal ───────────────────────────────────
