@@ -16,8 +16,6 @@
   // and have them paste their own values, just like the other pages.
   // Prefer Vercel env vars (served via /api/config → window.DASH_*),
   // Credentials come exclusively from /api/config → window.DASH_* at load time.
-  const TOPBAR_SUPABASE_URL = (window.DASH_SUPABASE_URL) || '';
-  const TOPBAR_SUPABASE_KEY = (window.DASH_SUPABASE_KEY) || '';
 
   // -------- CSS --------
   // Themes are applied by setting data-theme="X" on <html>.
@@ -504,19 +502,19 @@ body.topbar-modal-open {
     if (window.location.pathname.endsWith('/health.html') ||
         window.location.pathname.endsWith('health.html')) return;
 
-    if (!window.supabase || !TOPBAR_SUPABASE_URL || !TOPBAR_SUPABASE_KEY) return;
-    if (TOPBAR_SUPABASE_URL.indexOf('PASTE-') === 0) return;
-
+    const secret = window.DASH_APP_SECRET || '';
     try {
-      const supa = window.supabase.createClient(TOPBAR_SUPABASE_URL, TOPBAR_SUPABASE_KEY);
-      const { data } = await supa
-        .from('app_state').select('data').eq('key', 'health').maybeSingle();
-      const current = (data && data.data) || {};
+      const readRes = await fetch('/api/db?key=health', {
+        headers: { 'X-App-Secret': secret },
+      });
+      const readJson = readRes.ok ? await readRes.json() : {};
+      const current = (readJson && readJson.data) || {};
       const merged = Object.assign({}, current, { po_water_v1: localWater });
-      await supa.from('app_state').upsert(
-        { key: 'health', data: merged, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
-      );
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+        body: JSON.stringify({ key: 'health', data: merged }),
+      });
     } catch (e) { /* offline — local change will sync next time user visits health */ }
   }
 

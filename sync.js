@@ -6,17 +6,13 @@
 //   syncedPrefixes — localStorage key prefixes to mirror (e.g. 'goals:')
 //   onApplied      — optional callback after remote state has been applied
 //
-// Requires:
-//   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-//   <script src="sync.js" defer></script>
+// All Supabase access goes through /api/db (server-side proxy).
+// No Supabase credentials are needed in the browser.
 // =============================================================
 (function () {
   'use strict';
 
-  // Credentials are injected by /api/config → window.DASH_* at page load.
-  // No hardcoded fallbacks — sync silently no-ops if config hasn't loaded.
-  const SUPABASE_URL = (typeof window !== 'undefined' && window.DASH_SUPABASE_URL) || '';
-  const SUPABASE_KEY = (typeof window !== 'undefined' && window.DASH_SUPABASE_KEY) || '';
+  function getSecret() { return window.DASH_APP_SECRET || ''; }
 
   window.initCloudSync = function (config) {
     const appKey = config && config.appKey;
@@ -24,11 +20,7 @@
     const syncedPrefixes = (config && config.syncedPrefixes) || [];
     const onApplied = config && config.onApplied;
     if (!appKey) return;
-    if (!window.supabase) return;
-    if (!SUPABASE_URL || !SUPABASE_KEY) return;
-    if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
 
-    let supa = null;
     let pushTimer = null;
     let suppressSync = false;
     let lastSyncedJson = null;
@@ -96,16 +88,19 @@
     }
 
     async function pushNow() {
-      if (!supa) return;
       const state = collect();
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
       try {
-        const { error } = await supa.from('app_state').upsert(
-          { key: appKey, data: state, updated_at: new Date().toISOString() },
-          { onConflict: 'key' }
-        );
-        if (!error) lastSyncedJson = json;
+        const r = await fetch('/api/db', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-App-Secret': getSecret(),
+          },
+          body: JSON.stringify({ key: appKey, data: state }),
+        });
+        if (r.ok) lastSyncedJson = json;
       } catch (e) {}
     }
     function schedulePush() {
@@ -117,47 +112,51 @@
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
       try {
-        fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
+        fetch('/api/db', {
           method: 'POST',
           headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_KEY,
             'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates',
+            'X-App-Secret': getSecret(),
           },
-          body: JSON.stringify({ key: appKey, data: state, updated_at: new Date().toISOString() }),
+          body: JSON.stringify({ key: appKey, data: state }),
           keepalive: true,
         }).catch(() => {});
         lastSyncedJson = json;
       } catch (e) {}
     }
 
-    (async function init() {
-      supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    async function poll() {
+      if (document.hidden) return;
       try {
-        const { data, error } = await supa
-          .from('app_state').select('data').eq('key', appKey).maybeSingle();
-        if (!error && data && data.data && Object.keys(data.data).length > 0) {
-          lastSyncedJson = JSON.stringify(data.data);
-          applyRemote(data.data);
-        } else if (Object.keys(collect()).length > 0) {
-          schedulePush();
+        const r = await fetch('/api/db?key=' + encodeURIComponent(appKey), {
+          headers: { 'X-App-Secret': getSecret() },
+        });
+        if (!r.ok) return;
+        const json = await r.json();
+        if (!json || !json.data) return;
+        const incoming = JSON.stringify(json.data);
+        if (incoming === lastSyncedJson) return;
+        lastSyncedJson = incoming;
+        applyRemote(json.data);
+      } catch (e) {}
+    }
+
+    (async function init() {
+      try {
+        const r = await fetch('/api/db?key=' + encodeURIComponent(appKey), {
+          headers: { 'X-App-Secret': getSecret() },
+        });
+        if (r.ok) {
+          const json = await r.json();
+          if (json && json.data && Object.keys(json.data).length > 0) {
+            lastSyncedJson = JSON.stringify(json.data);
+            applyRemote(json.data);
+          } else if (Object.keys(collect()).length > 0) {
+            schedulePush();
+          }
         }
       } catch (e) {}
-      supa.channel('app_state_' + appKey)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'app_state',
-          filter: 'key=eq.' + appKey,
-        }, (payload) => {
-          if (!payload.new || !payload.new.data) return;
-          const incoming = JSON.stringify(payload.new.data);
-          if (incoming === lastSyncedJson) return;
-          lastSyncedJson = incoming;
-          applyRemote(payload.new.data);
-        })
-        .subscribe();
+      setInterval(poll, 30000);
     })();
 
     window.addEventListener('beforeunload', flushOnUnload);
