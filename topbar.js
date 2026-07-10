@@ -670,9 +670,14 @@ body.topbar-modal-open {
         'settings:theme','settings:monthly_budget',
         'google_last_sync','canvas_last_sync','strava_last_sync','whoop_last_sync',
         'finance_active_tab','po_coach_units_migrated_lb_v1','po_coach_workout_done',
-        'wish-hero-pct-num',
+        'wish-hero-pct-num','app_secret',
       ]);
       const SKIP_PFX = ['photo_','google_tokens','tpl:','coach_proactive'];
+      // Redact values that look like API keys — long opaque alphanumeric strings
+      // that serve no purpose in the AI context and risk being flagged or leaked.
+      const API_KEY_RE = /^(sk-|xi-|sb_|xai-|Bearer |ghp_|eyJ)/;
+      const LOOKS_LIKE_KEY = (v) => typeof v === 'string' &&
+        (API_KEY_RE.test(v) || (v.length > 40 && /^[A-Za-z0-9_\-]{40,}$/.test(v)));
       const now = Date.now(), WINDOW = 35 * 86400000;
       const out = {};
 
@@ -682,6 +687,7 @@ body.topbar-modal-open {
         let v;
         try { v = JSON.parse(localStorage.getItem(k)); } catch (_) { v = localStorage.getItem(k); }
         if (typeof v === 'string' && v.startsWith('data:')) continue; // base64 blob
+        if (LOOKS_LIKE_KEY(v)) continue; // redact API-key-shaped strings
 
         if (k === 'marathon_plan_v1' && v && Array.isArray(v.entries)) {
           out[k] = { ...v, entries: v.entries
@@ -749,9 +755,11 @@ body.topbar-modal-open {
       return el;
     }
 
+    const _today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     const CHAT_SYS =
       "You are the user's personal AI coach — sharp, direct, like talking to a knowledgeable friend who " +
-      "knows all their data. Your replies are read aloud via ElevenLabs TTS when the user has voice mode on — " +
+      "knows all their data. Today is " + _today + ". " +
+      "Your replies are read aloud via ElevenLabs TTS when the user has voice mode on — " +
       "never say you are 'text only' or disclaim voice capability. Dashboard data is below. Rules: " +
       "Never repeat what you said in a previous turn. Never re-introduce yourself. " +
       "Never restate data the user already knows or already mentioned. " +
@@ -761,8 +769,8 @@ body.topbar-modal-open {
     const PROACTIVE_SYS =
       "You are the user's personal coach scanning their entire life-tracking dashboard for anything worth " +
       "flagging right now — overdue or upcoming deadlines, missed daily targets, low supplies, schedule " +
-      "conflicts, anything time-sensitive across fitness/health/finance/college/marathon/etc. Pick the 1-3 " +
-      "MOST relevant things only — not a status report of everything. If genuinely nothing stands out, say a " +
+      "conflicts, anything time-sensitive across fitness/health/finance/college/marathon/etc. Today is " + _today + ". " +
+      "Pick the 1-3 MOST relevant things only — not a status report of everything. If genuinely nothing stands out, say a " +
       "brief one-line all-clear instead of inventing concerns. Be direct and concise, a few short lines, no preamble.";
 
     // Conversation history — keeps the last 10 turns so the coach remembers
