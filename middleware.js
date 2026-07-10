@@ -36,7 +36,11 @@ export const config = {
 // Making it public ensures it loads reliably for all pages including the
 // login page itself, and avoids any edge-case auth failures that would
 // leave window.DASH_* variables undefined.
-const PUBLIC_PATHS = ['/login.html', '/api/auth', '/api/config', '/sw.js', '/manifest.json'];
+// /api/push-send is called by Vercel Cron (no session cookie, only a CRON_SECRET
+// Authorization header). The Edge Middleware V8 isolate may not expose CRON_SECRET
+// via process.env, so we exempt this path here and let the serverless function's
+// own CRON_SECRET / APP_SECRET checks handle auth.
+const PUBLIC_PATHS = ['/login.html', '/api/auth', '/api/config', '/sw.js', '/manifest.json', '/api/push-send', '/api/push-subscribe'];
 
 export default async function middleware(req) {
   const { pathname } = new URL(req.url);

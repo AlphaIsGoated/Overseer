@@ -953,7 +953,7 @@ img, video, canvas, svg { max-width: 100%; }
   border-radius: 12px; margin-bottom: 4px;
 }
 
-.wt-chart-wrap { position: relative; margin: 16px 0 8px; }
+.wt-chart-wrap { position: relative; margin: 16px 0 8px; height: 140px; }
 .wt-chart-yaxis {
   position: absolute; left: 0; top: 0; bottom: 0; width: 36px;
   display: flex; flex-direction: column; justify-content: space-between;
@@ -964,9 +964,19 @@ img, video, canvas, svg { max-width: 100%; }
   font-family: var(--font-mono);
 }
 .wt-chart {
-  height: 130px; display: block;
+  height: 100%; display: block;
   margin-left: 36px; width: calc(100% - 36px);
 }
+.wt-chart-tip {
+  position: absolute; top: 0; left: 0;
+  background: rgba(12,12,14,0.94); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 8px 12px;
+  pointer-events: none; transform: translateX(-50%);
+  white-space: nowrap; transition: opacity 0.1s;
+  opacity: 0; z-index: 20;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.55);
+}
+.wt-chart-tip.show { opacity: 1; }
 .wt-grid { stroke: rgba(255,255,255,0.05); stroke-width: 1; }
 .wt-area { fill: url(#wtFill); }
 .wt-line { fill: none; stroke: var(--good); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -1187,6 +1197,7 @@ img, video, canvas, svg { max-width: 100%; }
   background: rgba(255,255,255,0.025);
   border: 1px solid var(--border);
   border-radius: 12px;
+  position: relative;
 }
 .wt-ib-summary-h {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -1696,6 +1707,48 @@ img, video, canvas, svg { max-width: 100%; }
   letter-spacing: -0.02em; margin-bottom: 6px; }
 .ol-celebrate-sub { font-size: 14px; color: var(--text-2); }
 
+/* Rep-range advisory sheet */
+.ol-repwarn-bg {
+  display: none; position: fixed; inset: 0; z-index: 9998;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+  align-items: flex-end; justify-content: center;
+}
+.ol-repwarn-bg.show { display: flex; }
+.ol-repwarn-sheet {
+  width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0; padding: 24px 20px 36px;
+  animation: ol-slide-up 0.28s ease both;
+}
+@keyframes ol-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.ol-repwarn-icon { font-size: 34px; margin-bottom: 6px; }
+.ol-repwarn-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: var(--text-1); }
+.ol-repwarn-msg { font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 16px; }
+.ol-repwarn-input-wrap { position: relative; margin-bottom: 12px; }
+.ol-repwarn-input-wrap textarea {
+  width: 100%; padding: 10px 44px 10px 12px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: rgba(0,0,0,0.25); color: var(--text-1);
+  font-family: inherit; font-size: 13px; resize: none; outline: none;
+  min-height: 62px;
+}
+.ol-repwarn-mic {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px;
+  color: var(--text-3); line-height: 1; -webkit-tap-highlight-color: transparent;
+}
+.ol-repwarn-mic.listening { color: #FF8A8A; }
+.ol-repwarn-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.ol-repwarn-rec {
+  font-size: 13.5px; color: var(--text-1); line-height: 1.55;
+  padding: 14px; background: rgba(107,227,164,0.07);
+  border: 1px solid rgba(107,227,164,0.2); border-radius: 12px;
+  margin-bottom: 16px;
+}
+
 @media (max-width: 480px) {
   .ol-stat-val { font-size: 20px; }
   .ol-stat-label { font-size: 8px; }
@@ -1739,7 +1792,7 @@ img, video, canvas, svg { max-width: 100%; }
           <span id="wtYAxisMax">—</span>
           <span id="wtYAxisMin">—</span>
         </div>
-        <svg class="wt-chart" viewBox="0 0 320 130" preserveAspectRatio="none">
+        <svg class="wt-chart" preserveAspectRatio="none">
           <defs>
             <linearGradient id="wtFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#6ee7b7" stop-opacity="0.25"/>
@@ -1747,11 +1800,9 @@ img, video, canvas, svg { max-width: 100%; }
             </linearGradient>
             <filter id="wtGlow"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           </defs>
-          <line class="wt-grid" x1="0" y1="20" x2="320" y2="20"></line>
-          <line class="wt-grid" x1="0" y1="65" x2="320" y2="65"></line>
-          <line class="wt-grid" x1="0" y1="110" x2="320" y2="110"></line>
           <g id="wtChartContent"></g>
         </svg>
+        <div id="wtChartTip" class="wt-chart-tip"></div>
         <div class="wt-meta" id="wtMeta">0 entries</div>
       </div>
 
@@ -1815,6 +1866,7 @@ img, video, canvas, svg { max-width: 100%; }
 
       <!-- One small trend chart + definition per InBody metric -->
       <div class="wt-ib-metric-grid" id="wtIbMetricCharts"></div>
+      <div id="ibMetricTip" class="wt-chart-tip"></div>
     </div>
 
     <button class="wt-progress-link" id="wtIbLink" type="button" aria-label="Open InBody scans">
@@ -2080,11 +2132,11 @@ img, video, canvas, svg { max-width: 100%; }
         <div class="ol-stat-val is-neutral" id="olStatSessions">—</div>
       </div>
       <div class="ol-stat">
-        <div class="ol-stat-label">Last 30 days</div>
+        <div class="ol-stat-label" id="olStatDeltaLabel">Last 30 days</div>
         <div class="ol-stat-val" id="olStatDelta">—</div>
       </div>
       <div class="ol-stat">
-        <div class="ol-stat-label">Best</div>
+        <div class="ol-stat-label" id="olStatBestLabel">Best</div>
         <div class="ol-stat-val is-warn" id="olStatBest">—</div>
       </div>
     </div>
@@ -2249,6 +2301,31 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="ol-celebrate-emoji">🏆</span>
     <div class="ol-celebrate-title" id="olCelebrateTitle">New best!</div>
     <div class="ol-celebrate-sub" id="olCelebrateSub"></div>
+  </div>
+</div>
+
+<!-- Rep-range advisory sheet -->
+<div class="ol-repwarn-bg" id="olRepWarnBg">
+  <div class="ol-repwarn-sheet">
+    <div class="ol-repwarn-icon" id="olRepWarnIcon">⚠️</div>
+    <div class="ol-repwarn-title" id="olRepWarnTitle">Rep Range Advisory</div>
+    <div class="ol-repwarn-msg" id="olRepWarnMsg"></div>
+    <div id="olRepWarnInputArea">
+      <div class="ol-repwarn-input-wrap">
+        <textarea id="olRepWarnText" rows="2" placeholder="Tell us what happened..."></textarea>
+        <button class="ol-repwarn-mic" id="olRepWarnMic" type="button" title="Voice input">🎤</button>
+      </div>
+      <div class="ol-repwarn-actions">
+        <button class="po-btn-secondary" id="olRepWarnSkip" type="button">Skip</button>
+        <button class="po-btn-primary" id="olRepWarnSubmit" type="button">Get advice</button>
+      </div>
+    </div>
+    <div id="olRepWarnRecArea" style="display:none">
+      <div class="ol-repwarn-rec" id="olRepWarnRecText"></div>
+      <div class="ol-repwarn-actions">
+        <button class="po-btn-primary" id="olRepWarnClose" type="button">Got it</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2614,6 +2691,12 @@ img, video, canvas, svg { max-width: 100%; }
     };
   }
 
+  // Epley estimated 1-rep max. For bodyweight exercises, skip this and compare reps.
+  function calc1RM(weight, reps) {
+    if (!weight || !reps || reps < 1) return weight || 0;
+    return weight * (1 + reps / 30);
+  }
+
   // Returns the start Date for the current olRange filter (null = no filter)
   function olRangeStart() {
     const d = new Date(); d.setHours(0,0,0,0);
@@ -2858,8 +2941,8 @@ img, video, canvas, svg { max-width: 100%; }
     const ex = getCurrentEx();
     const isBw = ex && ex.bw;
     const allLogs = (ex ? (state.logs[ex.id] || []) : []).map(olNorm).filter(l => !l.isRest);
-    const bestVal = allLogs.length ? Math.max.apply(null, allLogs.map(l => isBw ? l.reps : l.weight)) : 0;
-    const isThisBest = (isBw ? norm.reps : norm.weight) === bestVal;
+    const bestVal = allLogs.length ? Math.max.apply(null, allLogs.map(l => isBw ? l.reps : calc1RM(l.weight, l.reps))) : 0;
+    const isThisBest = isBw ? norm.reps === bestVal : calc1RM(norm.weight, norm.reps) >= bestVal - 0.01;
     const totalReps = norm.setReps.reduce((s, r) => s + (r || 0), 0);
     let html = `<span class="ol-sets-date">${olFmtDate(norm.date)}</span>`;
     norm.setReps.forEach(r => {
@@ -2879,6 +2962,8 @@ img, video, canvas, svg { max-width: 100%; }
     const isBw = ex && ex.bw;
 
     $('olStatSessions').textContent = allLogs.length || '—';
+    $('olStatDeltaLabel').textContent = isBw ? 'Last 30 days' : '30d e1RM';
+    $('olStatBestLabel').textContent  = isBw ? 'Best' : 'Best e1RM';
 
     // Last 30 days delta: compare earliest log ≥ 30 days ago to latest
     if (allLogs.length >= 2) {
@@ -2886,8 +2971,9 @@ img, video, canvas, svg { max-width: 100%; }
       const recent = allLogs.filter(l => new Date(l.date) >= cutoff);
       const older  = allLogs.filter(l => new Date(l.date) <  cutoff);
       if (recent.length && older.length) {
-        const latestVal = isBw ? recent[recent.length-1].reps : recent[recent.length-1].weight;
-        const baseVal   = isBw ? older[older.length-1].reps   : older[older.length-1].weight;
+        const lat = recent[recent.length-1], bas = older[older.length-1];
+        const latestVal = isBw ? lat.reps : calc1RM(lat.weight, lat.reps);
+        const baseVal   = isBw ? bas.reps : calc1RM(bas.weight, bas.reps);
         const delta = latestVal - baseVal;
         const sign  = delta >= 0 ? '+' : '';
         const el = $('olStatDelta');
@@ -2902,10 +2988,15 @@ img, video, canvas, svg { max-width: 100%; }
       $('olStatDelta').className = 'ol-stat-val is-neutral';
     }
 
-    // All-time best (top-set weight or max reps)
+    // All-time best: max reps for bodyweight, max estimated 1RM for weighted
     if (allLogs.length) {
-      const bestVal = Math.max.apply(null, allLogs.map(l => isBw ? l.reps : l.weight));
-      $('olStatBest').textContent = bestVal + (isBw ? 'r' : ' ' + u);
+      if (isBw) {
+        const bestReps = Math.max.apply(null, allLogs.map(l => l.reps));
+        $('olStatBest').textContent = bestReps + 'r';
+      } else {
+        const best1RM = Math.max.apply(null, allLogs.map(l => calc1RM(l.weight, l.reps)));
+        $('olStatBest').textContent = best1RM.toFixed(0) + ' ' + u;
+      }
     } else {
       $('olStatBest').textContent = '—';
     }
@@ -2924,7 +3015,7 @@ img, video, canvas, svg { max-width: 100%; }
     const u = unit();
     const isBw = ex && ex.bw;
     const last = allLogs[allLogs.length - 1];
-    const bestVal = Math.max.apply(null, allLogs.map(l => isBw ? l.reps : l.weight));
+    const bestVal = Math.max.apply(null, allLogs.map(l => isBw ? l.reps : calc1RM(l.weight, l.reps)));
 
     let text;
     if (isBw) {
@@ -2950,7 +3041,7 @@ img, video, canvas, svg { max-width: 100%; }
     const u = unit();
     const isBw = ex && ex.bw;
     const sorted = allLogs.slice().sort((a, b) => b.date.localeCompare(a.date));
-    const bestVal = Math.max.apply(null, allLogs.filter(l => !l.isRest).map(l => isBw ? l.reps : l.weight));
+    const bestVal = Math.max.apply(null, allLogs.filter(l => !l.isRest).map(l => isBw ? l.reps : calc1RM(l.weight, l.reps)));
 
     let html = `<table class="ol-hist-table">
       <thead><tr>
@@ -2960,23 +3051,24 @@ img, video, canvas, svg { max-width: 100%; }
     sorted.forEach((l, si) => {
       // Find the next older non-rest entry for delta
       const prevNonRest = sorted.slice(si + 1).find(x => !x.isRest);
-      const prevVal = prevNonRest ? (isBw ? prevNonRest.reps : prevNonRest.weight) : null;
+      const curORM  = isBw ? l.reps : calc1RM(l.weight, l.reps);
+      const prevORM = prevNonRest ? (isBw ? prevNonRest.reps : calc1RM(prevNonRest.weight, prevNonRest.reps)) : null;
       const curVal  = isBw ? l.reps : l.weight;
       const isFirst = si === sorted.length - 1 || !sorted.slice(si+1).find(x => !x.isRest);
-      const isBest  = !l.isRest && curVal === bestVal;
+      const isBest  = !l.isRest && curORM >= bestVal - 0.01;
 
       let progress = '';
       let progressCls = 'is-neutral';
       if (l.isRest) {
         progress = 'rest day'; progressCls = 'is-neutral';
-      } else if (prevVal === null || isFirst) {
+      } else if (prevORM === null || isFirst) {
         progress = 'first'; progressCls = 'is-first';
       } else {
-        const d = curVal - prevVal;
-        if (d === 0) { progress = 'same'; progressCls = 'is-neutral'; }
+        const d = curORM - prevORM;
+        if (Math.abs(d) < 0.05) { progress = 'same'; progressCls = 'is-neutral'; }
         else {
           const sign = d > 0 ? '+' : '';
-          progress = sign + d.toFixed(1);
+          progress = sign + d.toFixed(1) + (isBw ? '' : ' ' + u);
           progressCls = d > 0 ? 'is-pos' : 'is-neutral';
         }
       }
@@ -3129,6 +3221,13 @@ img, video, canvas, svg { max-width: 100%; }
     $('olLogBg').classList.remove('show');
     renderAll();
     if (typeof wtRender === 'function') wtRender();
+
+    // Rep-range advisory for weighted sets significantly outside 6-8
+    if (!isRest && !ex.bw && reps > 0) {
+      if (reps <= 4 || reps >= 12) {
+        setTimeout(() => olShowRepWarn(reps <= 4 ? 'under' : 'over', ex.name, reps, weight, unit()), 380);
+      }
+    }
   }
 
   // ── New-best celebration ────────────────────────────────────────
@@ -3189,6 +3288,110 @@ img, video, canvas, svg { max-width: 100%; }
     }
     requestAnimationFrame(draw);
   }
+
+  // ── Rep-range advisory ───────────────────────────────────────────
+  let _rwCtx = null;
+  let _rwRecognizer = null;
+  let _rwListening = false;
+
+  function olShowRepWarn(type, exName, reps, weight, u) {
+    const isUnder = type === 'under';
+    $('olRepWarnIcon').textContent    = isUnder ? '🏋️' : '💡';
+    $('olRepWarnTitle').textContent   = isUnder ? 'Heavy set detected' : 'High rep range';
+    $('olRepWarnMsg').textContent     = isUnder
+      ? `You logged ${reps} rep${reps !== 1 ? 's' : ''} at ${weight} ${u} — that's below the 6–8 hypertrophy range. Tell us what happened so we can advise you.`
+      : `You logged ${reps} reps at ${weight} ${u} — that's above the 6–8 hypertrophy range. Are you targeting a smaller muscle group, or going lighter on purpose?`;
+    $('olRepWarnText').value = '';
+    $('olRepWarnInputArea').style.display = '';
+    $('olRepWarnRecArea').style.display   = 'none';
+    $('olRepWarnSubmit').textContent = 'Get advice';
+    $('olRepWarnSubmit').disabled = false;
+    _rwCtx = { type, exName, reps, weight, u };
+    _rwListening = false;
+    $('olRepWarnMic').classList.remove('listening');
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      if (_rwRecognizer) { try { _rwRecognizer.abort(); } catch {} }
+      const rec = new SR();
+      rec.lang = 'en-US'; rec.interimResults = false;
+      rec.onresult  = e => { const t = e.results?.[0]?.[0]?.transcript; if (t) $('olRepWarnText').value = t; };
+      rec.onend  = () => { _rwListening = false; $('olRepWarnMic').classList.remove('listening'); };
+      rec.onerror = () => { _rwListening = false; $('olRepWarnMic').classList.remove('listening'); };
+      _rwRecognizer = rec;
+      $('olRepWarnMic').style.display = '';
+    } else {
+      $('olRepWarnMic').style.display = 'none';
+    }
+
+    $('olRepWarnBg').classList.add('show');
+  }
+
+  function olHideRepWarn() { $('olRepWarnBg').classList.remove('show'); }
+
+  // Fallback rule-based recommendation (used if API is unavailable)
+  function olRepWarnFallback(type, explanation) {
+    const e = explanation.toLowerCase();
+    if (type === 'under') {
+      if (/form|couldn't|can't|failed|too heavy|injury|hurt/.test(e))
+        return 'Your form or ability flagged this as too heavy — consider dropping 5–10% to stay in the 6–8 range.';
+      if (/heavy|strength|max|1rm|pr|test/.test(e) || !explanation.trim())
+        return 'Heavy singles and triples are great for building strength — just cycle back to hypertrophy ranges in your next session.';
+      return 'Try lowering the weight slightly to hit 6–8 clean reps and maximise hypertrophy.';
+    } else {
+      if (/calv|forearm|delt|lateral|side|curl|pushdown|isolation|small/.test(e))
+        return 'Higher reps are perfectly appropriate for isolation and smaller muscle groups — keep the weight where it is.';
+      return 'You're moving this weight comfortably — bump it up a notch next session to stay in the 6–8 range.';
+    }
+  }
+
+  $('olRepWarnMic').addEventListener('click', () => {
+    if (!_rwRecognizer) return;
+    if (_rwListening) { _rwRecognizer.stop(); return; }
+    _rwListening = true;
+    $('olRepWarnMic').classList.add('listening');
+    try { _rwRecognizer.start(); } catch { _rwListening = false; $('olRepWarnMic').classList.remove('listening'); }
+  });
+
+  $('olRepWarnSkip').addEventListener('click', olHideRepWarn);
+  $('olRepWarnClose').addEventListener('click', olHideRepWarn);
+  $('olRepWarnBg').addEventListener('click', e => { if (e.target === $('olRepWarnBg')) olHideRepWarn(); });
+
+  $('olRepWarnSubmit').addEventListener('click', async () => {
+    const ctx = _rwCtx;
+    if (!ctx) { olHideRepWarn(); return; }
+    const explanation = $('olRepWarnText').value.trim();
+    $('olRepWarnSubmit').textContent = 'Thinking…';
+    $('olRepWarnSubmit').disabled = true;
+
+    const system = `You are a concise personal strength coach. The user logged a set with reps ${ctx.type === 'under' ? 'below' : 'above'} the 6–8 hypertrophy target range.
+Analyse their explanation and give a 1–2 sentence recommendation:
+• Low reps + bad form / inability → recommend lowering the weight
+• Low reps + intentional heavy/strength set → acknowledge it's valid
+• High reps + small/isolation muscle (calves, forearms, side delts, curls, pushdowns) → tell them higher reps are fine, keep the weight
+• High reps + compound / large muscle → suggest increasing the weight next session
+Be direct and encouraging. No bullet points in the response.`;
+
+    const prompt = `Exercise: ${ctx.exName}\nReps logged: ${ctx.reps} (weight: ${ctx.weight} ${ctx.u})\nUser says: "${explanation || 'nothing provided'}"`;
+
+    let rec;
+    try {
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({ system, messages: [{ role: 'user', content: prompt }] })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
+      const data = await res.json();
+      rec = (res.ok && data.text) ? data.text : olRepWarnFallback(ctx.type, explanation);
+    } catch {
+      rec = olRepWarnFallback(ctx.type, explanation);
+    }
+
+    $('olRepWarnInputArea').style.display = 'none';
+    $('olRepWarnRecArea').style.display   = '';
+    $('olRepWarnRecText').textContent = rec;
+  });
 
   // Compute today's split from state.splitRotation + state.splitAnchor.
   // Returns the rotation entry name (e.g. "Push" or "Rest") AND the index.
@@ -3948,20 +4151,27 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   function wtRenderChart() {
+    const svgEl = document.querySelector('.wt-chart');
+    if (!svgEl) return;
+    // Use actual rendered pixel width for the coordinate space so circles
+    // render as circles (not ovals) regardless of card width.
+    const W = Math.round(svgEl.getBoundingClientRect().width) || 284;
+    const H = 130;
+    svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
     const recent = wtEntries.slice(-30);
     const weights = recent.map(e => e.weight);
     const min = Math.min.apply(null, weights);
     const max = Math.max.apply(null, weights);
     const pad = Math.max((max - min) * 0.15, 0.5);
     const yMin = min - pad, yMax = max + pad;
-    const xLeft = 8, xRight = 312, yTop = 20, yBot = 110;
+    const xLeft = 8, xRight = W - 8, yTop = 20, yBot = 110;
     const xRange = xRight - xLeft, yRange = yBot - yTop;
-    const xFor = (i) => recent.length === 1 ? xRight : xLeft + (i / (recent.length - 1)) * xRange;
+    const xFor = (i) => recent.length === 1 ? (W / 2) : xLeft + (i / (recent.length - 1)) * xRange;
     const yFor = (w) => yBot - ((w - yMin) / (yMax - yMin)) * yRange;
     const points = recent.map((e, i) => ({ x: xFor(i), y: yFor(e.weight) }));
     const linePath = wtSmoothPath(points);
     const areaPath = linePath + ' L ' + points[points.length - 1].x.toFixed(2) + ' ' + yBot + ' L ' + points[0].x.toFixed(2) + ' ' + yBot + ' Z';
-    // 7d moving avg
     const avgPoints = recent.map((_, i) => {
       const start = Math.max(0, i - 6);
       const win = recent.slice(start, i + 1);
@@ -3969,18 +4179,49 @@ img, video, canvas, svg { max-width: 100%; }
       return { x: xFor(i), y: yFor(avg) };
     });
     const avgPath = wtSmoothPath(avgPoints);
-    let html = '<path class="wt-avg-line" d="' + avgPath + '"></path>'
-             + '<path class="wt-area" d="' + areaPath + '"></path>'
-             + '<path class="wt-line" filter="url(#wtGlow)" d="' + linePath + '"></path>';
+    // Grid lines (rendered in JS so x2 matches actual W)
+    let html = [20, 65, 110].map(y => '<line class="wt-grid" x1="0" y1="' + y + '" x2="' + W + '" y2="' + y + '"/>').join('');
+    html += '<path class="wt-avg-line" d="' + avgPath + '"></path>'
+          + '<path class="wt-area" d="' + areaPath + '"></path>'
+          + '<path class="wt-line" filter="url(#wtGlow)" d="' + linePath + '"></path>';
     points.forEach((p, i) => {
       const cls = (i === points.length - 1) ? 'wt-dot-today' : 'wt-dot';
       const r = (i === points.length - 1) ? 5 : 3;
       html += '<circle class="' + cls + '" cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="' + r + '"/>';
     });
+    // Invisible hit targets for hover
+    points.forEach((p, i) => {
+      html += '<rect data-widx="' + i + '" x="' + Math.max(0, p.x - 14).toFixed(1) + '" y="' + yTop + '" width="28" height="' + (yBot - yTop) + '" fill="transparent" style="cursor:crosshair"/>';
+    });
     $('wtChartContent').innerHTML = html;
     $('wtYAxisMax').textContent = yMax.toFixed(1);
     $('wtYAxisMin').textContent = yMin.toFixed(1);
     $('wtMeta').textContent = wtEntries.length + ' ' + (wtEntries.length === 1 ? 'entry' : 'entries') + ' · last ' + recent.length + ' days';
+
+    // Wire hover tooltip
+    const tip = $('wtChartTip');
+    if (!tip || !points.length) return;
+    const u = unit();
+    function wtShowTip(e) {
+      const rect = svgEl.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const svgX = cx * (W / rect.width);
+      let nearIdx = 0, nearDist = Infinity;
+      points.forEach((p, i) => { const d = Math.abs(p.x - svgX); if (d < nearDist) { nearDist = d; nearIdx = i; } });
+      const p = points[nearIdx]; const entry = recent[nearIdx];
+      const tipX = (p.x / W) * rect.width + 36;
+      const tipY = (p.y / H) * rect.height;
+      tip.innerHTML = '<div style="font-size:10px;color:var(--text-3);margin-bottom:2px;letter-spacing:0.04em">' + photoFmtDate(entry.dateKey) + '</div>'
+                    + '<div style="font-size:17px;font-weight:700;letter-spacing:-0.02em">' + entry.weight.toFixed(1) + ' ' + u + '</div>';
+      tip.classList.add('show');
+      tip.style.left = tipX + 'px';
+      tip.style.top = Math.max(4, tipY - 52) + 'px';
+    }
+    function wtHideTip() { tip.classList.remove('show'); }
+    svgEl.onpointermove = wtShowTip;
+    svgEl.onpointerleave = wtHideTip;
+    svgEl.ontouchmove = wtShowTip;
+    svgEl.ontouchend = wtHideTip;
   }
 
   function wtRenderDelta() {
@@ -4524,17 +4765,38 @@ img, video, canvas, svg { max-width: 100%; }
   // in the browser, so this works the same on every device.
   // ============================================================
   const IB_KEY = 'po_coach_inbody';
+  const IB_IMG_PFX = 'po_coach_inbody_img_';
   let inbodyScans = [];
   try {
     const raw = localStorage.getItem(IB_KEY);
     if (raw) inbodyScans = JSON.parse(raw);
   } catch (e) { inbodyScans = []; }
   if (!Array.isArray(inbodyScans)) inbodyScans = [];
+
+  // Migrate any scans that still have imageDataUrl inline → move to separate key
+  let _ibMigrated = false;
+  inbodyScans.forEach(s => {
+    if (s.id && s.imageDataUrl) {
+      try { localStorage.setItem(IB_IMG_PFX + s.id, s.imageDataUrl); } catch {}
+      delete s.imageDataUrl;
+      _ibMigrated = true;
+    }
+  });
+
   inbodyScans.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   function ibSave() {
-    try { localStorage.setItem(IB_KEY, JSON.stringify(inbodyScans)); } catch (e) {}
+    try { localStorage.setItem(IB_KEY, JSON.stringify(inbodyScans)); } catch (e) {
+      console.error('[InBody] Failed to save scan list', e);
+    }
   }
+  function ibSaveImage(id, dataUrl) {
+    try { localStorage.setItem(IB_IMG_PFX + id, dataUrl); return true; } catch { return false; }
+  }
+  function ibDeleteImage(id) { try { localStorage.removeItem(IB_IMG_PFX + id); } catch {} }
+  function ibGetImage(id) { return localStorage.getItem(IB_IMG_PFX + id) || ''; }
+
+  if (_ibMigrated) ibSave();
 
   // Merge a weight reading into the SAME timeline the quick "Enter
   // weight" box uses, so InBody scans become part of normal weight
@@ -4727,6 +4989,12 @@ img, video, canvas, svg { max-width: 100%; }
     "You read strength training programs — photos of handwritten/printed plans, app screenshots, or "
     + "plain text — and extract every exercise, grouped by training day. "
     + "Always call the import_strength_plan tool exactly once with your best reading. "
+    + "IMPORTANT: Always use the full, proper anatomical/common name for every exercise. "
+    + "Expand every abbreviation or shorthand — e.g. 'BP' → 'Barbell Bench Press', 'OHP' → 'Overhead Press', "
+    + "'RDL' → 'Romanian Deadlift', 'DB Row' → 'Dumbbell Row', 'SQ' → 'Back Squat', "
+    + "'DL' → 'Barbell Deadlift', 'CGP' → 'Close-Grip Bench Press', 'CG Row' → 'Close-Grip Cable Row'. "
+    + "If the input only says 'pull-ups' write 'Pull-Ups', not an abbreviation. "
+    + "Capitalise each word. Never output an abbreviation as the exercise name. "
     + "Group exercises under whatever day labels the program uses (Push/Pull/Legs, Upper/Lower, Day 1/2/3, "
     + "specific muscle groups, etc.) — preserve the program's own day names rather than inventing new ones. "
     + "If a rep range is given as a single number (e.g. \"10 reps\"), use it for both repMin and repMax. "
@@ -4790,7 +5058,10 @@ img, video, canvas, svg { max-width: 100%; }
       }).join('');
       return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px">' + escapeHtmlGym(d.dayName) + '</div>' + rows + '</div>';
     }).join('');
-    $('planImportSummary').innerHTML = html || '<div style="color:var(--text-3);font-size:13px">No exercises found.</div>';
+    $('planImportSummary').innerHTML =
+      '<div style="font-size:11px;color:var(--text-3);margin-bottom:12px;padding:8px 10px;background:rgba(125,211,252,0.06);border:1px solid rgba(125,211,252,0.15);border-radius:8px">'
+      + '✦ Claude\'s interpretation — review exercise names below and tap <b>Save</b> to confirm, or <b>Cancel</b> to discard.</div>'
+      + (html || '<div style="color:var(--text-3);font-size:13px">No exercises found.</div>');
     planImportShow('planImportReview');
   }
   function escapeHtmlGym(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -4968,11 +5239,12 @@ img, video, canvas, svg { max-width: 100%; }
     const vfl = parseFloat($('wtIbVfl').value);
     if (!dateKey || isNaN(weight)) { alert('Date and weight are required.'); return; }
     const ex = ibPendingExtracted || {};
+    const ibId = 'ib_' + Date.now() + '_' + Math.floor(Math.random() * 999);
+    ibSaveImage(ibId, ibPendingImage.dataUrl);
     const entry = {
-      id: 'ib_' + Date.now() + '_' + Math.floor(Math.random() * 999),
+      id: ibId,
       dateKey,
       ts: Date.now(),
-      imageDataUrl: ibPendingImage.dataUrl,
       weight,
       bodyFatPercent: isNaN(fat) ? null : fat,
       skeletalMuscleMass: isNaN(smm) ? null : smm,
@@ -5011,7 +5283,7 @@ img, video, canvas, svg { max-width: 100%; }
     } else {
       grid.innerHTML = inbodyScans.slice().reverse().map(s =>
         '<button class="wt-photo-card" data-id="' + s.id + '" type="button">' +
-          '<img src="' + s.imageDataUrl + '" alt="">' +
+          '<img src="' + ibGetImage(s.id) + '" alt="">' +
           '<div class="wt-photo-overlay"></div>' +
           '<div class="wt-photo-meta">' +
             '<span class="wt-photo-date">' + ibFmtDate(s.dateKey) + '</span>' +
@@ -5033,7 +5305,7 @@ img, video, canvas, svg { max-width: 100%; }
     const s = inbodyScans.find(x => x.id === id);
     if (!s) return;
     activeIbId = id;
-    $('wtIbViewerImg').src = s.imageDataUrl;
+    $('wtIbViewerImg').src = ibGetImage(s.id);
     $('wtIbViewerDate').textContent = ibFmtDate(s.dateKey).toUpperCase();
     $('wtIbViewerWeight').textContent = s.weight.toFixed(1) + ' ' + state.units;
     const rows = [];
@@ -5068,7 +5340,9 @@ img, video, canvas, svg { max-width: 100%; }
     const wrap = $('wtIbMetricCharts');
     if (recent.length < 1) { wrap.innerHTML = ''; return; }
     wrap.innerHTML = IB_METRIC_DEFS.map(m => {
-      const vals = recent.map(s => s[m.key]).filter(v => v != null);
+      // Only include scans that have this metric
+      const scansWithVal = recent.filter(s => s[m.key] != null);
+      const vals = scansWithVal.map(s => s[m.key]);
       const last = vals.length ? vals[vals.length - 1] : null;
       const prev = vals.length > 1 ? vals[vals.length - 2] : null;
       const suffix = m.kind === 'percent' ? '%' : m.kind === 'kcal' ? ' kcal' : m.kind === 'smi' ? ' kg/m²' : m.kind === 'weight' ? ' ' + state.units : '';
@@ -5085,9 +5359,16 @@ img, video, canvas, svg { max-width: 100%; }
         chartHtml = '<div class="wt-ib-metric-empty">' + (vals.length === 1 ? 'Need another scan to chart this' : 'Not detected yet') + '</div>';
       } else {
         const sp = ibSparkPath(vals, 200, 44, 5);
-        chartHtml = '<svg class="wt-ib-metric-svg" viewBox="0 0 200 44" preserveAspectRatio="none">'
+        // Encode scan dates + values as JSON in a data attribute for the hover tooltip
+        const tipData = JSON.stringify(scansWithVal.map((s, i) => ({ d: s.dateKey, v: vals[i] })));
+        chartHtml = '<svg class="wt-ib-metric-svg" viewBox="0 0 200 44" preserveAspectRatio="none"'
+          + ' data-metric="' + m.key + '" data-suffix="' + suffix.trim() + '" data-dec="' + m.decimals + '"'
+          + ' data-tip=\'' + tipData.replace(/'/g, '&apos;') + '\''
+          + ' data-color="' + m.color + '">'
           + '<path fill="none" stroke="' + m.color + '" stroke-width="2" d="' + sp.path + '"></path>'
           + sp.dots.map((p, i) => '<circle cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="' + (i === sp.dots.length - 1 ? 3 : 2) + '" fill="' + m.color + '"></circle>').join('')
+          // Wide invisible hit-strips per data point
+          + sp.dots.map((p, i) => '<rect data-sidx="' + i + '" x="' + Math.max(0, p.x - 14).toFixed(1) + '" y="0" width="28" height="44" fill="transparent"/>').join('')
           + '</svg>';
       }
       return '<div class="wt-ib-metric-card">'
@@ -5099,6 +5380,40 @@ img, video, canvas, svg { max-width: 100%; }
         + chartHtml
         + '</div>';
     }).join('');
+
+    // Wire shared hover tooltip via pointer events on the grid
+    const tip = $('ibMetricTip');
+    if (!tip) return;
+    wrap.addEventListener('pointermove', (e) => {
+      const svg = e.target.closest('svg[data-tip]');
+      if (!svg) { tip.classList.remove('show'); return; }
+      const tipData = JSON.parse(svg.dataset.tip || '[]');
+      if (!tipData.length) return;
+      const suffix = svg.dataset.suffix ? ' ' + svg.dataset.suffix : '';
+      const dec = parseInt(svg.dataset.dec || '1');
+      const color = svg.dataset.color || '#6ee7b7';
+      const rect = svg.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const svgX = cx * (200 / rect.width);
+      // Find nearest data point (dots are evenly spaced from xFor)
+      const n = tipData.length;
+      const xFor2 = (i) => 5 + (i / (n - 1)) * (200 - 10);
+      let nearIdx = 0, nearDist = Infinity;
+      tipData.forEach((_, i) => { const d = Math.abs(xFor2(i) - svgX); if (d < nearDist) { nearDist = d; nearIdx = i; } });
+      const pt = tipData[nearIdx];
+      tip.innerHTML = '<div style="font-size:10px;color:var(--text-3);margin-bottom:2px;letter-spacing:0.04em">' + photoFmtDate(pt.d) + '</div>'
+                    + '<div style="font-size:16px;font-weight:700;letter-spacing:-0.02em;color:' + color + '">' + pt.v.toFixed(dec) + suffix + '</div>';
+      tip.classList.add('show');
+      // Position tip above the SVG card
+      const wrapRect = wrap.getBoundingClientRect();
+      const cardEl = svg.closest('.wt-ib-metric-card');
+      const cardRect = cardEl ? cardEl.getBoundingClientRect() : rect;
+      const tipXInWrap = e.clientX - wrapRect.left;
+      const tipYInWrap = cardRect.top - wrapRect.top - 4;
+      tip.style.left = tipXInWrap + 'px';
+      tip.style.top = Math.max(0, tipYInWrap - tip.offsetHeight) + 'px';
+    }, { passive: true });
+    wrap.addEventListener('pointerleave', () => tip.classList.remove('show'));
   }
 
   // ============================================================
@@ -5240,6 +5555,7 @@ img, video, canvas, svg { max-width: 100%; }
   function ibDeleteActive() {
     if (!activeIbId) return;
     if (!confirm('Delete this InBody scan? This cannot be undone.')) return;
+    ibDeleteImage(activeIbId);
     inbodyScans = inbodyScans.filter(s => s.id !== activeIbId);
     ibSave();
     ibCloseViewer();

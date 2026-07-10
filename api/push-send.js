@@ -121,8 +121,12 @@ export default async function handler(req, res) {
 
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = (req.headers && req.headers.authorization) || '';
+  // isCron: Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" (serverless
+  // runtime always has CRON_SECRET even if Edge Middleware doesn't).
+  // The ?cron=1 query param is kept as a fallback so the manual test button in
+  // the dashboard still works without needing APP_SECRET in the URL.
   const isCron = (cronSecret && authHeader === 'Bearer ' + cronSecret)
-              || (req.query && req.query.cron === '1'); // fallback for manual test
+              || (req.query && req.query.cron === '1');
 
   if (!isCron && !requireAppSecret(req, res)) return;
 
