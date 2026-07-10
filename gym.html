@@ -2768,9 +2768,16 @@ img, video, canvas, svg { max-width: 100%; }
     const yMin = Math.floor((rawMin - pad) / step) * step;
     const yMax = Math.ceil((rawMax  + pad) / step) * step;
 
-    const W = 320;
+    // Read actual pixel dimensions so the viewBox is 1:1 with rendered pixels —
+    // this prevents circle elements from appearing as ovals under preserveAspectRatio="none".
+    const svgBbox = svgEl.getBoundingClientRect();
+    const W = Math.round(svgBbox.width) || 320;
+    const H = Math.round(svgBbox.height) || 160;
     svgEl.setAttribute('preserveAspectRatio', 'none');
-    const H = 120, lPad = 34, rPad = 12, yTop = 10, yBot = 106;
+    const lPad = 34, rPad = 12;
+    // Keep top/bottom margins proportional to the original 10/106 design (H=120)
+    const yTop = Math.round(H * 10 / 120);
+    const yBot = Math.round(H * 106 / 120);
     const xFor = i => lPad + (i / Math.max(1, logs.length - 1)) * (W - lPad - rPad);
     const yFor = v => yBot - ((v - yMin) / (yMax - yMin)) * (yBot - yTop);
 
@@ -2780,7 +2787,7 @@ img, video, canvas, svg { max-width: 100%; }
       log: l, idx: i,
     }));
 
-    svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 
     // Gradient defs
     let svg = `<defs>
@@ -2800,8 +2807,8 @@ img, video, canvas, svg { max-width: 100%; }
 
     // Date labels — first and last
     if (logs.length > 0) {
-      svg += `<text x="${lPad}" y="${H-1}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="start">${olFmtDate(logs[0].date)}</text>`;
-      svg += `<text x="${(W-rPad)}" y="${H-1}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="end">${olFmtDate(logs[logs.length-1].date)}</text>`;
+      svg += `<text x="${lPad}" y="${H-2}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="start">${olFmtDate(logs[0].date)}</text>`;
+      svg += `<text x="${(W-rPad)}" y="${H-2}" font-size="9" fill="rgba(255,255,255,0.25)" text-anchor="end">${olFmtDate(logs[logs.length-1].date)}</text>`;
     }
 
     // Area fill + smooth line
@@ -4117,7 +4124,9 @@ Be direct and encouraging. No bullet points in the response.`;
     if (wtEntries.length >= 2) {
       $('wtChartWrap').classList.remove('hidden');
       $('wtLegend').classList.remove('hidden');
-      wtRenderChart();
+      // requestAnimationFrame ensures the browser has laid out the newly visible
+      // element before we read getBoundingClientRect() for the viewBox dimensions.
+      requestAnimationFrame(wtRenderChart);
       wtRenderDelta();
       wtRenderComposition();
     } else {
@@ -4153,75 +4162,94 @@ Be direct and encouraging. No bullet points in the response.`;
   function wtRenderChart() {
     const svgEl = document.querySelector('.wt-chart');
     if (!svgEl) return;
-    // Use actual rendered pixel width for the coordinate space so circles
-    // render as circles (not ovals) regardless of card width.
-    const W = Math.round(svgEl.getBoundingClientRect().width) || 284;
-    const H = 130;
+    // Read actual pixel dimensions so the SVG coordinate space matches rendered
+    // pixels exactly — this keeps circles circular with preserveAspectRatio="none".
+    // If width is 0 the element is hidden (collapsed section); bail and let the
+    // section-expand handler call us once the element is visible.
+    const bbox = svgEl.getBoundingClientRect();
+    const W = Math.round(bbox.width);
+    const H = Math.round(bbox.height) || 140;
+    if (!W) return;
     svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 
     const recent = wtEntries.slice(-30);
     const weights = recent.map(e => e.weight);
-    const min = Math.min.apply(null, weights);
-    const max = Math.max.apply(null, weights);
-    const pad = Math.max((max - min) * 0.15, 0.5);
-    const yMin = min - pad, yMax = max + pad;
-    const xLeft = 8, xRight = W - 8, yTop = 20, yBot = 110;
+    const wMin = Math.min.apply(null, weights);
+    const wMax = Math.max.apply(null, weights);
+    const pad = Math.max((wMax - wMin) * 0.15, 0.5);
+    const yMin = wMin - pad, yMax = wMax + pad;
+
+    // Padding: 14% top, 14% bottom — keeps dots away from edges
+    const yTop = Math.round(H * 0.14);
+    const yBot = H - Math.round(H * 0.14);
+    const xLeft = 8, xRight = W - 8;
     const xRange = xRight - xLeft, yRange = yBot - yTop;
-    const xFor = (i) => recent.length === 1 ? (W / 2) : xLeft + (i / (recent.length - 1)) * xRange;
+    const xFor = (i) => recent.length === 1 ? W / 2 : xLeft + (i / (recent.length - 1)) * xRange;
     const yFor = (w) => yBot - ((w - yMin) / (yMax - yMin)) * yRange;
     const points = recent.map((e, i) => ({ x: xFor(i), y: yFor(e.weight) }));
     const linePath = wtSmoothPath(points);
-    const areaPath = linePath + ' L ' + points[points.length - 1].x.toFixed(2) + ' ' + yBot + ' L ' + points[0].x.toFixed(2) + ' ' + yBot + ' Z';
+    const areaPath = linePath
+      + ' L ' + points[points.length - 1].x.toFixed(2) + ' ' + yBot
+      + ' L ' + points[0].x.toFixed(2) + ' ' + yBot + ' Z';
     const avgPoints = recent.map((_, i) => {
-      const start = Math.max(0, i - 6);
-      const win = recent.slice(start, i + 1);
+      const win = recent.slice(Math.max(0, i - 6), i + 1);
       const avg = win.reduce((s, p) => s + p.weight, 0) / win.length;
       return { x: xFor(i), y: yFor(avg) };
     });
     const avgPath = wtSmoothPath(avgPoints);
-    // Grid lines (rendered in JS so x2 matches actual W)
-    let html = [20, 65, 110].map(y => '<line class="wt-grid" x1="0" y1="' + y + '" x2="' + W + '" y2="' + y + '"/>').join('');
+
+    // Three subtle grid lines at top / middle / bottom of the data range
+    const midY = Math.round((yTop + yBot) / 2);
+    let html = [yTop, midY, yBot].map(y =>
+      '<line class="wt-grid" x1="0" y1="' + y + '" x2="' + W + '" y2="' + y + '"/>'
+    ).join('');
     html += '<path class="wt-avg-line" d="' + avgPath + '"></path>'
           + '<path class="wt-area" d="' + areaPath + '"></path>'
           + '<path class="wt-line" filter="url(#wtGlow)" d="' + linePath + '"></path>';
     points.forEach((p, i) => {
-      const cls = (i === points.length - 1) ? 'wt-dot-today' : 'wt-dot';
-      const r = (i === points.length - 1) ? 5 : 3;
-      html += '<circle class="' + cls + '" cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="' + r + '"/>';
+      const isLast = i === points.length - 1;
+      html += '<circle class="' + (isLast ? 'wt-dot-today' : 'wt-dot') + '"'
+            + ' cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '"'
+            + ' r="' + (isLast ? 5 : 3.5) + '"/>';
     });
-    // Invisible hit targets for hover
+    // Invisible vertical hit strips for hover
     points.forEach((p, i) => {
-      html += '<rect data-widx="' + i + '" x="' + Math.max(0, p.x - 14).toFixed(1) + '" y="' + yTop + '" width="28" height="' + (yBot - yTop) + '" fill="transparent" style="cursor:crosshair"/>';
+      html += '<rect data-widx="' + i + '" x="' + Math.max(0, p.x - 14).toFixed(1) + '"'
+            + ' y="' + yTop + '" width="28" height="' + (yBot - yTop) + '" fill="transparent" style="cursor:crosshair"/>';
     });
     $('wtChartContent').innerHTML = html;
     $('wtYAxisMax').textContent = yMax.toFixed(1);
     $('wtYAxisMin').textContent = yMin.toFixed(1);
     $('wtMeta').textContent = wtEntries.length + ' ' + (wtEntries.length === 1 ? 'entry' : 'entries') + ' · last ' + recent.length + ' days';
 
-    // Wire hover tooltip
+    // Hover tooltip — position relative to the wrap container (which includes the y-axis column)
     const tip = $('wtChartTip');
     if (!tip || !points.length) return;
     const u = unit();
     function wtShowTip(e) {
-      const rect = svgEl.getBoundingClientRect();
-      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      const svgX = cx * (W / rect.width);
+      const r = svgEl.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      // W now equals r.width (1:1 mapping), so scaleX = 1. Keep the math explicit.
+      const svgX = cx * (W / r.width);
       let nearIdx = 0, nearDist = Infinity;
       points.forEach((p, i) => { const d = Math.abs(p.x - svgX); if (d < nearDist) { nearDist = d; nearIdx = i; } });
-      const p = points[nearIdx]; const entry = recent[nearIdx];
-      const tipX = (p.x / W) * rect.width + 36;
-      const tipY = (p.y / H) * rect.height;
-      tip.innerHTML = '<div style="font-size:10px;color:var(--text-3);margin-bottom:2px;letter-spacing:0.04em">' + photoFmtDate(entry.dateKey) + '</div>'
-                    + '<div style="font-size:17px;font-weight:700;letter-spacing:-0.02em">' + entry.weight.toFixed(1) + ' ' + u + '</div>';
+      const pt = points[nearIdx];
+      const entry = recent[nearIdx];
+      // +36 offsets for the 36px y-axis column to the left of the SVG
+      const tipX = (pt.x / W) * r.width + 36;
+      const tipY = (pt.y / H) * r.height;
+      tip.innerHTML = '<div style="font-size:10px;color:var(--text-3);margin-bottom:3px;letter-spacing:0.04em">'
+                    + photoFmtDate(entry.dateKey) + '</div>'
+                    + '<div style="font-size:17px;font-weight:700;letter-spacing:-0.02em">'
+                    + entry.weight.toFixed(1) + ' ' + u + '</div>';
       tip.classList.add('show');
       tip.style.left = tipX + 'px';
-      tip.style.top = Math.max(4, tipY - 52) + 'px';
+      tip.style.top = Math.max(4, tipY - 56) + 'px';
     }
-    function wtHideTip() { tip.classList.remove('show'); }
     svgEl.onpointermove = wtShowTip;
-    svgEl.onpointerleave = wtHideTip;
+    svgEl.onpointerleave = () => tip.classList.remove('show');
     svgEl.ontouchmove = wtShowTip;
-    svgEl.ontouchend = wtHideTip;
+    svgEl.ontouchend = () => tip.classList.remove('show');
   }
 
   function wtRenderDelta() {
@@ -5641,7 +5669,9 @@ Be direct and encouraging. No bullet points in the response.`;
         btn.setAttribute('aria-expanded', String(nowOpen));
         applyOpen(bodyEl, nowOpen, true);
         const cur = loadSt(); cur[key] = nowOpen; saveSt(cur);
-        if (nowOpen && key === 'chart') olRenderChart();
+        // Re-render charts that were hidden (getBoundingClientRect returns 0 on display:none)
+        if (nowOpen && key === 'chart') requestAnimationFrame(() => { try { olRenderChart(); } catch {} });
+        if (nowOpen && key === 'weight') requestAnimationFrame(() => { try { wtRenderChart(); } catch {} });
       });
     });
   })();
