@@ -179,9 +179,54 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     if (items.length) html += (html ? '<br>' : '') + '<ul class="reply-list">' + items.join('') + '</ul>';
     return html;
   }
-  function addUser(t){ const e = document.createElement('div'); e.className = 'msg user'; e.innerHTML = '<div class="bubble">' + esc(t) + '</div>'; feed.appendChild(e); scroll(); }
-  function addCoach(html){ const e = document.createElement('div'); e.className = 'msg coach'; e.innerHTML = '<div class="bubble"><span class="tag">Nova</span><div>' + html + '</div></div>'; feed.appendChild(e); scroll(); return e; }
+  // ── Chat history persistence ──────────────────────────────────
+  const NOVA_HIST_KEY = 'nova_chat_history';
+  const NOVA_MAX_SAVED = 60;
+  const NOVA_MAX_CTX   = 20;
+  const novaHistory = []; // sent to API for context
+
+  function novaPersist(role, text) {
+    try {
+      const arr = JSON.parse(localStorage.getItem(NOVA_HIST_KEY) || '[]');
+      arr.push({ role, text, ts: Date.now() });
+      if (arr.length > NOVA_MAX_SAVED) arr.splice(0, arr.length - NOVA_MAX_SAVED);
+      localStorage.setItem(NOVA_HIST_KEY, JSON.stringify(arr));
+    } catch (e) {}
+  }
+
+  function addUser(t, save){
+    const e = document.createElement('div');
+    e.className = 'msg user';
+    e.innerHTML = '<div class="bubble">' + esc(t) + '</div>';
+    feed.appendChild(e); scroll();
+    if (save !== false) novaPersist('user', t);
+  }
+  function addCoach(html, rawText, save){
+    const e = document.createElement('div');
+    e.className = 'msg coach';
+    e.innerHTML = '<div class="bubble"><span class="tag">Nova</span><div>' + html + '</div></div>';
+    feed.appendChild(e); scroll();
+    if (save !== false && rawText != null) novaPersist('coach', rawText);
+    return e;
+  }
   function scroll(){ window.scrollTo(0, document.body.scrollHeight); }
+
+  // Restore saved history on load
+  (function loadNovaHistory() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(NOVA_HIST_KEY) || '[]');
+      arr.forEach(m => {
+        if (m.role === 'user') {
+          addUser(m.text, false);
+          novaHistory.push({ role: 'user', content: m.text });
+        } else {
+          addCoach(render(m.text), null, false);
+          novaHistory.push({ role: 'assistant', content: m.text });
+        }
+      });
+      if (novaHistory.length > NOVA_MAX_CTX) novaHistory.splice(0, novaHistory.length - NOVA_MAX_CTX);
+    } catch (e) {}
+  })();
 
   const SYS =
     "You are Nova, a personal mentor living inside the user's life-tracking dashboard. " +
@@ -190,30 +235,44 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     "Answer in short bullet points starting with '- ', few words each, plain language. " +
     "Wrap key words and numbers in **double asterisks**. " +
     "End with one '- Do today:' bullet giving the single action. " +
+    "Build naturally on the conversation history — never repeat what you already said. " +
     "Dashboard data as JSON:\n";
 
   let busy = false;
   async function ask(text){
     text = (text||'').trim(); if (!text || busy) return;
-    busy = true; addUser(text); input.value = '';
+    busy = true;
+    addUser(text);  // persists
+    input.value = '';
     setOrb('think');
-    const loading = addCoach('<span class="dots"><i></i><i></i><i></i></span>');
+    const loading = addCoach('<span class="dots"><i></i><i></i><i></i></span>', null, false);
     try {
+      const msgs = [...novaHistory, { role: 'user', content: text }];
       const res = await fetch('/api/ai/ai-chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({
           system: SYS + JSON.stringify(dashboardData()),
           model: window.getPreferredModel ? window.getPreferredModel() : 'claude-opus-4-8',
-          messages: [{ role: 'user', content: text }],
+          messages: msgs,
         }),
       });
       if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'nova');
       const json = await res.json();
-      if (!res.ok || json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error || 'Something went wrong.')); setOrb(''); busy = false; return; }
-      loading.querySelector('div:last-child').innerHTML = render(json.text || 'Hmm, no reply.');
+      if (!res.ok || json.error){
+        loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error || 'Something went wrong.'));
+        setOrb(''); busy = false; return;
+      }
+      const reply = json.text || 'Hmm, no reply.';
+      loading.querySelector('div:last-child').innerHTML = render(reply);
+      // Update persisted element to final reply
+      novaPersist('coach', reply);
+      // Keep AI context trimmed
+      novaHistory.push({ role: 'user', content: text });
+      novaHistory.push({ role: 'assistant', content: reply });
+      if (novaHistory.length > NOVA_MAX_CTX) novaHistory.splice(0, novaHistory.length - NOVA_MAX_CTX);
       setOrb('happy'); setTimeout(() => setOrb(''), 2500);
-      speakReply(json.text || '');
+      speakReply(reply);
     } catch(e){
       loading.querySelector('div:last-child').innerHTML = render('- Could not reach Nova — check your connection.');
       setOrb('');

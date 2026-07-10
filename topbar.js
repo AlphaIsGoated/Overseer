@@ -650,9 +650,8 @@ body.topbar-modal-open {
   // Present everywhere (this file is loaded on every page) rather than
   // living on one dedicated page, since the point is an always-available
   // assistant, not a destination you navigate to. Proactively surfaces
-  // something noteworthy on first open per browser session (cached in
-  // sessionStorage so re-opening on a different page doesn't re-spend
-  // an AI call), then behaves as an ordinary cross-module chat.
+  // something noteworthy once per day (cached in localStorage by date),
+  // persists chat history across sessions so follow-ups have full context.
   function initCoach() {
     const fab = document.getElementById('coachFab');
     const panelBg = document.getElementById('coachPanelBg');
@@ -670,13 +669,13 @@ body.topbar-modal-open {
         'finance_active_tab','po_coach_units_migrated_lb_v1','po_coach_workout_done',
         'wish-hero-pct-num','app_secret',
       ]);
-      const SKIP_PFX = ['photo_','google_tokens','tpl:','coach_proactive'];
+      const SKIP_PFX = ['photo_','google_tokens','tpl:','coach_proactive','coach_chat_history','nova_chat_history'];
       // Redact values that look like API keys — long opaque alphanumeric strings
       // that serve no purpose in the AI context and risk being flagged or leaked.
       const API_KEY_RE = /^(sk-|xi-|sb_|xai-|Bearer |ghp_|eyJ)/;
       const LOOKS_LIKE_KEY = (v) => typeof v === 'string' &&
         (API_KEY_RE.test(v) || (v.length > 40 && /^[A-Za-z0-9_\-]{40,}$/.test(v)));
-      const now = Date.now(), WINDOW = 35 * 86400000;
+      const now = Date.now();
       const out = {};
 
       for (let i = 0; i < localStorage.length; i++) {
@@ -688,18 +687,23 @@ body.topbar-modal-open {
         if (LOOKS_LIKE_KEY(v)) continue; // redact API-key-shaped strings
 
         if (k === 'marathon_plan_v1' && v && Array.isArray(v.entries)) {
-          out[k] = { ...v, entries: v.entries
-            .filter(e => Math.abs(new Date(e.date + 'T00:00').getTime() - now) < WINDOW)
-            .map(e => ({ date:e.date, type:e.type, label:e.label,
-              plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
-              actualDistanceMi:e.actualDistanceMi })) };
+          // Include all completed entries (full history for trend analysis)
+          // + all future planned entries (so coach knows upcoming schedule).
+          // Slim each entry to avoid token bloat.
+          const slim = (e) => ({ date:e.date, type:e.type, label:e.label,
+            plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
+            actualDistanceMi:e.actualDistanceMi });
+          const past = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() <= now).map(slim);
+          const future = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() > now).map(slim);
+          out[k] = { ...v, entries_completed: past, entries_upcoming: future.slice(0, 30) };
+          delete out[k].entries; // replaced by split arrays above
         } else if (k === 'notes:items' && Array.isArray(v)) {
           out[k] = v.slice(0, 25).map(n => ({ title:n.title, category:n.category,
             body:(n.body||'').slice(0,150), pinned:n.pinned }));
         } else if (k === 'brain:obs_notes' && Array.isArray(v)) {
           out[k] = v.slice(0, 12).map(n => ({ path:n.path, body:(n.body||'').slice(0,80) }));
         } else if (k === 'strava_activities_v1' && Array.isArray(v)) {
-          out[k] = v.slice(-10).map(a => ({ name:a.name, type:a.type,
+          out[k] = v.slice(-30).map(a => ({ name:a.name, type:a.type,
             date:a.start_date_local, distance:a.distance,
             elapsed_time:a.elapsed_time, average_heartrate:a.average_heartrate }));
         } else if (k === 'google_calendars_v3' && v && typeof v === 'object') {
@@ -736,14 +740,30 @@ body.topbar-modal-open {
       return out;
     }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    function addMsg(role, text, proactive) {
+    function addMsg(role, text, proactive, save) {
       const el = document.createElement('div');
       el.className = 'coach-msg ' + role + (proactive ? ' proactive' : '');
       el.textContent = text;
       feed.appendChild(el);
       feed.scrollTop = feed.scrollHeight;
+      if (save !== false) persistMsg(role, text, proactive);
       return el;
     }
+
+    function loadChatHistory() {
+      try {
+        const arr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+        arr.forEach(m => {
+          addMsg(m.role, m.text, m.proactive, false);
+          // Rebuild AI context from non-proactive messages
+          if (!m.proactive) {
+            chatHistory.push({ role: m.role === 'coach' ? 'assistant' : 'user', content: m.text });
+          }
+        });
+        if (chatHistory.length > MAX_CTX) chatHistory.splice(0, chatHistory.length - MAX_CTX);
+      } catch (e) {}
+    }
+
     function addLoading() {
       const el = document.createElement('div');
       el.className = 'coach-msg coach';
@@ -771,8 +791,27 @@ body.topbar-modal-open {
       "Pick the 1-3 MOST relevant things only — not a status report of everything. If genuinely nothing stands out, say a " +
       "brief one-line all-clear instead of inventing concerns. Be direct and concise, a few short lines, no preamble.";
 
-    // Conversation history — keeps the last 10 turns so the coach remembers
-    // what was said earlier in the session without ballooning token usage.
+    // ── Persistence helpers ──────────────────────────────────────
+    const HIST_KEY = 'coach_chat_history';
+    const MAX_SAVED = 60;   // visual messages kept in localStorage
+    const MAX_CTX   = 20;   // AI context turns (user+assistant pairs)
+
+    function todayDateStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function proactiveDayKey() { return 'coach_proactive_' + todayDateStr(); }
+
+    function persistMsg(role, text, proactive) {
+      try {
+        const arr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+        arr.push({ role, text, proactive: !!proactive, ts: Date.now() });
+        if (arr.length > MAX_SAVED) arr.splice(0, arr.length - MAX_SAVED);
+        localStorage.setItem(HIST_KEY, JSON.stringify(arr));
+      } catch (e) {}
+    }
+
+    // Conversation history sent to the AI — rebuilt from localStorage on load.
     const chatHistory = [];
     const DATA_SYS = CHAT_SYS + JSON.stringify(dashboardData());
 
@@ -807,12 +846,13 @@ body.topbar-modal-open {
       text = (text || '').trim();
       if (!text || busy) return;
       busy = true;
-      addMsg('user', text);
+      addMsg('user', text);  // persists user message
       input.value = '';
       const loading = addLoading();
       try {
         const reply = await callAI(DATA_SYS, text, true);
-        loading.textContent = reply;
+        loading.remove();
+        addMsg('coach', reply, false);  // persists coach reply
         speak(reply);
       } catch (e) {
         loading.textContent = '⚠ ' + (e.message || 'Could not reach your coach.');
@@ -821,11 +861,6 @@ body.topbar-modal-open {
     }
 
     async function runProactiveScan() {
-      const cached = sessionStorage.getItem('coach_proactive_text');
-      if (cached) { addMsg('coach', cached, true); speak(cached); return; }
-      // Conservation mode skips this entirely — it's the single biggest
-      // recurring cost (a full dashboard-data scan on every session) since
-      // it fires automatically rather than being something you asked for.
       if (window.isConservationMode && window.isConservationMode()) {
         addMsg('coach', 'Conservation mode is on, so I skipped the automatic scan — ask me anything directly instead.', true);
         return;
@@ -833,25 +868,33 @@ body.topbar-modal-open {
       const loading = addLoading();
       try {
         const text = await callAI(PROACTIVE_SYS + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
-        loading.textContent = text;
-        loading.classList.add('proactive');
-        sessionStorage.setItem('coach_proactive_text', text);
+        loading.remove();
+        addMsg('coach', text, true);  // persists to chat history
+        localStorage.setItem(proactiveDayKey(), '1');
+        // Prune old day keys to avoid localStorage bloat
+        try {
+          const todayKey = proactiveDayKey();
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('coach_proactive_') && k !== todayKey) localStorage.removeItem(k);
+          }
+        } catch (e) {}
         speak(text);
       } catch (e) {
         loading.remove();
       }
     }
 
+    let historyLoaded = false;
     function openPanel() {
       panelBg.classList.add('show');
       fab.classList.remove('has-insight');
-      if (!feed.childElementCount) {
-        if (!sessionStorage.getItem('coach_proactive_seen')) {
-          sessionStorage.setItem('coach_proactive_seen', '1');
+      if (!historyLoaded) {
+        historyLoaded = true;
+        loadChatHistory();
+        // Run proactive scan only if we haven't done one today
+        if (!localStorage.getItem(proactiveDayKey())) {
           runProactiveScan();
-        } else {
-          const cached = sessionStorage.getItem('coach_proactive_text');
-          if (cached) { addMsg('coach', cached, true); speak(cached); }
         }
       }
       setTimeout(() => input.focus(), 80);
@@ -862,9 +905,8 @@ body.topbar-modal-open {
     document.getElementById('coachClose').addEventListener('click', closePanel);
     panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
 
-    // A subtle "something's worth a look" indicator before the panel's
-    // ever been opened this session — removed the instant it's opened.
-    if (!sessionStorage.getItem('coach_proactive_seen')) fab.classList.add('has-insight');
+    // Show the insight dot if today's briefing hasn't run yet
+    if (!localStorage.getItem(proactiveDayKey())) fab.classList.add('has-insight');
 
     // ---- Voice ----
     // Pre-unlock an HTMLAudioElement during a user gesture so it can be reused
