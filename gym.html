@@ -5685,7 +5685,7 @@ Be direct and encouraging. No bullet points in the response.`;
   // the wire. The actual JPEG lives in Supabase Storage. pcCollectState
   // strips any base64 dataUrl entries before push so the payload stays
   // tiny and we never blow iOS Safari's ~5MB localStorage quota.
-  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos'];
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_coach_inbody'];
 
   let pcPushTimer = null;
   let pcSuppressSync = false;
@@ -5718,9 +5718,19 @@ Be direct and encouraging. No bullet points in the response.`;
       try {
         let val = JSON.parse(v);
         if (k === 'po_coach_photos' && Array.isArray(val)) {
+          // Strip base64 data-URLs — only push Supabase Storage URL pointers
           val = val
             .filter((p) => p && p.url)
             .map((p) => ({ id: p.id, url: p.url, dateKey: p.dateKey, weight: p.weight }));
+        }
+        if (k === 'po_coach_inbody' && Array.isArray(val)) {
+          // Strip any residual imageDataUrl fields — images live in separate
+          // localStorage keys (po_coach_inbody_img_*) and are too large to sync
+          val = val.map(s => {
+            if (!s.imageDataUrl) return s;
+            const { imageDataUrl, ...rest } = s;
+            return rest;
+          });
         }
         out[k] = val;
       } catch {}
@@ -5752,15 +5762,112 @@ Be direct and encouraging. No bullet points in the response.`;
     try { photosRender(); } catch {}
   }
 
+  // Additive merge helpers — local data is NEVER deleted by remote.
+  // Local always wins on conflicts (most recent user interaction takes precedence).
+  function _pcMergeById(localArr, remoteArr, idKey) {
+    const map = new Map();
+    for (const e of (remoteArr || [])) if (e && e[idKey]) map.set(e[idKey], e);
+    for (const e of (localArr  || [])) if (e && e[idKey]) map.set(e[idKey], e);
+    return Array.from(map.values());
+  }
+
   function pcApplyRemoteState(remote) {
     if (!remote || typeof remote !== 'object') return false;
     pcSuppressSync = true;
     let changed = false;
     try {
       for (const k of PC_SYNCED_KEYS) {
+        if (!(k in remote) && localStorage.getItem(k) == null) continue;
+
+        // ── po_coach_v1 (gym state) ──────────────────────────────────
+        if (k === 'po_coach_v1') {
+          let localSt = null;
+          try { const r = localStorage.getItem(k); localSt = r ? JSON.parse(r) : null; } catch {}
+          const remoteSt = (remote[k] && typeof remote[k] === 'object') ? remote[k] : null;
+          if (!remoteSt) continue; // nothing remote to apply
+          if (!localSt) {
+            // Local is empty — restore from cloud
+            const incoming = JSON.stringify(remoteSt);
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+            continue;
+          }
+          // Merge: additive union of exercises and logs, local wins on conflict
+          const exMap = new Map();
+          for (const e of (remoteSt.exercises || [])) if (e && e.id) exMap.set(e.id, e);
+          for (const e of (localSt.exercises  || [])) if (e && e.id) exMap.set(e.id, e);
+          const mergedLogs = {};
+          for (const [exId, logs] of Object.entries(remoteSt.logs || {})) {
+            const dateMap = new Map();
+            for (const l of (logs || [])) if (l && l.date) dateMap.set(l.date, l);
+            mergedLogs[exId] = Array.from(dateMap.values());
+          }
+          for (const [exId, logs] of Object.entries(localSt.logs || {})) {
+            if (!mergedLogs[exId]) mergedLogs[exId] = [];
+            const dateMap = new Map();
+            for (const l of mergedLogs[exId]) if (l && l.date) dateMap.set(l.date, l);
+            for (const l of (logs || [])) if (l && l.date) dateMap.set(l.date, l);
+            mergedLogs[exId] = Array.from(dateMap.values())
+              .sort((a, b) => a.date.localeCompare(b.date));
+          }
+          const merged = { ...remoteSt, ...localSt,
+            exercises: Array.from(exMap.values()),
+            logs: mergedLogs };
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
+
+        // ── po_coach_weights (array keyed by dateKey) ────────────────
+        if (k === 'po_coach_weights') {
+          let localW = [];
+          try { const r = localStorage.getItem(k); localW = r ? JSON.parse(r) : []; } catch {}
+          const remoteW = Array.isArray(remote[k]) ? remote[k] : [];
+          const wtMap = new Map();
+          for (const e of remoteW) if (e && e.dateKey) wtMap.set(e.dateKey, e);
+          for (const e of localW)  if (e && e.dateKey) wtMap.set(e.dateKey, e);
+          const merged = Array.from(wtMap.values())
+            .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
+
+        // ── po_coach_inbody (InBody scan metadata, keyed by id) ──────
+        if (k === 'po_coach_inbody') {
+          let localScans = [];
+          try { const r = localStorage.getItem(k); localScans = r ? JSON.parse(r) : []; } catch {}
+          const remoteScans = Array.isArray(remote[k]) ? remote[k] : [];
+          const scanMap = new Map();
+          for (const s of remoteScans) if (s && s.id) scanMap.set(s.id, s);
+          for (const s of localScans)  if (s && s.id) scanMap.set(s.id, s);
+          const merged = Array.from(scanMap.values())
+            .sort((a, b) => (a.dateKey || '').localeCompare(b.dateKey || ''));
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
+
+        // ── po_coach_workout_done (object: {dateKey: true}) ──────────
+        if (k === 'po_coach_workout_done') {
+          let localD = {};
+          try { const r = localStorage.getItem(k); localD = r ? JSON.parse(r) : {}; } catch {}
+          const remoteD = (remote[k] && typeof remote[k] === 'object') ? remote[k] : {};
+          const merged = { ...remoteD, ...localD }; // union, local wins
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
+
+        // ── po_coach_photos (merge: keep local base64-only + remote URL set) ─
         if (k === 'po_coach_photos') {
-          // Merge: keep local dataUrl-only photos (not yet uploaded) +
-          // overlay the remote URL-based set.
           let localPhotos = [];
           try { localPhotos = JSON.parse(localStorage.getItem(k) || '[]'); } catch {}
           const remotePhotos = Array.isArray(remote[k]) ? remote[k] : [];
@@ -5773,18 +5880,15 @@ Be direct and encouraging. No bullet points in the response.`;
           }
           continue;
         }
-        if (k in remote) {
-          const incoming = JSON.stringify(remote[k]);
-          const local = localStorage.getItem(k);
-          if (local !== incoming) { try { _pcOrigSet(k, incoming); changed = true; } catch {} }
-        } else if (localStorage.getItem(k) != null) {
-          try { _pcOrigRemove(k); changed = true; } catch {}
-        }
       }
     } finally {
       pcSuppressSync = false;
     }
-    if (changed) { try { pcRerender(); } catch (e) {} }
+    if (changed) {
+      try { pcRerender(); } catch (e) {}
+      // Push the merged state back to the cloud so remote reflects the full union
+      pcSchedulePush();
+    }
     return changed;
   }
 
@@ -5867,7 +5971,11 @@ Be direct and encouraging. No bullet points in the response.`;
         const json = await r.json();
         if (json && json.data && Object.keys(json.data).length > 0) {
           pcLastSyncedJson = JSON.stringify(json.data);
+          // applyRemote does an additive merge (local is never discarded).
+          // After merging, schedule a push so any local-only data makes it
+          // to the cloud — even if this is the first load on a new URL.
           pcMaybeApplyRemote(json.data);
+          pcSchedulePush();
         } else if (Object.keys(pcCollectState()).length > 0) {
           pcSchedulePush();
         }
