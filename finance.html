@@ -720,6 +720,12 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.nw-stat-date {
+  font-size: 9px; color: var(--text-tertiary);
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 1px;
+}
 
 /* Two-column overview row: line chart + donut */
 .nw-overview-grid {
@@ -1777,6 +1783,130 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (max-width: 600px) {
   .sub-auto-toggle { width: 100%; justify-content: space-between; padding: 12px 14px; }
 }
+
+/* ===== EMPLOYMENT ===== */
+.emp-hero {
+  background: linear-gradient(135deg, rgba(107,227,164,0.08) 0%, rgba(125,211,252,0.03) 100%);
+  border: 0.5px solid rgba(107,227,164,0.15);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.emp-hero-eyebrow {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: #6BE3A4; font-weight: 700; margin-bottom: 4px;
+}
+.emp-hero-income {
+  font-size: 32px; font-weight: 700; color: var(--text-primary);
+  line-height: 1.05; font-variant-numeric: tabular-nums;
+}
+.emp-hero-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+.emp-stat-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px; margin-top: 14px;
+}
+.emp-stat {
+  background: rgba(255,255,255,0.04); border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 10px 12px;
+}
+.emp-stat-label {
+  font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;
+  letter-spacing: 0.05em; font-weight: 600; margin-bottom: 4px;
+}
+.emp-stat-val { font-size: 15px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.emp-stat-val.accent { color: #6BE3A4; }
+.emp-stat-val.warn  { color: #FF8A8A; }
+.emp-insight-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.emp-insight {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; background: rgba(255,255,255,0.03);
+  border-radius: 10px; border: 0.5px solid rgba(255,255,255,0.06);
+  font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;
+}
+.emp-insight-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.emp-add-card {
+  background: var(--bg-card); border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px;
+}
+.emp-add-eyebrow {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-tertiary); font-weight: 700; margin-bottom: 12px;
+}
+.emp-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.emp-add-grid .emp-input-full { grid-column: 1 / -1; }
+.emp-input {
+  background: rgba(255,255,255,0.04); border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 8px; color: var(--text-primary); font-family: inherit;
+  font-size: 13px; padding: 9px 11px; outline: none; width: 100%; box-sizing: border-box;
+}
+.emp-input::placeholder { color: var(--text-tertiary); }
+.emp-input:focus { border-color: rgba(107,227,164,0.4); }
+.emp-add-btn {
+  grid-column: 1 / -1; background: rgba(107,227,164,0.12);
+  border: 0.5px solid rgba(107,227,164,0.25); border-radius: 8px;
+  color: #6BE3A4; cursor: pointer; font-family: inherit; font-size: 13px;
+  font-weight: 700; letter-spacing: 0.04em; padding: 10px; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.emp-add-btn:hover { background: rgba(107,227,164,0.20); }
+.emp-section-h {
+  display: flex; justify-content: space-between; align-items: center; margin: 14px 0 8px;
+}
+.emp-section-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-tertiary); font-weight: 700;
+}
+.emp-section-count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.emp-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  align-items: center; gap: 12px;
+  padding: 12px 14px; background: rgba(255,255,255,0.025);
+  border-radius: 10px; margin-bottom: 8px;
+}
+.emp-row-title { font-weight: 600; color: var(--text-primary); font-size: 14px; }
+.emp-row-company { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.emp-row-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  background: rgba(125,211,252,0.10); border: 0.5px solid rgba(125,211,252,0.20);
+  color: #7DD3FC; margin-top: 4px;
+}
+.emp-row-right { text-align: right; }
+.emp-row-monthly {
+  font-size: 18px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.emp-row-per { font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
+.emp-row-paycheck { font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
+.emp-row-del {
+  background: transparent; border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 6px; color: var(--text-tertiary); cursor: pointer;
+  font-size: 13px; padding: 4px 8px; font-family: inherit;
+}
+.emp-row-del:hover { color: #FF8A8A; border-color: rgba(255,138,138,0.3); }
+/* Income card injected into Net Worth tab */
+.emp-nw-card {
+  background: linear-gradient(135deg, rgba(107,227,164,0.07) 0%, rgba(107,227,164,0.02) 100%);
+  border: 0.5px solid rgba(107,227,164,0.12); border-radius: 12px;
+  padding: 14px 16px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; margin-bottom: 14px;
+}
+.emp-nw-eyebrow {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+  color: #6BE3A4; font-weight: 700; margin-bottom: 3px;
+}
+.emp-nw-income {
+  font-size: 20px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.emp-nw-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.emp-nw-right { text-align: right; flex-shrink: 0; }
+.emp-nw-annual { font-size: 14px; font-weight: 600; color: #6BE3A4; font-variant-numeric: tabular-nums; }
+.emp-nw-annual-label { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+@media (max-width: 600px) {
+  .emp-stat-grid { grid-template-columns: 1fr 1fr; }
+  .emp-add-grid { grid-template-columns: 1fr; }
+  .emp-add-grid .emp-input-full { grid-column: 1; }
+  .emp-add-btn { grid-column: 1; }
+}
 </style>
 </head>
 <body>
@@ -1957,14 +2087,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div class="nw-stat">
             <div class="nw-stat-label">All-time high</div>
             <div class="nw-stat-val" id="nwStatHigh">—</div>
+            <div class="nw-stat-date" id="nwStatHighDate"></div>
           </div>
           <div class="nw-stat">
             <div class="nw-stat-label">All-time low</div>
             <div class="nw-stat-val" id="nwStatLow">—</div>
+            <div class="nw-stat-date" id="nwStatLowDate"></div>
           </div>
           <div class="nw-stat">
             <div class="nw-stat-label">Snapshots</div>
             <div class="nw-stat-val" id="nwStatCount">—</div>
+            <div class="nw-stat-date" id="nwStatFirstDate"></div>
           </div>
         </div>
         <div class="nw-chart-empty" id="nwChartEmpty">Add or edit an asset to start tracking your net worth over time.</div>
@@ -1995,6 +2128,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
       <div class="nw-activity-list" id="nwActivityList"></div>
       <div class="nw-activity-empty" id="nwActivityEmpty">No activity yet — add your first account.</div>
+    </div>
+
+    <!-- Employment income summary — shown when jobs are added -->
+    <div class="emp-nw-card" id="empNwCard" style="display:none">
+      <div>
+        <div class="emp-nw-eyebrow">EMPLOYMENT INCOME</div>
+        <div class="emp-nw-income" id="empNwMonthly">USD 0 / mo</div>
+        <div class="emp-nw-sub" id="empNwSub"></div>
+      </div>
+      <div class="emp-nw-right">
+        <div class="emp-nw-annual" id="empNwAnnual">USD 0</div>
+        <div class="emp-nw-annual-label">/ year</div>
+      </div>
     </div>
 
     <div class="card-grid" style="gap:10px">
@@ -2178,6 +2324,70 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<!-- ===== EMPLOYMENT ===== -->
+<div class="section" data-section="employ" hidden>
+  <div class="section-title">
+    <span class="section-title-text">EMPLOYMENT</span>
+  </div>
+
+  <!-- Income summary hero -->
+  <div class="emp-hero">
+    <div class="emp-hero-eyebrow">TOTAL MONTHLY INCOME</div>
+    <div class="emp-hero-income" id="empMonthlyTotal">USD 0</div>
+    <div class="emp-hero-sub" id="empAnnualSub">USD 0 / year</div>
+    <div class="emp-stat-grid">
+      <div class="emp-stat">
+        <div class="emp-stat-label">Subs / income</div>
+        <div class="emp-stat-val" id="empVsSubs">—</div>
+      </div>
+      <div class="emp-stat">
+        <div class="emp-stat-label">Annual / NW</div>
+        <div class="emp-stat-val" id="empVsNw">—</div>
+      </div>
+      <div class="emp-stat">
+        <div class="emp-stat-label">Wishlist payoff</div>
+        <div class="emp-stat-val" id="empWishPayoff">—</div>
+      </div>
+    </div>
+    <div class="emp-insight-list" id="empInsights"></div>
+  </div>
+
+  <!-- Add form -->
+  <div class="emp-add-card">
+    <div class="emp-add-eyebrow">+ ADD A JOB / INTERNSHIP</div>
+    <div class="emp-add-grid">
+      <input type="text"   id="empTitle"     placeholder="Job title (e.g. SWE Intern)"   class="emp-input emp-input-full">
+      <input type="text"   id="empCompany"   placeholder="Company"                        class="emp-input">
+      <input type="number" id="empAmount"    placeholder="Pay per paycheck"  step="0.01"  class="emp-input">
+      <select id="empCurrency" class="emp-input">
+        <option value="USD">USD</option>
+        <option value="CHF">CHF</option>
+        <option value="EUR">EUR</option>
+        <option value="GBP">GBP</option>
+      </select>
+      <select id="empFrequency" class="emp-input emp-input-full">
+        <option value="weekly">Weekly</option>
+        <option value="biweekly" selected>Bi-weekly (every 2 weeks)</option>
+        <option value="semimonthly">Semi-monthly (twice a month)</option>
+        <option value="monthly">Monthly</option>
+      </select>
+      <button class="emp-add-btn" id="empAddBtn">+ Add Job</button>
+    </div>
+  </div>
+
+  <!-- Jobs list -->
+  <div class="emp-section-h">
+    <span class="emp-section-label">CURRENT JOBS</span>
+    <span class="emp-section-count" id="empCount">0 jobs</span>
+  </div>
+  <div id="empList"></div>
+  <div id="empEmpty" class="wish-empty-card">
+    <div class="wish-empty-icon">💼</div>
+    <div class="wish-empty-title">No jobs added yet</div>
+    <div class="wish-empty-sub">Add a job or internship above to track your income and see how it stacks up against your subscriptions, wishlist, and net worth.</div>
+  </div>
+</div>
+
 <!-- ===== NOVA — AI money coach ===== -->
 <div class="section" data-section="nova" hidden>
   <div class="section-title">
@@ -2220,6 +2430,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <button class="bot-tab" data-tab="wish">
     <span class="bot-tab-icon">🎯</span>
     <span class="bot-tab-label">Wishlist</span>
+  </button>
+  <button class="bot-tab" data-tab="employ">
+    <span class="bot-tab-icon">💼</span>
+    <span class="bot-tab-label">Jobs</span>
   </button>
   <button class="bot-tab" data-tab="nova">
     <span class="bot-tab-icon">✨</span>
@@ -2329,7 +2543,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   tabs.forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
   const savedTab = storeGet(TAB_KEY);
-  setActiveTab(savedTab && ['net','subs','incoming','wish','nova'].includes(savedTab) ? savedTab : 'net');
+  setActiveTab(savedTab && ['net','subs','incoming','wish','employ','nova'].includes(savedTab) ? savedTab : 'net');
 
   // ============================================================
   // NET WORTH (copied from the main dashboard, verbatim logic)
@@ -2492,6 +2706,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     if (typeof renderWishlist === 'function') renderWishlist();
     if (typeof renderOrders   === 'function') renderOrders();
     if (typeof updateOrdPreview === 'function') updateOrdPreview();
+    if (typeof renderEmploymentSummary === 'function') renderEmploymentSummary(grand);
   }
 
   // ============================================================
@@ -2509,15 +2724,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   function fmtActivityDate(ts) {
     const d = new Date(ts);
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const today     = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const yesterday = today - 86400000;
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    if (dayStart === today) {
-      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    }
-    if (dayStart === yesterday) return 'yest';
+    const dayStart  = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return mons[d.getMonth()] + ' ' + d.getDate();
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (dayStart === today)     return 'Today ' + time;
+    if (dayStart === yesterday) return 'Yesterday ' + time;
+    const dateStr = mons[d.getMonth()] + ' ' + d.getDate() +
+      (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
+    return dateStr + ', ' + time;
   }
   function renderActivity() {
     const list = document.getElementById('nwActivityList');
@@ -2754,27 +2970,49 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   // Stats overlay — what 1% is worth, all-time high/low, snapshot count.
   // Reads the snapshot history (CHF base) and converts to display currency.
+  function fmtSnapshotDate(ts) {
+    if (!ts) return '';
+    const d   = new Date(ts);
+    const now = new Date();
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const yr  = d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '';
+    return mons[d.getMonth()] + ' ' + d.getDate() + yr;
+  }
+
   function renderChartStats(hist) {
-    const oneEl   = document.getElementById('nwStat1pct');
-    const highEl  = document.getElementById('nwStatHigh');
-    const lowEl   = document.getElementById('nwStatLow');
-    const countEl = document.getElementById('nwStatCount');
+    const oneEl       = document.getElementById('nwStat1pct');
+    const highEl      = document.getElementById('nwStatHigh');
+    const highDateEl  = document.getElementById('nwStatHighDate');
+    const lowEl       = document.getElementById('nwStatLow');
+    const lowDateEl   = document.getElementById('nwStatLowDate');
+    const countEl     = document.getElementById('nwStatCount');
+    const firstDateEl = document.getElementById('nwStatFirstDate');
     if (!oneEl) return;
     if (!hist || !hist.length) {
       oneEl.textContent = '—';
-      highEl.textContent = '—';
-      lowEl.textContent = '—';
-      countEl.textContent = '0';
+      if (highEl)      highEl.textContent      = '—';
+      if (highDateEl)  highDateEl.textContent   = '';
+      if (lowEl)       lowEl.textContent        = '—';
+      if (lowDateEl)   lowDateEl.textContent    = '';
+      if (countEl)     countEl.textContent      = '0';
+      if (firstDateEl) firstDateEl.textContent  = '';
       return;
     }
     const vals = hist.map(p => p.v);
     const last = vals[vals.length - 1];
-    const high = Math.max.apply(null, vals);
-    const low  = Math.min.apply(null, vals);
-    oneEl.textContent   = fmtMoney(last / 100);
-    highEl.textContent  = fmtMoney(high);
-    lowEl.textContent   = fmtMoney(low);
-    countEl.textContent = String(hist.length);
+    let highVal = vals[0], highTs = hist[0].t;
+    let lowVal  = vals[0], lowTs  = hist[0].t;
+    hist.forEach(p => {
+      if (p.v > highVal) { highVal = p.v; highTs = p.t; }
+      if (p.v < lowVal)  { lowVal  = p.v; lowTs  = p.t; }
+    });
+    oneEl.textContent = fmtMoney(last / 100);
+    if (highEl)      highEl.textContent     = fmtMoney(highVal);
+    if (highDateEl)  highDateEl.textContent  = fmtSnapshotDate(highTs);
+    if (lowEl)       lowEl.textContent      = fmtMoney(lowVal);
+    if (lowDateEl)   lowDateEl.textContent   = fmtSnapshotDate(lowTs);
+    if (countEl)     countEl.textContent    = String(hist.length);
+    if (firstDateEl) firstDateEl.textContent = 'since ' + fmtSnapshotDate(hist[0].t);
   }
 
   NW_CATS.forEach(cat => {
@@ -4157,6 +4395,239 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     discardBtn.addEventListener('click', reset);
   })();
 
+  // ============================================================
+  // EMPLOYMENT — track jobs/internships and income breakdown
+  // ============================================================
+  const EMP_KEY = 'employment_jobs';
+
+  const EMP_FREQ_LABELS = {
+    weekly:      'Weekly',
+    biweekly:    'Bi-weekly',
+    semimonthly: 'Semi-monthly',
+    monthly:     'Monthly',
+  };
+
+  function empMonthlyMultiplier(freq) {
+    if (freq === 'weekly')      return 52 / 12;
+    if (freq === 'biweekly')    return 26 / 12;
+    if (freq === 'semimonthly') return 2;
+    return 1; // monthly
+  }
+
+  function empGetMonthlyUSD(job) {
+    const amtUSD = (Number(job.amount) || 0) / (exchangeRates[job.currency] || 1);
+    return amtUSD * empMonthlyMultiplier(job.frequency);
+  }
+
+  function empTotalMonthlyUSD() {
+    const jobs = storeGet(EMP_KEY) || [];
+    return jobs.reduce((s, j) => s + empGetMonthlyUSD(j), 0);
+  }
+
+  function renderEmploymentSummary(netWorthUSD) {
+    const monthly = empTotalMonthlyUSD();
+    const annual  = monthly * 12;
+
+    // Net Worth income card (shown only when there's income)
+    const nwCard = document.getElementById('empNwCard');
+    if (nwCard) {
+      if (monthly < 0.01) {
+        nwCard.style.display = 'none';
+      } else {
+        nwCard.style.display = 'flex';
+        const mEl = document.getElementById('empNwMonthly');
+        const aEl = document.getElementById('empNwAnnual');
+        const sEl = document.getElementById('empNwSub');
+        if (mEl) mEl.textContent = fmtMoney(monthly) + ' / mo';
+        if (aEl) aEl.textContent = fmtMoney(annual);
+        if (sEl) {
+          const jobs = storeGet(EMP_KEY) || [];
+          const n = jobs.length;
+          sEl.textContent = n + ' job' + (n === 1 ? '' : 's');
+        }
+      }
+    }
+
+    // Employment tab hero
+    const mTotal = document.getElementById('empMonthlyTotal');
+    const aSub   = document.getElementById('empAnnualSub');
+    if (mTotal) mTotal.textContent = fmtMoney(monthly);
+    if (aSub)   aSub.textContent   = fmtMoney(annual) + ' / year';
+
+    // Stat: subs vs income
+    const subItems = storeGet('subs') || [];
+    const monthlySubsUSD = subItems.reduce((s, it) => s + monthlyEquivalent(it), 0);
+    const vsSubsEl = document.getElementById('empVsSubs');
+    if (vsSubsEl) {
+      if (monthly < 0.01) { vsSubsEl.textContent = '—'; vsSubsEl.className = 'emp-stat-val'; }
+      else {
+        const pct = (monthlySubsUSD / monthly * 100);
+        vsSubsEl.textContent = pct.toFixed(1) + '%';
+        vsSubsEl.className = 'emp-stat-val' + (pct > 20 ? ' warn' : ' accent');
+      }
+    }
+
+    // Stat: annual income vs net worth
+    const vsNwEl = document.getElementById('empVsNw');
+    if (vsNwEl) {
+      if (annual < 0.01 || !netWorthUSD || netWorthUSD < 0.01) {
+        vsNwEl.textContent = '—'; vsNwEl.className = 'emp-stat-val';
+      } else {
+        const ratio = annual / netWorthUSD;
+        vsNwEl.textContent = ratio.toFixed(2) + '×';
+        vsNwEl.className = 'emp-stat-val accent';
+      }
+    }
+
+    // Stat: months to pay off wishlist
+    const wishPayEl = document.getElementById('empWishPayoff');
+    if (wishPayEl) {
+      const wishItems = storeGet('wishlist') || [];
+      const wishTotal = wishItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+      if (monthly < 0.01 || wishTotal < 0.01) {
+        wishPayEl.textContent = '—'; wishPayEl.className = 'emp-stat-val';
+      } else {
+        const months = wishTotal / monthly;
+        wishPayEl.textContent = months < 1
+          ? '< 1 mo'
+          : months.toFixed(1) + ' mo';
+        wishPayEl.className = 'emp-stat-val' + (months > 12 ? ' warn' : ' accent');
+      }
+    }
+
+    // Insight bullets
+    const insightsEl = document.getElementById('empInsights');
+    if (insightsEl && monthly > 0.01) {
+      const bullets = [];
+      if (monthlySubsUSD > 0) {
+        const pct = (monthlySubsUSD / monthly * 100).toFixed(1);
+        bullets.push({ icon: '📊', text: 'Your subscriptions consume ' + pct + '% of monthly income (' + fmtMoney(monthlySubsUSD) + '/mo).' });
+      }
+      if (netWorthUSD > 0) {
+        const months = netWorthUSD / monthly;
+        bullets.push({ icon: '🏦', text: 'At this income rate your current net worth represents ' + months.toFixed(1) + ' months of pay.' });
+      }
+      const wishItems2 = storeGet('wishlist') || [];
+      const wishTotal2 = wishItems2.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+      if (wishTotal2 > 0) {
+        const months2 = wishTotal2 / monthly;
+        bullets.push({ icon: '🎯', text: 'Your wishlist (' + fmtMoney(wishTotal2) + ') would take ' + months2.toFixed(1) + ' months of income to fully fund.' });
+      }
+      insightsEl.innerHTML = bullets.map(b =>
+        '<div class="emp-insight"><span class="emp-insight-icon">' + b.icon + '</span><span>' + b.text + '</span></div>'
+      ).join('');
+    } else if (insightsEl) {
+      insightsEl.innerHTML = '';
+    }
+  }
+
+  function renderEmployment() {
+    const jobs = storeGet(EMP_KEY) || [];
+    const list  = document.getElementById('empList');
+    const empty = document.getElementById('empEmpty');
+    const count = document.getElementById('empCount');
+    if (!list) return;
+
+    count.textContent = jobs.length + ' job' + (jobs.length === 1 ? '' : 's');
+
+    if (!jobs.length) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = '';
+      renderEmploymentSummary(0);
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    list.innerHTML = '';
+    jobs.forEach((job, idx) => {
+      const monthlyUSD = empGetMonthlyUSD(job);
+      const row = document.createElement('div');
+      row.className = 'emp-row';
+
+      const left = document.createElement('div');
+      const paycheckDisplay = (job.entered_currency && job.entered_currency !== 'USD')
+        ? job.entered_currency + ' ' + Number(job.entered_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : fmtMoney(Number(job.amount));
+      left.innerHTML =
+        '<div class="emp-row-title">' + escapeHtml(job.title) + '</div>' +
+        (job.company ? '<div class="emp-row-company">' + escapeHtml(job.company) + '</div>' : '') +
+        '<div class="emp-row-badge">' + (EMP_FREQ_LABELS[job.frequency] || job.frequency) + '</div>';
+
+      const right = document.createElement('div');
+      right.className = 'emp-row-right';
+      right.innerHTML =
+        '<div class="emp-row-monthly">' + fmtMoney(monthlyUSD) + '</div>' +
+        '<div class="emp-row-per">/ month</div>' +
+        '<div class="emp-row-paycheck">' + paycheckDisplay + ' / paycheck</div>';
+
+      const del = document.createElement('button');
+      del.className = 'emp-row-del';
+      del.textContent = '×';
+      del.title = 'Remove';
+      del.addEventListener('click', () => {
+        const arr = storeGet(EMP_KEY) || [];
+        arr.splice(idx, 1);
+        storeSet(EMP_KEY, arr);
+        renderEmployment();
+        renderAllNetWorth();
+      });
+
+      row.appendChild(left);
+      row.appendChild(right);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+
+    renderAllNetWorth();
+  }
+
+  // Wire up the add button
+  (function() {
+    const addBtn  = document.getElementById('empAddBtn');
+    const titleEl = document.getElementById('empTitle');
+    const compEl  = document.getElementById('empCompany');
+    const amtEl   = document.getElementById('empAmount');
+    const ccyEl   = document.getElementById('empCurrency');
+    const freqEl  = document.getElementById('empFrequency');
+    if (!addBtn) return;
+
+    function doAdd() {
+      const title = (titleEl.value || '').trim();
+      const company = (compEl.value || '').trim();
+      const rawAmt = parseFloat(amtEl.value);
+      const ccy = ccyEl.value || 'USD';
+      const freq = freqEl.value || 'biweekly';
+      if (!title || isNaN(rawAmt) || rawAmt <= 0) {
+        titleEl.focus();
+        return;
+      }
+      const amtUSD = rawAmt / (exchangeRates[ccy] || 1);
+      const job = {
+        id: Date.now(),
+        title, company,
+        amount: amtUSD,
+        entered_amount: rawAmt,
+        entered_currency: ccy,
+        currency: 'USD',
+        frequency: freq,
+      };
+      const arr = storeGet(EMP_KEY) || [];
+      arr.push(job);
+      storeSet(EMP_KEY, arr);
+      titleEl.value = '';
+      compEl.value  = '';
+      amtEl.value   = '';
+      renderEmployment();
+    }
+
+    addBtn.addEventListener('click', doAdd);
+    [titleEl, compEl, amtEl, ccyEl, freqEl].forEach(el => {
+      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+    });
+  })();
+
+  renderEmployment();
+
 })();
 </script>
 
@@ -4165,7 +4636,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'finance',
-    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'nw_currency', 'nw:activity', 'nw:history'],
+    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'employment_jobs', 'nw_currency', 'nw:activity', 'nw:history'],
     syncedPrefixes: ['nw:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
