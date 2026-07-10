@@ -13,7 +13,7 @@
 // ============================================================
 import { requireAppSecret, rejectIfTooLarge } from './_lib/security.js';
 
-const DEFAULT_VOICE = '21m00Tcm4TlvDq8ikWAM'; // Rachel — warm, clear, stable
+const DEFAULT_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam — deep, clear, JARVIS-adjacent
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

@@ -221,19 +221,40 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     busy = false;
   }
 
-  document.getElementById('send').addEventListener('click', () => ask(input.value));
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(input.value); });
+  // Pre-unlock Audio element on first gesture so iOS autoplay works after async gaps.
+  let _novaVoiceEl = null;
+  function unlockAudio() {
+    if (_novaVoiceEl) return;
+    try {
+      _novaVoiceEl = new Audio();
+      _novaVoiceEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+      _novaVoiceEl.volume = 0;
+      _novaVoiceEl.play().then(() => { _novaVoiceEl.pause(); _novaVoiceEl.volume = 1; }).catch(() => {});
+    } catch (_) {}
+  }
 
-  // ---- Voice: speak replies aloud (Web Speech API, browser-native, free) ----
+  document.getElementById('send').addEventListener('click', () => { unlockAudio(); ask(input.value); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { unlockAudio(); ask(input.value); } });
+
+  // ---- Voice: speak replies aloud via ElevenLabs (or Web Speech fallback) ----
   let voiceOn = false;
   const voiceToggle = document.getElementById('voiceToggle');
   try { voiceOn = localStorage.getItem('nova_voice_on') === '1'; } catch (e) {}
   voiceToggle.classList.toggle('on', voiceOn);
   voiceToggle.addEventListener('click', () => {
+    unlockAudio();
     voiceOn = !voiceOn;
     voiceToggle.classList.toggle('on', voiceOn);
     try { localStorage.setItem('nova_voice_on', voiceOn ? '1' : '0'); } catch (e) {}
-    if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+    if (voiceOn) {
+      // Immediately re-speak the last Nova reply so voice feels instant.
+      const msgs = feed.querySelectorAll('.msg.coach .bubble div');
+      const last = msgs[msgs.length - 1];
+      if (last) speakReply(last.textContent);
+    } else {
+      if (_novaVoiceEl) { _novaVoiceEl.pause(); _novaVoiceEl.src = ''; }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    }
   });
   function speakReply(text) {
     if (!voiceOn || !text) return;
@@ -245,14 +266,26 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
         body: JSON.stringify({ text: clean }),
-      }).then(r => r.ok ? r.arrayBuffer() : null).then(buf => {
+      }).then(r => {
+        if (!r.ok) return r.json().catch(() => ({})).then(b => { throw new Error(b.error || ('ElevenLabs ' + r.status)); });
+        return r.arrayBuffer();
+      }).then(buf => {
         if (!buf || !voiceOn) return;
         const blob = new Blob([buf], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => URL.revokeObjectURL(url);
-        audio.play().catch(() => {});
-      }).catch(() => {});
+        const cleanup = () => URL.revokeObjectURL(url);
+        if (_novaVoiceEl) {
+          _novaVoiceEl.pause();
+          _novaVoiceEl.src = url;
+          _novaVoiceEl.volume = 1;
+          _novaVoiceEl.onended = cleanup;
+          _novaVoiceEl.play().catch(err => { cleanup(); addNovaError('Voice error: ' + err.message); });
+        } else {
+          const a = new Audio(url);
+          a.onended = cleanup;
+          a.play().catch(err => { cleanup(); addNovaError('Voice error: ' + err.message); });
+        }
+      }).catch(err => addNovaError('Voice error: ' + err.message));
       return;
     }
     if (!window.speechSynthesis) return;
@@ -260,6 +293,10 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     const u = new SpeechSynthesisUtterance(clean);
     u.rate = 1.02;
     window.speechSynthesis.speak(u);
+  }
+  function addNovaError(msg) {
+    const e = addCoach('<span style="color:#f87171">⚠ ' + msg + '</span>');
+    console.warn('[nova voice]', msg);
   }
 
   // ---- Voice: speak your question (Web Speech API speech-to-text) ----

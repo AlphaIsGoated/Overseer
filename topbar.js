@@ -890,6 +890,7 @@ body.topbar-modal-open {
         const lastCoachMsg = [...feed.querySelectorAll('.coach-msg.coach')].pop();
         if (lastCoachMsg) speak(lastCoachMsg.textContent);
       } else {
+        if (_voiceEl) { _voiceEl.pause(); _voiceEl.src = ''; }
         if (window.speechSynthesis) window.speechSynthesis.cancel();
       }
     });
