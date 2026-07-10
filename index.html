@@ -1355,6 +1355,7 @@ body::after {
       const r = await fetch(url);
       const j = await r.json();
       const cur = j.current || {};
+      if (cur.temperature_2m == null) throw new Error('no temperature data');
       const [icon, label] = weatherIcon(cur.weather_code);
       const temp = Math.round(cur.temperature_2m);
       $('todayWeather').innerHTML =
