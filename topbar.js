@@ -15,9 +15,9 @@
   // For your audience's standalone, replace these with placeholders
   // and have them paste their own values, just like the other pages.
   // Prefer Vercel env vars (served via /api/config → window.DASH_*),
-  // otherwise fall back to these defaults.
-  const TOPBAR_SUPABASE_URL = (window.DASH_SUPABASE_URL) || 'https://srajryooffirbroltjmg.supabase.co';
-  const TOPBAR_SUPABASE_KEY = (window.DASH_SUPABASE_KEY) || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
+  // Credentials come exclusively from /api/config → window.DASH_* at load time.
+  const TOPBAR_SUPABASE_URL = (window.DASH_SUPABASE_URL) || '';
+  const TOPBAR_SUPABASE_KEY = (window.DASH_SUPABASE_KEY) || '';
 
   // -------- CSS --------
   // Themes are applied by setting data-theme="X" on <html>.
