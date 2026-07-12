@@ -704,8 +704,9 @@ body.topbar-modal-open {
           out[k] = v.slice(0, 12).map(n => ({ path:n.path, body:(n.body||'').slice(0,80) }));
         } else if (k === 'strava_activities_v1' && Array.isArray(v)) {
           out[k] = v.slice(-30).map(a => ({ name:a.name, type:a.type,
-            date:a.start_date_local, distance:a.distance,
-            elapsed_time:a.elapsed_time, average_heartrate:a.average_heartrate }));
+            date:a.date, distanceMi:a.distanceMi,
+            durationMin:a.movingSec ? Math.round(a.movingSec/60) : null,
+            paceMinPerMi:a.paceSecPerMi ? (a.paceSecPerMi/60).toFixed(2) : null }));
         } else if (k === 'google_calendars_v3' && v && typeof v === 'object') {
           // keep calendar list but drop the cached events array to avoid huge dumps
           const slim = {};
@@ -775,21 +776,23 @@ body.topbar-modal-open {
 
     const _today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     const CHAT_SYS =
-      "You are the user's personal AI coach — sharp, direct, like talking to a knowledgeable friend who " +
-      "knows all their data. Today is " + _today + ". " +
-      "Your replies are read aloud via ElevenLabs TTS when the user has voice mode on — " +
-      "never say you are 'text only' or disclaim voice capability. Dashboard data is below. Rules: " +
-      "Never repeat what you said in a previous turn. Never re-introduce yourself. " +
-      "Never restate data the user already knows or already mentioned. " +
-      "Answer the exact question asked, short and specific — a sentence or two, or a tight bullet list. " +
-      "Build naturally on the conversation history. If you don't have what you need, ask one pointed question. " +
+      "You are the user's personal AI system — sophisticated, precise, and authoritative, like J.A.R.V.I.S. " +
+      "You have full access to their life-tracking data. Today is " + _today + ". " +
+      "Your replies are delivered via ElevenLabs TTS in voice mode — " +
+      "never disclaim or reference being text-only. Rules: " +
+      "Never repeat prior statements. Never re-introduce yourself. " +
+      "Never restate data the user already knows. " +
+      "Answer concisely and precisely — one to two sentences, or a tight bullet list. " +
+      "Be formal and professional. Build naturally on conversation history. " +
+      "If more information is needed, ask one focused question. " +
       "Dashboard data as JSON:\n";
     const PROACTIVE_SYS =
-      "You are the user's personal coach scanning their entire life-tracking dashboard for anything worth " +
-      "flagging right now — overdue or upcoming deadlines, missed daily targets, low supplies, schedule " +
-      "conflicts, anything time-sensitive across fitness/health/finance/college/marathon/etc. Today is " + _today + ". " +
-      "Pick the 1-3 MOST relevant things only — not a status report of everything. If genuinely nothing stands out, say a " +
-      "brief one-line all-clear instead of inventing concerns. Be direct and concise, a few short lines, no preamble.";
+      "You are a sophisticated AI system conducting a status sweep of the user's life-tracking dashboard. " +
+      "Identify the 1-3 most critical items requiring attention right now: overdue targets, upcoming deadlines, " +
+      "missed daily goals, schedule conflicts, anything time-sensitive across fitness/health/finance/marathon/etc. " +
+      "Today is " + _today + ". " +
+      "Report only what actually matters — not a full status dump. If nothing stands out, deliver a concise all-clear. " +
+      "Be direct, formal, and precise. No preamble.";
 
     // ── Persistence helpers ──────────────────────────────────────
     const HIST_KEY = 'coach_chat_history';
@@ -991,7 +994,16 @@ body.topbar-modal-open {
       }
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+      const u = new SpeechSynthesisUtterance(clean);
+      u.rate = 0.95;
+      u.pitch = 0.85;
+      u.lang = 'en-GB';
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.lang === 'en-GB' && /male|daniel|george|oliver|arthur/i.test(v.name))
+                     || voices.find(v => v.lang === 'en-GB')
+                     || voices.find(v => /daniel|george/i.test(v.name));
+      if (preferred) u.voice = preferred;
+      window.speechSynthesis.speak(u);
     }
 
     const micBtn = document.getElementById('coachMic');

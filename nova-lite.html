@@ -141,7 +141,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
       } else if (k === 'brain:obs_notes' && Array.isArray(v)) {
         out[k] = v.slice(0,12).map(n => ({ path:n.path, body:(n.body||'').slice(0,80) }));
       } else if (k === 'strava_activities_v1' && Array.isArray(v)) {
-        out[k] = v.slice(-10).map(a => ({ name:a.name, type:a.type, date:a.start_date_local, distance:a.distance, elapsed_time:a.elapsed_time, average_heartrate:a.average_heartrate }));
+        out[k] = v.slice(-15).map(a => ({ name:a.name, type:a.type, date:a.date, distanceMi:a.distanceMi, durationMin:a.movingSec ? Math.round(a.movingSec/60) : null, paceMinPerMi:a.paceSecPerMi ? (a.paceSecPerMi/60).toFixed(2) : null }));
       } else if (k === 'google_calendars_v3' && v && typeof v === 'object') {
         const slim = {}; for (const id of Object.keys(v)) slim[id] = { name:v[id].name, color:v[id].color, enabled:v[id].enabled }; out[k] = slim;
       } else if (k === 'internship:opportunities' && Array.isArray(v)) {
@@ -229,13 +229,13 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
   })();
 
   const SYS =
-    "You are Nova, a personal mentor living inside the user's life-tracking dashboard. " +
-    "You can see their saved data (food, water, gym, finance, sleep, goals, etc.). " +
-    "Give honest, specific, encouraging guidance. " +
-    "Answer in short bullet points starting with '- ', few words each, plain language. " +
-    "Wrap key words and numbers in **double asterisks**. " +
-    "End with one '- Do today:' bullet giving the single action. " +
-    "Build naturally on the conversation history — never repeat what you already said. " +
+    "You are Nova, a sophisticated AI system integrated into the user's personal life-tracking dashboard. " +
+    "You have access to their complete data: fitness, nutrition, runs, finance, sleep, goals, and more. " +
+    "Respond with professionalism and precision — be direct, data-driven, and authoritative. " +
+    "Speak formally, like a capable assistant who commands respect. " +
+    "Format replies as concise bullet points starting with '- '. Wrap key numbers and terms in **double asterisks**. " +
+    "End with one '- Recommendation:' bullet giving the single most important action. " +
+    "Never repeat prior statements. Build naturally on conversation history. " +
     "Dashboard data as JSON:\n";
 
   let busy = false;
@@ -350,7 +350,15 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
-    u.rate = 1.02;
+    u.rate = 0.95;
+    u.pitch = 0.85;
+    u.lang = 'en-GB';
+    // prefer a deep British male voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang === 'en-GB' && /male|daniel|george|oliver|arthur/i.test(v.name))
+                   || voices.find(v => v.lang === 'en-GB')
+                   || voices.find(v => /daniel|george/i.test(v.name));
+    if (preferred) u.voice = preferred;
     window.speechSynthesis.speak(u);
   }
   function addNovaError(msg) {
