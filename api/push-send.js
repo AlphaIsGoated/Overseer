@@ -160,15 +160,19 @@ export default async function handler(req, res) {
   );
 
   const sent = results.filter(r => r.status === 'fulfilled').length;
-  // Collect error details — 410/404 means the subscription expired (device unsubscribed)
+  // Collect error details with status codes for diagnosis
   const failures = results
-    .map((r, i) => r.status === 'rejected' ? { endpoint: subs[i].endpoint.slice(-40), error: String(r.reason) } : null)
+    .map((r, i) => r.status === 'rejected' ? { endpoint: subs[i].endpoint.slice(-40), error: String(r.reason), status: r.reason && r.reason.statusCode } : null)
     .filter(Boolean);
-  const expired = results.filter((r, i) => r.status === 'rejected' && r.reason && (r.reason.statusCode === 410 || r.reason.statusCode === 404)).map((r, i) => subs[i].endpoint);
+  // Remove any subscription that gets a 4xx — all are unrecoverable:
+  // 404/410 = expired/cancelled, 400/401/403 = invalid or VAPID mismatch
+  const deadEndpoints = results
+    .map((r, i) => (r.status === 'rejected' && r.reason && r.reason.statusCode >= 400 && r.reason.statusCode < 500) ? subs[i].endpoint : null)
+    .filter(Boolean);
 
-  // Auto-remove expired subscriptions so they stop accumulating
-  if (expired.length > 0) {
-    const cleaned = subs.filter(s => !expired.includes(s.endpoint));
+  // Auto-remove dead subscriptions so they stop accumulating
+  if (deadEndpoints.length > 0) {
+    const cleaned = subs.filter(s => !deadEndpoints.includes(s.endpoint));
     await fetch(supaUrl + '/rest/v1/app_state', {
       method: 'POST',
       headers: { apikey: supaKey, Authorization: 'Bearer ' + supaKey, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
@@ -176,5 +180,5 @@ export default async function handler(req, res) {
     }).catch(() => {});
   }
 
-  return res.status(200).json({ ok: true, type, sent, failed: failures.length, failures, expiredRemoved: expired.length, total: subs.length, payload });
+  return res.status(200).json({ ok: true, type, sent, failed: failures.length, failures, deadRemoved: deadEndpoints.length, total: subs.length, payload });
 }
