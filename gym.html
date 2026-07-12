@@ -5635,12 +5635,12 @@ Be direct and encouraging. No bullet points in the response.`;
     if (!haveScanData && !haveTrainData) { wrap.classList.add('hidden'); return; }
     wrap.classList.remove('hidden');
 
-    // Color palette oldest→newest: same sky-blue hue, increasing opacity/brightness
-    // Distinct accent colors oldest→newest: coral → amber → mint → sky
+    // Distinct colors oldest→newest: coral → amber → violet → sky
+    // (mint/#6ee7b7 deliberately avoided — it's the training-volume trace color)
     const SCAN_COLORS = [
       { fill: 'rgba(255,138,138,0.10)', stroke: '#FF8A8A', dotR: 2.5 },
       { fill: 'rgba(242,192, 99,0.10)', stroke: '#F2C063', dotR: 2.5 },
-      { fill: 'rgba(110,231,183,0.10)', stroke: '#6ee7b7', dotR: 3   },
+      { fill: 'rgba(167,139,250,0.10)', stroke: '#A78BFA', dotR: 3   },
       { fill: 'rgba(125,211,252,0.14)', stroke: '#7DD3FC', dotR: 4   },
     ];
     const colorOffset = Math.max(0, 4 - scansWithData.length);
