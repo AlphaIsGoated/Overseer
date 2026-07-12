@@ -164,10 +164,10 @@ export default async function handler(req, res) {
   const failures = results
     .map((r, i) => r.status === 'rejected' ? { endpoint: subs[i].endpoint.slice(-40), error: String(r.reason), status: r.reason && r.reason.statusCode } : null)
     .filter(Boolean);
-  // Remove any subscription that gets a 4xx — all are unrecoverable:
-  // 404/410 = expired/cancelled, 400/401/403 = invalid or VAPID mismatch
+  // Remove any subscription that fails — if the push service can't deliver
+  // it for any reason it's considered dead. User can re-subscribe.
   const deadEndpoints = results
-    .map((r, i) => (r.status === 'rejected' && r.reason && r.reason.statusCode >= 400 && r.reason.statusCode < 500) ? subs[i].endpoint : null)
+    .map((r, i) => r.status === 'rejected' ? subs[i].endpoint : null)
     .filter(Boolean);
 
   // Auto-remove dead subscriptions so they stop accumulating

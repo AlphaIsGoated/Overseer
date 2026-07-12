@@ -1311,8 +1311,9 @@ body::after {
         st.textContent = 'No subscriptions found — tap Re-subscribe on each device in Settings.';
       } else if (d.sent > 0 && d.failed > 0) {
         st.style.color = '#F2C063';
-        const err = d.failures && d.failures[0] ? d.failures[0].error : '';
-        st.textContent = '✓ ' + d.sent + ' sent, ' + d.failed + ' failed. ' + (err ? 'Error: ' + err.slice(0, 80) : '');
+        const f0 = d.failures && d.failures[0];
+        const errStr = f0 ? (f0.status ? 'HTTP ' + f0.status + ' — ' : '') + f0.error.slice(0, 60) : '';
+        st.textContent = '✓ ' + d.sent + ' sent, ' + d.failed + ' failed (dead subs purged). ' + (errStr ? errStr : '') + (d.deadRemoved ? ' [' + d.deadRemoved + ' removed]' : '');
       } else if (d.failed > 0) {
         st.style.color = '#FF8A8A';
         const err = d.failures && d.failures[0] ? d.failures[0].error : '';
