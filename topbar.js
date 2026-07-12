@@ -1102,16 +1102,15 @@ body.topbar-modal-open {
       navigator.serviceWorker.register('/sw.js', { scope: '/' }).then((reg) => {
         const vapidPublicKey = window.DASH_VAPID_PUBLIC_KEY;
         if (!vapidPublicKey || Notification.permission !== 'granted') return;
-        reg.pushManager.getSubscription().then((existing) => {
-          // Always re-save the subscription on page load to handle the case
-          // where the server's subscription record was lost or expired.
-          const sub = existing;
-          if (!sub) {
-            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) })
-              .then(newSub => savePushSub(newSub)).catch(() => {});
-          }
-          savePushSub(sub);
-        });
+        // Always call subscribe() — not getSubscription() — so an expired
+        // subscription at the push service level gets replaced automatically.
+        // subscribe() is idempotent: returns the existing subscription if
+        // it's still valid, creates a new one if it has expired (which would
+        // cause a 410 from the cron and silent removal from Supabase).
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        }).then(sub => savePushSub(sub)).catch(() => {});
       }).catch(() => {});
     }
 
