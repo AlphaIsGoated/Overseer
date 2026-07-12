@@ -35,7 +35,7 @@
     },
     {
       "path": "/api/push-send?type=training&cron=1",
-      "schedule": "0 10 * * *"
+      "schedule": "0 21 * * *"
     },
     {
       "path": "/api/push-send?type=nutrition&cron=1",
