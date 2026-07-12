@@ -29,12 +29,15 @@ export default async function handler(req, res) {
     const rows = await getRes.json().catch(() => []);
     const current = (rows && rows[0] && rows[0].data) ? rows[0].data : [];
     const subs = Array.isArray(current) ? current : [];
-    // Deduplicate by deviceId (preferred) or endpoint URL (legacy entries without deviceId).
-    // This ensures re-subscribing on the same device replaces the old entry
-    // rather than accumulating ghost endpoints.
+    // Deduplicate + purge old ghost entries:
+    // - Remove any entry matching this deviceId (same device re-subscribing)
+    // - Remove any entry matching this endpoint (exact duplicate)
+    // - Remove any entry WITHOUT a deviceId when we have one — these are
+    //   pre-deviceId ghosts that can never be deduped and just accumulate
     const filtered = subs.filter(s => {
-      if (deviceId && s.deviceId === deviceId) return false;
-      if (s.endpoint === sub.endpoint) return false;
+      if (deviceId && s.deviceId === deviceId) return false; // same device, will replace
+      if (s.endpoint === sub.endpoint) return false;          // exact duplicate
+      if (deviceId && !s.deviceId) return false;             // old ghost, purge
       return true;
     });
     filtered.push({ ...sub, ...(deviceId ? { deviceId } : {}) });
