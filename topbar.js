@@ -1101,6 +1101,19 @@ body.topbar-modal-open {
         let old;
         try { old = JSON.parse(localStorage.getItem(k)) || []; } catch { old = []; }
         if (!Array.isArray(old)) { localStorage.removeItem(k); return; }
+        // Archive this day to history before deleting it.
+        if (old.length) {
+          try {
+            const dateStr = k.slice('goals:'.length);
+            let hist; try { hist = JSON.parse(localStorage.getItem('goals_history_v1')) || []; } catch { hist = []; }
+            if (!Array.isArray(hist)) hist = [];
+            if (!hist.find(h => h.date === dateStr)) {
+              hist.unshift({ date: dateStr, goals: old });
+              if (hist.length > 90) hist.length = 90;
+              localStorage.setItem('goals_history_v1', JSON.stringify(hist));
+            }
+          } catch {}
+        }
         old.forEach(g => {
           if (g && !g.done && g.text && !seen.has(g.text)) {
             todayGoals.push({ text: g.text, done: false });

@@ -593,6 +593,25 @@ body::after {
   .gm-card { padding: 16px; }
   .gm-progress-num { font-size: 36px; }
 }
+
+/* ---- history ---- */
+.hist-toggle { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--text-tertiary); font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; padding: 0; margin: 18px 0 10px; }
+.hist-toggle svg { transition: transform 0.2s; }
+.hist-toggle.open svg { transform: rotate(90deg); }
+.hist-day { margin-bottom: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; }
+.hist-day-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; }
+.hist-day-date { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.hist-day-summary { font-size: 11px; color: var(--text-tertiary); }
+.hist-day-summary .done-count { color: var(--success); font-weight: 700; }
+.hist-day-summary .miss-count { color: var(--text-tertiary); }
+.hist-day-body { padding: 0 16px 12px; display: none; }
+.hist-day.expanded .hist-day-body { display: block; }
+.hist-goal-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.04); font-size: 13px; }
+.hist-goal-row:first-child { border-top: none; }
+.hist-goal-icon { font-size: 14px; flex-shrink: 0; }
+.hist-goal-text { flex: 1; color: var(--text-secondary); }
+.hist-goal-text.done { color: var(--text-tertiary); text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.2); }
+.hist-empty { font-size: 12px; font-style: italic; color: var(--text-tertiary); text-align: center; padding: 18px 0; }
 </style>
 </head>
 <body>
@@ -691,6 +710,15 @@ body::after {
     </div>
   </div>
 
+  <!-- HISTORY -->
+  <div class="section" id="histSection">
+    <button type="button" class="hist-toggle" id="histToggle">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      Goal History
+    </button>
+    <div id="histList" style="display:none;"></div>
+  </div>
+
 </div>
 
 <script>
@@ -714,6 +742,7 @@ body::after {
     }
   }
   function storeDelete(key) { try { localStorage.removeItem(key); } catch (e) {} }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function storeListKeys(prefix) {
     const out = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -758,6 +787,19 @@ body::after {
   }
   function setGoals(key, list) { storeSet(key, list); }
 
+  // ---------- history ----------
+  const HIST_KEY = 'goals_history_v1';
+  function saveToHistory(dateStr, goals) {
+    if (!goals || !goals.length) return;
+    let hist; try { hist = storeGet(HIST_KEY) || []; } catch { hist = []; }
+    if (!Array.isArray(hist)) hist = [];
+    if (!hist.find(h => h.date === dateStr)) {
+      hist.unshift({ date: dateStr, goals });
+      if (hist.length > 90) hist.length = 90;
+      storeSet(HIST_KEY, hist);
+    }
+  }
+
   // ---------- rollover: pull undone older goals into today ----------
   function rollover() {
     const todayDateStr = getActiveDateString();
@@ -769,6 +811,7 @@ body::after {
       const dateStr = k.slice('goals:'.length);
       if (dateStr >= todayDateStr) return;
       const old = getGoals(k);
+      saveToHistory(dateStr, old);
       old.forEach(g => {
         if (!g.done && g.text && !texts.has(g.text)) {
           today.push({ text: g.text, done: false });
@@ -1187,6 +1230,51 @@ body::after {
     const goals = getGoals(tomorrowKey());
     renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), tomorrowKey(), true);
   }
+
+  // ---------- History ----------
+  function renderHistory() {
+    let hist; try { hist = storeGet(HIST_KEY) || []; } catch { hist = []; }
+    if (!Array.isArray(hist)) hist = [];
+    const listEl = document.getElementById('histList');
+    if (!hist.length) {
+      listEl.innerHTML = '<div class="hist-empty">No history yet — completed goals will appear here after the day rolls over.</div>';
+      return;
+    }
+    listEl.innerHTML = hist.map((entry, idx) => {
+      const goals = Array.isArray(entry.goals) ? entry.goals : [];
+      const doneCount = goals.filter(g => g.done).length;
+      const missCount = goals.filter(g => !g.done).length;
+      const summaryParts = [];
+      if (doneCount) summaryParts.push('<span class="done-count">' + doneCount + ' done</span>');
+      if (missCount) summaryParts.push('<span class="miss-count">' + missCount + ' missed</span>');
+      const rows = goals.map(g =>
+        '<div class="hist-goal-row">' +
+        '<span class="hist-goal-icon">' + (g.done ? '✓' : '○') + '</span>' +
+        '<span class="hist-goal-text' + (g.done ? ' done' : '') + '">' + escapeHtml(g.text) + '</span>' +
+        '</div>'
+      ).join('');
+      return '<div class="hist-day" data-idx="' + idx + '">' +
+        '<div class="hist-day-header">' +
+        '<span class="hist-day-date">' + formatDate(entry.date) + '</span>' +
+        '<span class="hist-day-summary">' + (summaryParts.join(' · ') || 'no goals') + '</span>' +
+        '</div>' +
+        '<div class="hist-day-body">' + rows + '</div>' +
+        '</div>';
+    }).join('');
+
+    listEl.querySelectorAll('.hist-day-header').forEach(hdr => {
+      hdr.addEventListener('click', () => hdr.closest('.hist-day').classList.toggle('expanded'));
+    });
+  }
+
+  document.getElementById('histToggle').addEventListener('click', () => {
+    const btn = document.getElementById('histToggle');
+    const listEl = document.getElementById('histList');
+    const open = listEl.style.display === 'none';
+    listEl.style.display = open ? 'block' : 'none';
+    btn.classList.toggle('open', open);
+    if (open) renderHistory();
+  });
 
   // ---------- Push remaining ----------
   document.getElementById('gmPushBtn').addEventListener('click', () => {
