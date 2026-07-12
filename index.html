@@ -1283,7 +1283,15 @@ body::after {
 
   $('pushTestBtn').addEventListener('click', async () => {
     const st = $('pushTestStatus');
-    st.style.display = 'block'; st.style.color = 'var(--text-tertiary)'; st.textContent = 'Sending…';
+    st.style.display = 'block'; st.style.color = 'var(--text-tertiary)'; st.textContent = 'Refreshing subscription…';
+
+    // Refresh the push subscription FIRST, while still inside the user gesture.
+    // iOS Safari won't allow pushManager.subscribe() after any network await.
+    if (window.requestPushPermission && Notification.permission === 'granted') {
+      try { await window.requestPushPermission(); } catch {}
+    }
+
+    st.textContent = 'Sending…';
     try {
       const r = await fetch('/api/push-send?type=morning&cron=1', {
         headers: { 'X-App-Secret': window.DASH_APP_SECRET || '' },
@@ -1294,18 +1302,7 @@ body::after {
         st.textContent = '✓ Sent to ' + d.sent + ' device' + (d.sent > 1 ? 's' : '') + '. Check your notification tray.';
       } else if (d.message === 'no subscriptions') {
         st.style.color = '#F2C063';
-        st.textContent = 'No subscriptions found — re-subscribing this device…';
-        if (window.requestPushPermission) {
-          window.requestPushPermission().then(() => {
-            st.textContent = 'Re-subscribed — sending test…';
-            return fetch('/api/push-send?type=morning&cron=1', {
-              headers: { 'X-App-Secret': window.DASH_APP_SECRET || '' },
-            });
-          }).then(r => r.json().catch(() => ({}))).then(d2 => {
-            if (d2.sent > 0) { st.style.color = '#6BE3A4'; st.textContent = '✓ Re-subscribed and notification sent. Check your tray.'; }
-            else { st.style.color = '#F2C063'; st.textContent = 'Re-subscribed but send still failed — check VAPID keys in Vercel.'; }
-          }).catch(() => { st.textContent = 'Could not re-subscribe — tap Re-subscribe in Settings manually.'; });
-        }
+        st.textContent = 'No subscriptions found — tap Re-subscribe on each device in Settings.';
       } else if (d.sent > 0 && d.failed > 0) {
         st.style.color = '#F2C063';
         const err = d.failures && d.failures[0] ? d.failures[0].error : '';
