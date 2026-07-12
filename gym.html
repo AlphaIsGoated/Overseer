@@ -1204,7 +1204,12 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .wt-photo-date { color: var(--good); }
 .wt-photo-weight { color: var(--text-1); }
-.wt-ib-grid-wrap { position: relative; }
+.wt-ib-grid-wrap { position: relative; display: flex; flex-direction: column; gap: 5px; }
+.wt-ib-card-date {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text-2); text-align: center; padding-bottom: 2px;
+}
+.wt-ib-card-fat { color: var(--good); margin-left: 4px; font-weight: 500; }
 .wt-ib-grid-del {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   width: 26px; height: 26px; border-radius: 50%;
@@ -5397,11 +5402,10 @@ Be direct and encouraging. No bullet points in the response.`;
           '<button class="wt-photo-card" data-id="' + s.id + '" type="button">' +
             '<img src="' + ibGetImage(s.id) + '" alt="">' +
             '<div class="wt-photo-overlay"></div>' +
-            '<div class="wt-photo-meta">' +
-              '<span class="wt-photo-date">' + ibFmtDate(s.dateKey) + '</span>' +
-              '<span class="wt-photo-weight">' + (s.bodyFatPercent != null ? s.bodyFatPercent.toFixed(1) + '%' : '—') + '</span>' +
-            '</div>' +
           '</button>' +
+          '<div class="wt-ib-card-date">' + ibFmtDate(s.dateKey) +
+            (s.bodyFatPercent != null ? '<span class="wt-ib-card-fat">· ' + s.bodyFatPercent.toFixed(1) + '%</span>' : '') +
+          '</div>' +
           '<button class="wt-ib-grid-del" data-id="' + s.id + '" type="button" aria-label="Delete scan">✕</button>' +
         '</div>'
       ).join('');
