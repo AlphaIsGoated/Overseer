@@ -1191,7 +1191,10 @@ body.topbar-modal-open {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
       body: JSON.stringify({ subscription: sub.toJSON() }),
-    })).then((r) => { if (!r.ok) throw new Error('subscribe API ' + r.status); return r.json(); });
+    })).then((r) => {
+      if (!r.ok) return r.json().catch(() => ({})).then(e => { throw new Error('subscribe API ' + r.status + (e && e.error ? ': ' + e.error : '')); });
+      return r.json();
+    });
   };
 
   if (document.readyState === 'loading') {
