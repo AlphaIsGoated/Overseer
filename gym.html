@@ -723,13 +723,15 @@ img, video, canvas, svg { max-width: 100%; }
 /* Compact in-card toggle (used for chart/InBody subsections) */
 .sec-toggle-card {
   display: flex; align-items: center; justify-content: space-between;
-  width: 100%; padding: 8px 0 6px; margin-top: 10px;
-  border: none; border-top: 1px solid rgba(255,255,255,0.06); background: none;
+  width: 100%; padding: 9px 12px; margin-top: 12px;
+  border: 1px solid rgba(255,255,255,0.10); border-radius: 10px;
+  background: rgba(255,255,255,0.04);
   cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--text-4);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--text-2);
 }
-.sec-toggle-card .sec-toggle-chevron { font-size: 9px; transition: transform 0.2s ease; }
+.sec-toggle-card:hover { background: rgba(255,255,255,0.07); }
+.sec-toggle-card .sec-toggle-chevron { font-size: 10px; color: var(--text-3); transition: transform 0.2s ease; }
 .sec-toggle-card[aria-expanded="false"] .sec-toggle-chevron { transform: rotate(-90deg); }
 
 @media (max-width: 480px) {
