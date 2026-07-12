@@ -156,7 +156,7 @@ export default async function handler(req, res) {
   const payloadStr = JSON.stringify(payload);
 
   const results = await Promise.allSettled(
-    subs.map(sub => webpush.sendNotification(sub, payloadStr))
+    subs.map(({ endpoint, keys, expirationTime }) => webpush.sendNotification({ endpoint, keys, expirationTime }, payloadStr))
   );
 
   const sent = results.filter(r => r.status === 'fulfilled').length;

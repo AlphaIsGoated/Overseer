@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   const sub = body && body.subscription;
+  const deviceId = (body && body.deviceId) || null;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'subscription required' });
 
   const url = process.env.SUPABASE_URL;
@@ -28,9 +29,15 @@ export default async function handler(req, res) {
     const rows = await getRes.json().catch(() => []);
     const current = (rows && rows[0] && rows[0].data) ? rows[0].data : [];
     const subs = Array.isArray(current) ? current : [];
-    // Deduplicate by endpoint URL.
-    const filtered = subs.filter(s => s.endpoint !== sub.endpoint);
-    filtered.push(sub);
+    // Deduplicate by deviceId (preferred) or endpoint URL (legacy entries without deviceId).
+    // This ensures re-subscribing on the same device replaces the old entry
+    // rather than accumulating ghost endpoints.
+    const filtered = subs.filter(s => {
+      if (deviceId && s.deviceId === deviceId) return false;
+      if (s.endpoint === sub.endpoint) return false;
+      return true;
+    });
+    filtered.push({ ...sub, ...(deviceId ? { deviceId } : {}) });
     const upsertRes = await fetch(url + '/rest/v1/app_state', {
       method: 'POST',
       headers: {

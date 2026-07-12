@@ -1164,13 +1164,23 @@ body.topbar-modal-open {
     return arr;
   }
 
-  // Soft subscribe: keep existing subscription if valid, only create fresh if none.
-  // Used by the test button so repeated taps don't mint new ghost endpoints.
+  function getDeviceId() {
+    let id = localStorage.getItem('dash_device_id');
+    if (!id) {
+      id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36));
+      localStorage.setItem('dash_device_id', id);
+    }
+    return id;
+  }
+
+  // Saves subscription to Supabase, tagged with a stable per-device ID.
+  // push-subscribe deduplicates by deviceId so re-subscribing replaces the
+  // old endpoint instead of adding a ghost entry for the same device.
   function saveSub(sub) {
     return fetch('/api/push-subscribe', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-      body: JSON.stringify({ subscription: sub.toJSON() }),
+      body: JSON.stringify({ subscription: sub.toJSON(), deviceId: getDeviceId() }),
     }).then((r) => {
       if (!r.ok) return r.json().catch(() => ({})).then(e => { throw new Error('subscribe API ' + r.status + (e && e.error ? ': ' + e.error : '')); });
       return r.json();
