@@ -1164,6 +1164,35 @@ body.topbar-modal-open {
     return arr;
   }
 
+  // Soft subscribe: keep existing subscription if valid, only create fresh if none.
+  // Used by the test button so repeated taps don't mint new ghost endpoints.
+  function saveSub(sub) {
+    return fetch('/api/push-subscribe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+      body: JSON.stringify({ subscription: sub.toJSON() }),
+    }).then((r) => {
+      if (!r.ok) return r.json().catch(() => ({})).then(e => { throw new Error('subscribe API ' + r.status + (e && e.error ? ': ' + e.error : '')); });
+      return r.json();
+    });
+  }
+
+  window.ensurePushSubscription = function () {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return Promise.reject(new Error('Push not supported.'));
+    }
+    const vapidPublicKey = window.DASH_VAPID_PUBLIC_KEY;
+    if (!vapidPublicKey) return Promise.reject(new Error('VAPID key not configured.'));
+    if (Notification.permission !== 'granted') return Promise.reject(new Error('Permission not granted.'));
+    return navigator.serviceWorker.ready.then((reg) => {
+      return reg.pushManager.getSubscription().then((existing) => {
+        if (existing) return saveSub(existing);
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) })
+          .then(saveSub);
+      });
+    });
+  };
+
   window.requestPushPermission = function () {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       return Promise.reject(new Error('Push notifications not supported in this browser.'));
@@ -1187,14 +1216,7 @@ body.topbar-modal-open {
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
         }));
-    }).then((sub) => fetch('/api/push-subscribe', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-      body: JSON.stringify({ subscription: sub.toJSON() }),
-    })).then((r) => {
-      if (!r.ok) return r.json().catch(() => ({})).then(e => { throw new Error('subscribe API ' + r.status + (e && e.error ? ': ' + e.error : '')); });
-      return r.json();
-    });
+    }).then(saveSub);
   };
 
   if (document.readyState === 'loading') {

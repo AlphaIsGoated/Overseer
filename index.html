@@ -1285,11 +1285,12 @@ body::after {
     const st = $('pushTestStatus');
     st.style.display = 'block'; st.style.color = 'var(--text-tertiary)'; st.textContent = 'Refreshing subscription…';
 
-    // Refresh the push subscription FIRST, while still inside the user gesture.
-    // iOS Safari won't allow pushManager.subscribe() after any network await.
-    if (window.requestPushPermission && Notification.permission === 'granted') {
+    // Confirm/create subscription while still inside the user gesture.
+    // Uses soft subscribe (keeps existing endpoint) to avoid minting ghost
+    // endpoints that pile up in Supabase and look like successful sends.
+    if (window.ensurePushSubscription && Notification.permission === 'granted') {
       try {
-        await window.requestPushPermission();
+        await window.ensurePushSubscription();
       } catch (subErr) {
         st.style.color = '#FF8A8A';
         st.textContent = 'Subscribe error: ' + (subErr && subErr.message ? subErr.message : String(subErr));
