@@ -1099,14 +1099,16 @@ body.topbar-modal-open {
     // offline-support basics too) and subscribe to push if permission is
     // already 'granted', or if the user just granted it.
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).then((reg) => {
+      // Register the SW unconditionally (needed for offline basics too).
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+      // Use .ready (not the register promise) so subscribe() runs only once
+      // a service worker is actually active — register() resolves while the
+      // SW may still be in 'installing' state, which causes subscribe() to
+      // fail silently and leaves Supabase with no subscription on record.
+      navigator.serviceWorker.ready.then((reg) => {
         const vapidPublicKey = window.DASH_VAPID_PUBLIC_KEY;
         if (!vapidPublicKey || Notification.permission !== 'granted') return;
-        // Always call subscribe() — not getSubscription() — so an expired
-        // subscription at the push service level gets replaced automatically.
-        // subscribe() is idempotent: returns the existing subscription if
-        // it's still valid, creates a new one if it has expired (which would
-        // cause a 410 from the cron and silent removal from Supabase).
+        // Always call subscribe() so an expired subscription is auto-replaced.
         reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
