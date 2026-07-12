@@ -1338,7 +1338,8 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-ib-region-meta span { white-space: nowrap; }
 /* Radar dot interactive hint */
 .wt-ib-radar-dot-hit { cursor: pointer; }
-.wt-ib-radar-dot-active { filter: drop-shadow(0 0 4px rgba(125,211,252,0.9)); }
+.wt-ib-radar-dot-active { filter: drop-shadow(0 0 5px rgba(125,211,252,1)); r: 5px; }
+.ib-spark-cur { pointer-events: none; transition: cx 0.1s ease, cy 0.1s ease; }
 
 /* Confirm-card "review all metrics" */
 .wt-ib-review { margin: -4px 0 14px; }
@@ -5476,7 +5477,6 @@ Be direct and encouraging. No bullet points in the response.`;
     const wrap = $('wtIbMetricCharts');
     if (recent.length < 1) { wrap.innerHTML = ''; return; }
     wrap.innerHTML = IB_METRIC_DEFS.map(m => {
-      // Only include scans that have this metric
       const scansWithVal = recent.filter(s => s[m.key] != null);
       const vals = scansWithVal.map(s => s[m.key]);
       const last = vals.length ? vals[vals.length - 1] : null;
@@ -5495,16 +5495,19 @@ Be direct and encouraging. No bullet points in the response.`;
         chartHtml = '<div class="wt-ib-metric-empty">' + (vals.length === 1 ? 'Need another scan to chart this' : 'Not detected yet') + '</div>';
       } else {
         const sp = ibSparkPath(vals, 200, 65, 6);
-        // Encode scan dates + values as JSON in a data attribute for the hover tooltip
         const tipData = JSON.stringify(scansWithVal.map((s, i) => ({ d: s.dateKey, v: vals[i] })));
         chartHtml = '<svg class="wt-ib-metric-svg" viewBox="0 0 200 65" preserveAspectRatio="none"'
           + ' data-metric="' + m.key + '" data-suffix="' + suffix.trim() + '" data-dec="' + m.decimals + '"'
           + ' data-tip=\'' + tipData.replace(/'/g, '&apos;') + '\''
           + ' data-color="' + m.color + '">'
+          // Line
           + '<path fill="none" stroke="' + m.color + '" stroke-width="2" d="' + sp.path + '"></path>'
-          + sp.dots.map((p, i) => '<circle cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="' + (i === sp.dots.length - 1 ? 3 : 2) + '" fill="' + m.color + '"></circle>').join('')
-          // Wide invisible hit-strips per data point
-          + sp.dots.map((p, i) => '<rect data-sidx="' + i + '" x="' + Math.max(0, p.x - 14).toFixed(1) + '" y="0" width="28" height="44" fill="transparent"/>').join('')
+          // Data dots — newest is slightly larger
+          + sp.dots.map((p, i) => '<circle class="ib-spark-dot" data-di="' + i + '" cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="' + (i === sp.dots.length - 1 ? 3 : 2) + '" fill="' + m.color + '"></circle>').join('')
+          // Cursor ring — starts offscreen, moves to selected dot
+          + '<circle class="ib-spark-cur" cx="-99" cy="-99" r="5.5" fill="none" stroke="' + m.color + '" stroke-width="1.5"></circle>'
+          // Hit strips (full height) — wide enough to tap on mobile
+          + sp.dots.map((p, i) => '<rect class="ib-spark-hit" data-sidx="' + i + '" x="' + Math.max(0, p.x - 14).toFixed(1) + '" y="0" width="28" height="65" fill="transparent" style="cursor:pointer"/>').join('')
           + '</svg>';
       }
       return '<div class="wt-ib-metric-card">'
@@ -5517,39 +5520,59 @@ Be direct and encouraging. No bullet points in the response.`;
         + '</div>';
     }).join('');
 
-    // Wire shared hover/tap tooltip via pointer events on the grid
     const tip = $('ibMetricTip');
     if (!tip) return;
-    function ibShowSparkTip(e) {
+    let tipPinned = false;
+
+    function clearSparkPin() {
+      tipPinned = false;
+      tip.classList.remove('show');
+      wrap.querySelectorAll('.ib-spark-cur').forEach(c => { c.setAttribute('cx', '-99'); c.setAttribute('cy', '-99'); });
+    }
+
+    function ibShowSparkTip(e, pin) {
       const svg = e.target.closest('svg[data-tip]');
-      if (!svg) { tip.classList.remove('show'); return; }
+      if (!svg) { if (!tipPinned) tip.classList.remove('show'); return; }
       const tipData = JSON.parse(svg.dataset.tip || '[]');
       if (!tipData.length) return;
       const suffix = svg.dataset.suffix ? ' ' + svg.dataset.suffix : '';
       const dec = parseInt(svg.dataset.dec || '1');
       const color = svg.dataset.color || '#6ee7b7';
       const rect = svg.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const svgX = cx * (200 / rect.width);
+      const svgX = (e.clientX - rect.left) * (200 / rect.width);
       const n = tipData.length;
       const xFor2 = (i) => 6 + (i / (n - 1)) * (200 - 12);
       let nearIdx = 0, nearDist = Infinity;
-      tipData.forEach((_, i) => { const d = Math.abs(xFor2(i) - svgX); if (d < nearDist) { nearDist = d; nearIdx = i; } });
+      tipData.forEach((_, i) => { const dx = Math.abs(xFor2(i) - svgX); if (dx < nearDist) { nearDist = dx; nearIdx = i; } });
       const pt = tipData[nearIdx];
-      tip.innerHTML = '<div style="font-size:10px;color:var(--text-3);margin-bottom:2px;letter-spacing:0.04em">' + photoFmtDate(pt.d) + '</div>'
+
+      // Move cursor ring to the selected dot
+      const dots = svg.querySelectorAll('.ib-spark-dot');
+      const cur = svg.querySelector('.ib-spark-cur');
+      if (cur && dots[nearIdx]) {
+        cur.setAttribute('cx', dots[nearIdx].getAttribute('cx'));
+        cur.setAttribute('cy', dots[nearIdx].getAttribute('cy'));
+      }
+
+      tip.innerHTML = '<div style="font-size:10px;color:var(--text-3);margin-bottom:2px;letter-spacing:0.04em">' + ibFmtDateShort(pt.d) + '</div>'
                     + '<div style="font-size:16px;font-weight:700;letter-spacing:-0.02em;color:' + color + '">' + pt.v.toFixed(dec) + suffix + '</div>';
       tip.classList.add('show');
       const wrapRect = wrap.getBoundingClientRect();
       const cardEl = svg.closest('.wt-ib-metric-card');
       const cardRect = cardEl ? cardEl.getBoundingClientRect() : rect;
-      const tipXInWrap = e.clientX - wrapRect.left;
-      const tipYInWrap = cardRect.top - wrapRect.top - 4;
-      tip.style.left = tipXInWrap + 'px';
-      tip.style.top = Math.max(0, tipYInWrap - tip.offsetHeight) + 'px';
+      tip.style.left = (e.clientX - wrapRect.left) + 'px';
+      tip.style.top = Math.max(0, cardRect.top - wrapRect.top - tip.offsetHeight - 4) + 'px';
+      if (pin) tipPinned = true;
     }
-    wrap.addEventListener('pointermove', ibShowSparkTip, { passive: true });
-    wrap.addEventListener('pointerdown', ibShowSparkTip, { passive: true });
-    wrap.addEventListener('pointerleave', () => tip.classList.remove('show'));
+
+    wrap.addEventListener('pointermove', (e) => { tipPinned = false; ibShowSparkTip(e, false); }, { passive: true });
+    wrap.addEventListener('pointerdown', (e) => { ibShowSparkTip(e, true); }, { passive: true });
+    wrap.addEventListener('pointerleave', () => { if (!tipPinned) clearSparkPin(); });
+
+    // Tapping outside the grid clears the pinned tooltip
+    if (wrap._sparkDocListener) document.removeEventListener('pointerdown', wrap._sparkDocListener);
+    wrap._sparkDocListener = (e) => { if (!wrap.contains(e.target)) clearSparkPin(); };
+    document.addEventListener('pointerdown', wrap._sparkDocListener, { passive: true });
   }
 
   // ============================================================
@@ -5588,16 +5611,38 @@ Be direct and encouraging. No bullet points in the response.`;
     { key: 'leftLeg',  label: 'L. Leg',    angle: 126 },
     { key: 'leftArm',  label: 'L. Arm',    angle: 198 }
   ];
+  // Short date helper that includes year for multi-year scan history
+  function ibFmtDateShort(key) {
+    const d = wtParseKey(key);
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return mons[d.getMonth()] + " '" + String(d.getFullYear()).slice(2);
+  }
+
   function ibRenderRadar() {
     const wrap = $('wtIbRadarWrap');
-    const last = inbodyScans[inbodyScans.length - 1];
-    const lean = last && last.segmentalLean;
-    const haveScanData = lean && IB_RADAR_AXES.some(a => lean[a.key] != null);
+
+    // Show up to 4 most recent scans that have segmental lean data
+    const scansWithData = inbodyScans.filter(s => {
+      const lean = s.segmentalLean;
+      return lean && IB_RADAR_AXES.some(a => lean[a.key] != null);
+    }).slice(-4);
+    const last = scansWithData[scansWithData.length - 1];
+    const haveScanData = scansWithData.length > 0;
+
     const trainVol = ibTrainingVolumeByRegion(30);
     const maxVol = Math.max.apply(null, Object.values(trainVol));
     const haveTrainData = maxVol > 0;
     if (!haveScanData && !haveTrainData) { wrap.classList.add('hidden'); return; }
     wrap.classList.remove('hidden');
+
+    // Color palette oldest→newest: same sky-blue hue, increasing opacity/brightness
+    const SCAN_COLORS = [
+      { fill: 'rgba(125,211,252,0.05)', stroke: 'rgba(125,211,252,0.28)', dotR: 2   },
+      { fill: 'rgba(125,211,252,0.09)', stroke: 'rgba(125,211,252,0.50)', dotR: 2.5 },
+      { fill: 'rgba(125,211,252,0.13)', stroke: 'rgba(125,211,252,0.72)', dotR: 3   },
+      { fill: 'rgba(125,211,252,0.18)', stroke: '#7DD3FC',                dotR: 4   },
+    ];
+    const colorOffset = Math.max(0, 4 - scansWithData.length);
 
     const cx = 110, cy = 110, R = 88;
     const toXY = (angleDeg, frac) => {
@@ -5606,7 +5651,7 @@ Be direct and encouraging. No bullet points in the response.`;
       return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
     };
     let svg = '';
-    // Grid rings at 25/50/75/100%
+    // Grid rings at 25 / 50 / 75 / 100%
     [0.25, 0.5, 0.75, 1].forEach(f => {
       const pts = IB_RADAR_AXES.map(a => toXY(a.angle, f));
       svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"></polygon>';
@@ -5618,35 +5663,74 @@ Be direct and encouraging. No bullet points in the response.`;
       svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + edge.x.toFixed(1) + '" y2="' + edge.y.toFixed(1) + '" stroke="rgba(255,255,255,0.08)" stroke-width="1"></line>';
       svg += '<text x="' + labelPt.x.toFixed(1) + '" y="' + labelPt.y.toFixed(1) + '" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle" dominant-baseline="middle">' + a.label + '</text>';
     });
-    // Scan trace: segmental lean % of ideal, mapped 50%→0, 150%→1
-    const scanPts = haveScanData ? IB_RADAR_AXES.map(a => toXY(a.angle, ((lean[a.key] || 50) - 50) / 100)) : [];
-    if (haveScanData) {
-      svg += '<polygon points="' + scanPts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="rgba(125,211,252,0.18)" stroke="#7DD3FC" stroke-width="2"></polygon>';
-    }
-    // Training trace: volume normalized to the highest-volume region
+
+    // Draw scan polygons oldest→newest (newest renders on top)
+    const allScanPts = scansWithData.map((scan, si) => {
+      const lean = scan.segmentalLean;
+      return IB_RADAR_AXES.map(a => toXY(a.angle, ((lean[a.key] || 50) - 50) / 100));
+    });
+    allScanPts.forEach((pts, si) => {
+      const c = SCAN_COLORS[colorOffset + si];
+      const sw = si === scansWithData.length - 1 ? 2 : 1.5;
+      svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')
+        + '" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="' + sw + '"></polygon>';
+    });
+
+    // Training trace (drawn before scan dots so dots sit on top)
     if (haveTrainData) {
       const pts = IB_RADAR_AXES.map(a => toXY(a.angle, trainVol[a.key] / maxVol));
-      svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="rgba(110,231,183,0.14)" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="4 3"></polygon>';
-      pts.forEach((p, i) => { svg += '<circle class="wt-ib-train-dot" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#6ee7b7"></circle>'; });
+      svg += '<polygon points="' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')
+        + '" fill="rgba(110,231,183,0.12)" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="4 3"></polygon>';
+      pts.forEach(p => { svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#6ee7b7"></circle>'; });
     }
-    // Scan dots drawn last (on top) with data-key for interactivity
+
+    // Dots for all scan traces, oldest first so newest is on top
+    allScanPts.forEach((pts, si) => {
+      const c = SCAN_COLORS[colorOffset + si];
+      pts.forEach((p, ai) => {
+        svg += '<circle class="wt-ib-radar-dot" data-key="' + IB_RADAR_AXES[ai].key + '" data-si="' + si + '"'
+          + ' cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '"'
+          + ' r="' + c.dotR + '" fill="' + c.stroke + '"></circle>';
+      });
+    });
+
+    // Hit areas: one per axis, sized to cover all scan dots on that axis
     if (haveScanData) {
-      scanPts.forEach((p, i) => {
-        const key = IB_RADAR_AXES[i].key;
-        svg += '<circle class="wt-ib-radar-dot" data-key="' + key + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="4" fill="#7DD3FC"></circle>';
-        svg += '<circle class="wt-ib-radar-dot-hit" data-key="' + key + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="14" fill="transparent" style="cursor:pointer"></circle>';
+      const newestPts = allScanPts[allScanPts.length - 1];
+      newestPts.forEach((p, ai) => {
+        svg += '<circle class="wt-ib-radar-dot-hit" data-key="' + IB_RADAR_AXES[ai].key + '"'
+          + ' cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="18" fill="transparent" style="cursor:pointer"></circle>';
       });
     }
     const svgEl = $('wtIbRadarSvg');
     svgEl.innerHTML = svg;
 
-    // Build strong/weak summary text (default callout state)
+    // Update legend to show scan dates
+    const legendEl = wrap.querySelector('.wt-ib-legend');
+    if (legendEl) {
+      let lHtml = '';
+      if (scansWithData.length > 1) {
+        scansWithData.forEach((scan, si) => {
+          const c = SCAN_COLORS[colorOffset + si];
+          lHtml += '<span class="wt-ib-legend-item">'
+            + '<span class="wt-ib-legend-dot" style="background:' + c.stroke + ';opacity:' + (0.35 + si * 0.22).toFixed(2) + '"></span>'
+            + ibFmtDateShort(scan.dateKey) + '</span>';
+        });
+      } else {
+        lHtml = '<span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-scan"></span>InBody scan</span>';
+      }
+      if (haveTrainData) lHtml += '<span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-train"></span>Training vol (30d)</span>';
+      legendEl.innerHTML = lHtml;
+    }
+
+    // Default callout: strong / weak from latest scan
     const calloutEl = $('wtIbRadarCallout');
     if (!haveScanData) {
       calloutEl.innerHTML = haveTrainData ? 'Upload an InBody scan to see which regions are strongest and weakest.' : 'Log workouts and upload a scan to see your muscle balance.';
       return;
     }
-    const ranked = IB_RADAR_AXES.map(a => ({ label: a.label, key: a.key, val: lean[a.key] })).filter(r => r.val != null).sort((a, b) => b.val - a.val);
+    const lastLean = last.segmentalLean;
+    const ranked = IB_RADAR_AXES.map(a => ({ label: a.label, key: a.key, val: lastLean[a.key] })).filter(r => r.val != null).sort((a, b) => b.val - a.val);
     let defaultCalloutHtml;
     if (ranked.length < 3) {
       defaultCalloutHtml = 'Need more segmental data from a scan to rank regions.';
@@ -5658,11 +5742,12 @@ Be direct and encouraging. No bullet points in the response.`;
       const weakNotes = weak.map(w => w.label + (haveTrainData && lowTrainKeys.includes(w.key) ? ' (also under-trained)' : ''));
       defaultCalloutHtml = '<span class="strong-tag">Strong:</span> ' + strong.map(s => s.label).join(', ')
         + ' &nbsp;·&nbsp; <span class="weak-tag">Weak:</span> ' + weakNotes.join(', ')
-        + ' <span style="color:var(--text-4);font-size:10px;margin-left:4px">tap a dot</span>';
+        + ' <span style="color:var(--text-4);font-size:10px;margin-left:4px">tap a region</span>';
     }
     calloutEl.innerHTML = defaultCalloutHtml;
 
-    // Wire dot interactivity
+    // Interactivity — tapping a region shows progression across all scans
+    function leanColor(lv) { return lv == null ? 'var(--text-3)' : lv >= 100 ? '#6ee7b7' : lv >= 80 ? '#F2C063' : '#FF8A8A'; }
     svgEl.addEventListener('pointerdown', (e) => {
       const hit = e.target.closest('[data-key]');
       if (!hit) {
@@ -5672,14 +5757,34 @@ Be direct and encouraging. No bullet points in the response.`;
       }
       const key = hit.dataset.key;
       const axisInfo = IB_RADAR_AXES.find(a => a.key === key);
-      const lv = lean && lean[key];
-      const fv = last && last.segmentalFat && last.segmentalFat[key];
+      const regionLabel = axisInfo ? axisInfo.label : key;
+
+      // Collect this region's value across all displayed scans
+      const history = scansWithData.map(scan => ({
+        date: scan.dateKey,
+        lv: scan.segmentalLean && scan.segmentalLean[key],
+        fv: scan.segmentalFat && scan.segmentalFat[key],
+      })).filter(p => p.lv != null);
+
+      let html = '<strong>' + regionLabel + '</strong>';
+      if (history.length > 1) {
+        html += ' — ';
+        html += history.map((p, i) => {
+          const arrow = i > 0 ? (p.lv > history[i-1].lv ? ' ↑' : p.lv < history[i-1].lv ? ' ↓' : '') : '';
+          return '<span style="color:' + leanColor(p.lv) + '">' + ibFmtDateShort(p.date) + ': ' + p.lv.toFixed(1) + '%' + arrow + '</span>';
+        }).join(' → ');
+      } else if (history.length === 1) {
+        html += ' — <span style="color:' + leanColor(history[0].lv) + '"><strong>' + history[0].lv.toFixed(1) + '% of ideal</strong></span>';
+        if (history[0].fv != null) html += ' · Fat: ' + history[0].fv.toFixed(1) + ' ' + state.units;
+      }
+      // Latest fat + training vol
+      if (history.length > 1) {
+        const latestFv = history[history.length - 1].fv;
+        if (latestFv != null) html += ' · Fat: ' + latestFv.toFixed(1) + ' ' + state.units + ' (latest)';
+      }
       const vol = trainVol[key] || 0;
-      const leanColor = lv == null ? 'var(--text-3)' : lv >= 100 ? '#6ee7b7' : lv >= 80 ? '#F2C063' : '#FF8A8A';
-      let html = '<strong style="color:' + leanColor + '">' + (axisInfo ? axisInfo.label : key) + '</strong>';
-      if (lv != null) html += ' — <strong>' + lv.toFixed(1) + '% of ideal</strong>';
-      if (fv != null) html += ' · Fat: ' + fv.toFixed(1) + ' ' + state.units;
-      if (vol > 0) html += ' · Volume: ' + vol.toLocaleString() + ' (30d)';
+      if (vol > 0) html += ' · Vol: ' + vol.toLocaleString() + ' (30d)';
+
       calloutEl.innerHTML = html;
       svgEl.querySelectorAll('.wt-ib-radar-dot').forEach(d => d.classList.toggle('wt-ib-radar-dot-active', d.dataset.key === key));
     });
