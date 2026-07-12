@@ -1204,6 +1204,16 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .wt-photo-date { color: var(--good); }
 .wt-photo-weight { color: var(--text-1); }
+.wt-ib-grid-wrap { position: relative; }
+.wt-ib-grid-del {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.18);
+  color: var(--text-1); font-size: 13px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent; backdrop-filter: blur(4px);
+}
+.wt-ib-grid-del:hover, .wt-ib-grid-del:active { background: rgba(220,60,60,0.8); }
 
 /* InBody body-composition summary */
 .wt-ib-summary {
@@ -2060,6 +2070,21 @@ img, video, canvas, svg { max-width: 100%; }
       <button class="wt-cam-btn" id="wtCamCancel">Cancel</button>
       <button class="wt-cam-shutter" id="wtCamShutter" aria-label="Capture"></button>
       <button class="wt-cam-btn" id="wtCamFlip" aria-label="Flip camera">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Camera modal for InBody scans -->
+  <div class="wt-cam" id="ibCam" aria-hidden="true">
+    <div class="wt-cam-stage">
+      <video class="wt-cam-video" id="ibCamVideo" autoplay playsinline muted></video>
+      <canvas id="ibCamCanvas" style="display:none"></canvas>
+    </div>
+    <div class="wt-cam-actions">
+      <button class="wt-cam-btn" id="ibCamCancel">Cancel</button>
+      <button class="wt-cam-shutter" id="ibCamShutter" aria-label="Capture"></button>
+      <button class="wt-cam-btn" id="ibCamFlip" aria-label="Flip camera">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
       </button>
     </div>
@@ -5368,17 +5393,31 @@ Be direct and encouraging. No bullet points in the response.`;
       grid.innerHTML = '<div class="wt-photo-empty">No scans yet · tap Take Photo to start</div>';
     } else {
       grid.innerHTML = inbodyScans.slice().reverse().map(s =>
-        '<button class="wt-photo-card" data-id="' + s.id + '" type="button">' +
-          '<img src="' + ibGetImage(s.id) + '" alt="">' +
-          '<div class="wt-photo-overlay"></div>' +
-          '<div class="wt-photo-meta">' +
-            '<span class="wt-photo-date">' + ibFmtDate(s.dateKey) + '</span>' +
-            '<span class="wt-photo-weight">' + (s.bodyFatPercent != null ? s.bodyFatPercent.toFixed(1) + '%' : '—') + '</span>' +
-          '</div>' +
-        '</button>'
+        '<div class="wt-ib-grid-wrap">' +
+          '<button class="wt-photo-card" data-id="' + s.id + '" type="button">' +
+            '<img src="' + ibGetImage(s.id) + '" alt="">' +
+            '<div class="wt-photo-overlay"></div>' +
+            '<div class="wt-photo-meta">' +
+              '<span class="wt-photo-date">' + ibFmtDate(s.dateKey) + '</span>' +
+              '<span class="wt-photo-weight">' + (s.bodyFatPercent != null ? s.bodyFatPercent.toFixed(1) + '%' : '—') + '</span>' +
+            '</div>' +
+          '</button>' +
+          '<button class="wt-ib-grid-del" data-id="' + s.id + '" type="button" aria-label="Delete scan">✕</button>' +
+        '</div>'
       ).join('');
       grid.querySelectorAll('.wt-photo-card').forEach(card => {
         card.addEventListener('click', () => ibOpenViewer(card.dataset.id));
+      });
+      grid.querySelectorAll('.wt-ib-grid-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!confirm('Delete this scan? This cannot be undone.')) return;
+          const id = btn.dataset.id;
+          ibDeleteImage(id);
+          inbodyScans = inbodyScans.filter(s => s.id !== id);
+          ibSave();
+          ibRenderGrid();
+          ibRenderSummary();
+        });
       });
     }
     if (!inbodyScans.length) $('wtIbCount').textContent = '0 scans';
@@ -5393,7 +5432,7 @@ Be direct and encouraging. No bullet points in the response.`;
     activeIbId = id;
     $('wtIbViewerImg').src = ibGetImage(s.id);
     $('wtIbViewerDate').textContent = ibFmtDate(s.dateKey).toUpperCase();
-    $('wtIbViewerWeight').textContent = s.weight.toFixed(1) + ' ' + state.units;
+    $('wtIbViewerWeight').textContent = s.weight != null ? s.weight.toFixed(1) + ' ' + state.units : '—';
     const rows = [];
     IB_METRIC_DEFS.filter(m => m.key !== 'weight').forEach(m => {
       const v = s[m.key];
@@ -5402,8 +5441,14 @@ Be direct and encouraging. No bullet points in the response.`;
       rows.push('<div><span>' + m.label + '</span><span>' + v.toFixed(m.decimals) + suffix + '</span></div>');
     });
     $('wtIbViewerStats').innerHTML = rows.join('');
+    $('wtIbViewer').classList.add('is-open');
+    document.body.style.overflow = 'hidden';
   }
-  function ibCloseViewer() { $('wtIbViewer').classList.remove('is-open'); activeIbId = null; }
+  function ibCloseViewer() {
+    $('wtIbViewer').classList.remove('is-open');
+    document.body.style.overflow = '';
+    activeIbId = null;
+  }
 
   // ============================================================
   // Per-metric trend charts + definitions
@@ -5731,7 +5776,47 @@ Be direct and encouraging. No bullet points in the response.`;
     $('wtIbOverlay').classList.remove('is-open');
     document.body.style.overflow = '';
   });
-  $('wtIbTakePhotoBtn').addEventListener('click', () => $('wtIbFileCamera').click());
+  // InBody camera via getUserMedia
+  let ibCamStream = null, ibCamFacing = 'environment';
+  async function ibOpenCam() {
+    $('ibCam').classList.add('is-open');
+    try {
+      ibCamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: ibCamFacing } }, audio: false });
+      $('ibCamVideo').srcObject = ibCamStream;
+    } catch {
+      try {
+        ibCamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        $('ibCamVideo').srcObject = ibCamStream;
+      } catch {
+        ibCloseCam();
+        // Fall back to file input if camera is unavailable
+        $('wtIbFileCamera').click();
+      }
+    }
+  }
+  function ibCloseCam() {
+    if (ibCamStream) { ibCamStream.getTracks().forEach(t => t.stop()); ibCamStream = null; }
+    $('ibCamVideo').srcObject = null;
+    $('ibCam').classList.remove('is-open');
+  }
+  $('wtIbTakePhotoBtn').addEventListener('click', ibOpenCam);
+  $('ibCamCancel').addEventListener('click', ibCloseCam);
+  $('ibCamFlip').addEventListener('click', async () => {
+    ibCamFacing = ibCamFacing === 'environment' ? 'user' : 'environment';
+    if (ibCamStream) ibCamStream.getTracks().forEach(t => t.stop());
+    try { await ibOpenCam(); } catch {}
+  });
+  $('ibCamShutter').addEventListener('click', () => {
+    const video = $('ibCamVideo'), canvas = $('ibCamCanvas');
+    if (!video.videoWidth) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    ibCloseCam();
+    canvas.toBlob(blob => {
+      if (blob) ibHandleFile(new File([blob], 'scan.jpg', { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.9);
+  });
+  // From Library still uses the file input directly
   $('wtIbFileCamera').addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];
     if (f) ibHandleFile(f);
