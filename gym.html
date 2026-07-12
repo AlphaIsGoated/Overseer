@@ -1290,6 +1290,46 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-ib-radar-callout b { color: var(--text-1); }
 .wt-ib-radar-callout .strong-tag { color: var(--good); font-weight: 700; }
 .wt-ib-radar-callout .weak-tag   { color: var(--bad); font-weight: 700; }
+.wt-ib-radar-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.wt-ib-radar-expand {
+  background: none; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px;
+  color: var(--text-3); padding: 4px 7px; font-size: 13px; cursor: pointer; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.wt-ib-radar-expand:hover { color: var(--text-1); border-color: rgba(255,255,255,0.25); }
+/* Fullscreen radar overlay */
+.wt-ib-radar-fs {
+  position: fixed; inset: 0; z-index: 400; background: var(--bg);
+  display: none; flex-direction: column; align-items: center;
+  padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px);
+}
+.wt-ib-radar-fs.is-open { display: flex; }
+.wt-ib-radar-fs-top {
+  width: 100%; max-width: 480px; display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 8px;
+}
+.wt-ib-radar-fs-title { font-size: 13px; font-weight: 700; color: var(--text-1); letter-spacing: 0.04em; }
+.wt-ib-radar-fs-close {
+  background: none; border: none; color: var(--text-2);
+  font-size: 18px; cursor: pointer; padding: 8px; -webkit-tap-highlight-color: transparent;
+}
+.wt-ib-radar-fs-hint { font-size: 10px; color: var(--text-4); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 10px; }
+.wt-ib-radar-fs-stage {
+  width: 100%; max-width: 480px; flex: 1; max-height: 50vh;
+  overflow: hidden; position: relative; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.wt-ib-radar-fs-svg {
+  width: 100%; height: 100%; display: block; max-width: none; max-height: none;
+  transform-origin: center center; will-change: transform; transition: none;
+}
+.wt-ib-radar-fs-legend { margin-top: 10px; }
+.wt-ib-radar-fs-callout {
+  max-width: 480px; width: 100%; margin-top: 10px;
+  font-size: 13px; line-height: 1.6; color: var(--text-2); text-align: center;
+}
+.wt-ib-radar-fs-callout .strong-tag { color: var(--good); font-weight: 700; }
+.wt-ib-radar-fs-callout .weak-tag   { color: var(--bad); font-weight: 700; }
 
 /* Per-metric trend chart grid */
 .wt-ib-metric-grid {
@@ -1920,6 +1960,9 @@ img, video, canvas, svg { max-width: 100%; }
         <div class="wt-ib-radar-wrap" id="wtIbRadarWrap">
           <div class="wt-ib-radar-h">
             <span class="wt-ib-summary-label">Muscle balance</span>
+            <button class="wt-ib-radar-expand" id="ibRadarExpandBtn" type="button" aria-label="Expand chart">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            </button>
           </div>
           <svg class="wt-ib-radar-svg" id="wtIbRadarSvg" viewBox="0 0 220 220"></svg>
           <div class="wt-ib-legend">
@@ -2079,6 +2122,20 @@ img, video, canvas, svg { max-width: 100%; }
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
       </button>
     </div>
+  </div>
+
+  <!-- Fullscreen radar chart overlay -->
+  <div class="wt-ib-radar-fs" id="ibRadarFs" aria-hidden="true">
+    <div class="wt-ib-radar-fs-top">
+      <span class="wt-ib-radar-fs-title">Muscle Balance</span>
+      <button class="wt-ib-radar-fs-close" id="ibRadarFsClose" aria-label="Close">✕</button>
+    </div>
+    <div class="wt-ib-radar-fs-hint">Pinch to zoom · drag to pan · double-tap to reset · tap axis for details</div>
+    <div class="wt-ib-radar-fs-stage" id="ibRadarFsStage">
+      <svg class="wt-ib-radar-fs-svg" id="ibRadarFsSvg" viewBox="0 0 220 220"></svg>
+    </div>
+    <div class="wt-ib-legend wt-ib-radar-fs-legend" id="ibRadarFsLegend"></div>
+    <div class="wt-ib-radar-fs-callout" id="ibRadarFsCallout">Tap a region axis for details</div>
   </div>
 
   <!-- Camera modal for InBody scans -->
@@ -5790,6 +5847,118 @@ Be direct and encouraging. No bullet points in the response.`;
       svgEl.querySelectorAll('.wt-ib-radar-dot').forEach(d => d.classList.toggle('wt-ib-radar-dot-active', d.dataset.key === key));
     });
   }
+
+  // ---- Fullscreen radar expand with pinch-zoom ----
+  (function initRadarFullscreen() {
+    const fs = $('ibRadarFs');
+    const fsSvg = $('ibRadarFsSvg');
+    const fsStage = $('ibRadarFsStage');
+    const fsCallout = $('ibRadarFsCallout');
+    const fsLegend = $('ibRadarFsLegend');
+
+    // Copy current SVG content + legend + callout into the fullscreen overlay
+    function openFs() {
+      fsSvg.innerHTML = $('wtIbRadarSvg').innerHTML;
+      fsLegend.innerHTML = $('wtIbRadarWrap').querySelector('.wt-ib-legend').innerHTML;
+      fsCallout.innerHTML = $('wtIbRadarCallout').innerHTML;
+      resetZoom();
+      fs.classList.add('is-open');
+      fs.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      wireFsTap();
+    }
+    function closeFs() {
+      fs.classList.remove('is-open');
+      fs.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+    $('ibRadarExpandBtn').addEventListener('click', openFs);
+    $('ibRadarFsClose').addEventListener('click', closeFs);
+    fs.addEventListener('keydown', e => { if (e.key === 'Escape') closeFs(); });
+
+    // Pinch-zoom + pan state
+    let scale = 1, tx = 0, ty = 0;
+    let startScale = 1, startTx = 0, startTy = 0, startDist = 0, startMidX = 0, startMidY = 0;
+    const ptrs = new Map();
+    function resetZoom() { scale = 1; tx = 0; ty = 0; applyT(); }
+    function applyT() { fsSvg.style.transform = 'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + scale.toFixed(3) + ')'; }
+    function pdist(a, b) { return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY); }
+    function pmid(a, b) { return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
+
+    // Track pointer movement to distinguish tap from pan
+    let ptrStartX = 0, ptrStartY = 0, ptrMoved = false;
+
+    fsStage.addEventListener('pointerdown', e => {
+      fsStage.setPointerCapture(e.pointerId);
+      ptrs.set(e.pointerId, e);
+      if (ptrs.size === 1) {
+        ptrStartX = e.clientX; ptrStartY = e.clientY; ptrMoved = false;
+        startTx = tx; startTy = ty;
+      } else if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        startDist = pdist(a, b); startScale = scale;
+        const m = pmid(a, b); startMidX = m.x; startMidY = m.y;
+        startTx = tx; startTy = ty;
+      }
+    }, { passive: true });
+
+    fsStage.addEventListener('pointermove', e => {
+      if (!ptrs.has(e.pointerId)) return;
+      ptrs.set(e.pointerId, e);
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        scale = Math.min(8, Math.max(1, startScale * pdist(a, b) / startDist));
+        const m = pmid(a, b);
+        tx = startTx + (m.x - startMidX);
+        ty = startTy + (m.y - startMidY);
+        applyT();
+        ptrMoved = true;
+      } else if (ptrs.size === 1 && scale > 1) {
+        const dx = e.clientX - ptrStartX, dy = e.clientY - ptrStartY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) ptrMoved = true;
+        tx = startTx + dx; ty = startTy + dy; applyT();
+      }
+    }, { passive: true });
+
+    const endPtr = e => { ptrs.delete(e.pointerId); };
+    fsStage.addEventListener('pointerup', endPtr);
+    fsStage.addEventListener('pointercancel', endPtr);
+
+    // Double-tap to reset zoom
+    let lastTap = 0;
+    fsStage.addEventListener('pointerup', e => {
+      if (ptrs.size > 0) return;
+      const now = Date.now();
+      if (now - lastTap < 300) { resetZoom(); lastTap = 0; }
+      else lastTap = now;
+    });
+
+    // Tap a region axis — mirror logic from the small radar
+    function wireFsTap() {
+      // Build the same defaultCalloutHtml from the current callout el content
+      const defaultHtml = $('wtIbRadarCallout').innerHTML;
+      fsSvg.addEventListener('pointerup', e => {
+        if (ptrMoved) return; // was a pan, not a tap
+        const hit = e.target.closest('[data-key]');
+        if (!hit) {
+          fsSvg.querySelectorAll('.wt-ib-radar-dot').forEach(d => d.classList.remove('wt-ib-radar-dot-active'));
+          fsCallout.innerHTML = defaultHtml;
+          return;
+        }
+        // Copy active state from small SVG by firing same logic
+        const key = hit.dataset.key;
+        const smallSvg = $('wtIbRadarSvg');
+        // Synthesise a pointerdown on the matching hit area of the small SVG so its
+        // registered handler updates wtIbRadarCallout, then mirror the result here.
+        const matchingHit = smallSvg.querySelector('.wt-ib-radar-dot-hit[data-key="' + key + '"]');
+        if (matchingHit) {
+          matchingHit.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }));
+          fsCallout.innerHTML = $('wtIbRadarCallout').innerHTML;
+        }
+        fsSvg.querySelectorAll('.wt-ib-radar-dot').forEach(d => d.classList.toggle('wt-ib-radar-dot-active', d.dataset.key === key));
+      });
+    }
+  })();
 
   // ---- Segmental region breakdown tiles ----
   function ibRenderRegionBreakdown() {
