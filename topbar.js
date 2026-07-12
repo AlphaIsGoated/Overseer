@@ -1072,7 +1072,50 @@ body.topbar-modal-open {
   }
 
   // -------- Boot --------
+  // Roll undone goals from past days into today on every page load,
+  // not just when main.html is open. Mirrors the rollover() logic in main.html.
+  function rolloverGoals() {
+    try {
+      const now = new Date();
+      // Before 6 AM still counts as "yesterday" (same as main.html logic).
+      const ref = new Date(now);
+      if (now.getHours() < 6) ref.setDate(ref.getDate() - 1);
+      const todayStr = ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0') + '-' + String(ref.getDate()).padStart(2, '0');
+      const todayK = 'goals:' + todayStr;
+
+      // Collect all past goal keys first (safe to delete after).
+      const pastKeys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('goals:') && k.slice('goals:'.length) < todayStr) pastKeys.push(k);
+      }
+      if (!pastKeys.length) return;
+
+      let todayGoals;
+      try { todayGoals = JSON.parse(localStorage.getItem(todayK)) || []; } catch { todayGoals = []; }
+      if (!Array.isArray(todayGoals)) todayGoals = [];
+      const seen = new Set(todayGoals.map(g => g.text));
+
+      let changed = false;
+      pastKeys.forEach(k => {
+        let old;
+        try { old = JSON.parse(localStorage.getItem(k)) || []; } catch { old = []; }
+        if (!Array.isArray(old)) { localStorage.removeItem(k); return; }
+        old.forEach(g => {
+          if (g && !g.done && g.text && !seen.has(g.text)) {
+            todayGoals.push({ text: g.text, done: false });
+            seen.add(g.text);
+            changed = true;
+          }
+        });
+        localStorage.removeItem(k);
+      });
+      if (changed) localStorage.setItem(todayK, JSON.stringify(todayGoals));
+    } catch {}
+  }
+
   function boot() {
+    rolloverGoals();
     injectStyleAndHTML();
     const btn = document.getElementById('topbarWaterAdd');
     if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); addWater(); });
