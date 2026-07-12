@@ -4811,7 +4811,9 @@ Be direct and encouraging. No bullet points in the response.`;
     }
   });
 
-  inbodyScans.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  // Filter out any malformed entries (null id or dateKey crash the sort)
+  inbodyScans = inbodyScans.filter(s => s && s.id && s.dateKey);
+  inbodyScans.sort((a, b) => (a.dateKey || '').localeCompare(b.dateKey || ''));
 
   function ibSave() {
     try { localStorage.setItem(IB_KEY, JSON.stringify(inbodyScans)); } catch (e) {
@@ -5291,9 +5293,9 @@ Be direct and encouraging. No bullet points in the response.`;
       segmentalFat: ex.segmentalFat || {}
     };
     // Replace any existing scan for the same date (re-uploading / correcting).
-    inbodyScans = inbodyScans.filter(s => s.dateKey !== dateKey);
+    inbodyScans = inbodyScans.filter(s => s && s.id && s.dateKey && s.dateKey !== dateKey);
     inbodyScans.push(entry);
-    inbodyScans.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+    inbodyScans.sort((a, b) => (a.dateKey || '').localeCompare(b.dateKey || ''));
     ibSave();
     wtUpsertEntry(dateKey, weight, 'inbody');
     ibResetOverlay();
@@ -5749,17 +5751,26 @@ Be direct and encouraging. No bullet points in the response.`;
 
   function pcRerender() {
     // Reload every closure variable that mirrors a synced localStorage
-    // key — otherwise renderAll/wtRender/photosRender would read stale
-    // in-memory copies from before the remote pull.
+    // key — otherwise renderAll/wtRender/photosRender/inbody would read
+    // stale in-memory copies from before the remote pull.
     try { state = loadState(); } catch {}
     try { wtEntries = wtLoad(); } catch {}
     try {
       const raw = localStorage.getItem(PHOTO_KEY);
       photos = raw ? JSON.parse(raw) : [];
     } catch { photos = []; }
+    try {
+      const raw = localStorage.getItem(IB_KEY);
+      let arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) arr = [];
+      inbodyScans = arr.filter(s => s && s.id && s.dateKey);
+      inbodyScans.sort((a, b) => (a.dateKey || '').localeCompare(b.dateKey || ''));
+    } catch { inbodyScans = []; }
     try { renderAll(); } catch {}
     try { wtRender(); } catch {}
     try { photosRender(); } catch {}
+    try { ibRenderGrid(); } catch {}
+    try { ibRenderSummary(); } catch {}
   }
 
   // Additive merge helpers — local data is NEVER deleted by remote.
