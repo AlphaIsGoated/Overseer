@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'subscription required' });
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return res.status(500).json({ error: 'Supabase not configured' });
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return res.status(500).json({ error: 'Supabase not configured (missing SUPABASE_SERVICE_ROLE_KEY)' });
 
   try {
     // Read current subscriptions, upsert/merge this device's sub, write back.
