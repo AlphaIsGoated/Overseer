@@ -1182,7 +1182,7 @@ body.topbar-modal-open {
       // that dead endpoint causes silent send failures. A fresh subscribe()
       // always returns a live endpoint from the push service.
       return reg.pushManager.getSubscription()
-        .then(existing => existing ? existing.unsubscribe() : Promise.resolve())
+        .then(existing => existing ? existing.unsubscribe().catch(() => {}) : Promise.resolve())
         .then(() => reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),

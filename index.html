@@ -1288,7 +1288,13 @@ body::after {
     // Refresh the push subscription FIRST, while still inside the user gesture.
     // iOS Safari won't allow pushManager.subscribe() after any network await.
     if (window.requestPushPermission && Notification.permission === 'granted') {
-      try { await window.requestPushPermission(); } catch {}
+      try {
+        await window.requestPushPermission();
+      } catch (subErr) {
+        st.style.color = '#FF8A8A';
+        st.textContent = 'Subscribe error: ' + (subErr && subErr.message ? subErr.message : String(subErr));
+        return;
+      }
     }
 
     st.textContent = 'Sending…';
