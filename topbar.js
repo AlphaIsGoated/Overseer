@@ -1175,12 +1175,23 @@ body.topbar-modal-open {
     return Notification.requestPermission().then((permission) => {
       if (permission !== 'granted') throw new Error('Permission denied.');
       return navigator.serviceWorker.ready;
-    }).then((reg) => reg.pushManager.getSubscription().then((existing) => existing || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) })))
-      .then((sub) => fetch('/api/push-subscribe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
-        body: JSON.stringify({ subscription: sub.toJSON() }),
-      })).then((r) => r.json());
+    }).then((reg) => {
+      // Always unsubscribe first so we get a guaranteed-fresh endpoint.
+      // getSubscription() can return a stale object whose endpoint has
+      // already been invalidated by the push service (410 Gone) — re-saving
+      // that dead endpoint causes silent send failures. A fresh subscribe()
+      // always returns a live endpoint from the push service.
+      return reg.pushManager.getSubscription()
+        .then(existing => existing ? existing.unsubscribe() : Promise.resolve())
+        .then(() => reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        }));
+    }).then((sub) => fetch('/api/push-subscribe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+      body: JSON.stringify({ subscription: sub.toJSON() }),
+    })).then((r) => { if (!r.ok) throw new Error('subscribe API ' + r.status); return r.json(); });
   };
 
   if (document.readyState === 'loading') {
