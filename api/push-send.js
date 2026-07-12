@@ -135,10 +135,10 @@ export default async function handler(req, res) {
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
   const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@overseer.app';
   const supaUrl = process.env.SUPABASE_URL;
-  const supaKey = process.env.SUPABASE_ANON_KEY;
+  const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!vapidPublic || !vapidPrivate) return res.status(500).json({ error: 'VAPID keys not configured' });
-  if (!supaUrl || !supaKey) return res.status(500).json({ error: 'Supabase not configured' });
+  if (!supaUrl || !supaKey) return res.status(500).json({ error: 'Supabase not configured (missing SUPABASE_SERVICE_ROLE_KEY)' });
 
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
 
