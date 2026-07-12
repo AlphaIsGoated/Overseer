@@ -902,7 +902,11 @@ body.topbar-modal-open {
       }
       setTimeout(() => input.focus(), 80);
     }
-    function closePanel() { panelBg.classList.remove('show'); }
+    function closePanel() {
+      panelBg.classList.remove('show');
+      if (_voiceEl) { _voiceEl.pause(); _voiceEl.src = ''; }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    }
 
     fab.addEventListener('click', openPanel);
     document.getElementById('coachClose').addEventListener('click', closePanel);
