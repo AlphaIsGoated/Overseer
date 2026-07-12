@@ -720,6 +720,18 @@ img, video, canvas, svg { max-width: 100%; }
 .sec-body { overflow: hidden; }
 .sec-body.collapsed { display: none; }
 
+/* Compact in-card toggle (used for chart/InBody subsections) */
+.sec-toggle-card {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 8px 0 6px; margin-top: 10px;
+  border: none; border-top: 1px solid rgba(255,255,255,0.06); background: none;
+  cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-4);
+}
+.sec-toggle-card .sec-toggle-chevron { font-size: 9px; transition: transform 0.2s ease; }
+.sec-toggle-card[aria-expanded="false"] .sec-toggle-chevron { transform: rotate(-90deg); }
+
 @media (max-width: 480px) {
   /* === Mobile / iPhone polish === */
   .po-shell { padding: 14px 10px calc(32px + env(safe-area-inset-bottom)); }
@@ -1787,41 +1799,47 @@ img, video, canvas, svg { max-width: 100%; }
 
       <div class="wt-empty" id="wtEmpty">Log your first weight to start tracking.</div>
 
-      <div class="wt-chart-wrap hidden" id="wtChartWrap">
-        <div class="wt-chart-yaxis">
-          <span id="wtYAxisMax">—</span>
-          <span id="wtYAxisMin">—</span>
+      <button class="sec-toggle-card" id="wtGraphToggle" aria-expanded="true" type="button">
+        Chart &amp; Composition<span class="sec-toggle-chevron">▾</span>
+      </button>
+      <div class="sec-body" id="wtGraphBody">
+        <div class="wt-chart-wrap hidden" id="wtChartWrap">
+          <div class="wt-chart-yaxis">
+            <span id="wtYAxisMax">—</span>
+            <span id="wtYAxisMin">—</span>
+          </div>
+          <svg class="wt-chart" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="wtFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#6ee7b7" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#6ee7b7" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="wtGlow"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <g id="wtChartContent"></g>
+          </svg>
+          <div id="wtChartTip" class="wt-chart-tip"></div>
         </div>
-        <svg class="wt-chart" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="wtFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#6ee7b7" stop-opacity="0.25"/>
-              <stop offset="100%" stop-color="#6ee7b7" stop-opacity="0"/>
-            </linearGradient>
-            <filter id="wtGlow"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          </defs>
-          <g id="wtChartContent"></g>
-        </svg>
-        <div id="wtChartTip" class="wt-chart-tip"></div>
-        <div class="wt-meta" id="wtMeta">0 entries</div>
-      </div>
 
-      <div class="wt-legend hidden" id="wtLegend">
-        <span class="wt-legend-item"><span class="wt-legend-dot"></span>DAILY</span>
-        <span class="wt-legend-item"><span class="wt-legend-dot wt-legend-dot-avg"></span>7-DAY AVG</span>
-      </div>
+        <div class="wt-meta hidden" id="wtMeta">0 entries</div>
 
-      <!-- Composition estimate — uses strength trend + weight trend to guess
-           how much of recent weight change was muscle vs fat. -->
-      <div class="wt-comp hidden" id="wtComp">
-        <div class="wt-comp-h">
-          <span class="wt-comp-label">Composition estimate</span>
-          <span class="wt-comp-window" id="wtCompWindow">last 30d</span>
+        <div class="wt-legend hidden" id="wtLegend">
+          <span class="wt-legend-item"><span class="wt-legend-dot"></span>DAILY</span>
+          <span class="wt-legend-item"><span class="wt-legend-dot wt-legend-dot-avg"></span>7-DAY AVG</span>
         </div>
-        <div class="wt-comp-headline" id="wtCompHeadline">—</div>
-        <div class="wt-comp-bars" id="wtCompBars"></div>
-        <div class="wt-comp-foot" id="wtCompFoot">—</div>
-      </div>
+
+        <!-- Composition estimate — uses strength trend + weight trend to guess
+             how much of recent weight change was muscle vs fat. -->
+        <div class="wt-comp hidden" id="wtComp">
+          <div class="wt-comp-h">
+            <span class="wt-comp-label">Composition estimate</span>
+            <span class="wt-comp-window" id="wtCompWindow">last 30d</span>
+          </div>
+          <div class="wt-comp-headline" id="wtCompHeadline">—</div>
+          <div class="wt-comp-bars" id="wtCompBars"></div>
+          <div class="wt-comp-foot" id="wtCompFoot">—</div>
+        </div>
+      </div><!-- /wtGraphBody -->
 
       <div class="wt-locked hidden" id="wtLocked">
         <div class="wt-locked-info">
@@ -1851,22 +1869,27 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
       <div class="wt-ib-stat-row" id="wtIbStatRow"></div>
 
-      <!-- Muscle Balance pentagon — InBody segmental lean % vs recent training volume -->
-      <div class="wt-ib-radar-wrap" id="wtIbRadarWrap">
-        <div class="wt-ib-radar-h">
-          <span class="wt-ib-summary-label">Muscle balance</span>
+      <button class="sec-toggle-card" id="wtIbGraphToggle" aria-expanded="true" type="button">
+        Muscle Balance &amp; Trends<span class="sec-toggle-chevron">▾</span>
+      </button>
+      <div class="sec-body" id="wtIbGraphBody">
+        <!-- Muscle Balance pentagon — InBody segmental lean % vs recent training volume -->
+        <div class="wt-ib-radar-wrap" id="wtIbRadarWrap">
+          <div class="wt-ib-radar-h">
+            <span class="wt-ib-summary-label">Muscle balance</span>
+          </div>
+          <svg class="wt-ib-radar-svg" id="wtIbRadarSvg" viewBox="0 0 220 220"></svg>
+          <div class="wt-ib-legend">
+            <span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-scan"></span>InBody scan</span>
+            <span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-train"></span>Training volume (30d)</span>
+          </div>
+          <div class="wt-ib-radar-callout" id="wtIbRadarCallout">—</div>
         </div>
-        <svg class="wt-ib-radar-svg" id="wtIbRadarSvg" viewBox="0 0 220 220"></svg>
-        <div class="wt-ib-legend">
-          <span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-scan"></span>InBody scan</span>
-          <span class="wt-ib-legend-item"><span class="wt-ib-legend-dot wt-ib-legend-dot-train"></span>Training volume (30d)</span>
-        </div>
-        <div class="wt-ib-radar-callout" id="wtIbRadarCallout">—</div>
-      </div>
 
-      <!-- One small trend chart + definition per InBody metric -->
-      <div class="wt-ib-metric-grid" id="wtIbMetricCharts"></div>
-      <div id="ibMetricTip" class="wt-chart-tip"></div>
+        <!-- One small trend chart + definition per InBody metric -->
+        <div class="wt-ib-metric-grid" id="wtIbMetricCharts"></div>
+        <div id="ibMetricTip" class="wt-chart-tip"></div>
+      </div><!-- /wtIbGraphBody -->
     </div>
 
     <button class="wt-progress-link" id="wtIbLink" type="button" aria-label="Open InBody scans">
@@ -5655,9 +5678,11 @@ Be direct and encouraging. No bullet points in the response.`;
     }
 
     const secs = [
-      { toggle: 'wtSecToggle',    body: 'wtSecBody',    key: 'weight'  },
-      { toggle: 'chartSecToggle', body: 'chartSecBody', key: 'chart'   },
-      { toggle: 'histSecToggle',  body: 'histSecBody',  key: 'history' },
+      { toggle: 'wtSecToggle',      body: 'wtSecBody',      key: 'weight'   },
+      { toggle: 'wtGraphToggle',    body: 'wtGraphBody',    key: 'wtgraph'  },
+      { toggle: 'wtIbGraphToggle',  body: 'wtIbGraphBody',  key: 'ibgraph'  },
+      { toggle: 'chartSecToggle',   body: 'chartSecBody',   key: 'chart'    },
+      { toggle: 'histSecToggle',    body: 'histSecBody',    key: 'history'  },
     ];
     const st = loadSt();
     secs.forEach(({ toggle, body, key }) => {
@@ -5672,8 +5697,8 @@ Be direct and encouraging. No bullet points in the response.`;
         applyOpen(bodyEl, nowOpen, true);
         const cur = loadSt(); cur[key] = nowOpen; saveSt(cur);
         // Re-render charts that were hidden (getBoundingClientRect returns 0 on display:none)
-        if (nowOpen && key === 'chart') requestAnimationFrame(() => { try { olRenderChart(); } catch {} });
-        if (nowOpen && key === 'weight') requestAnimationFrame(() => { try { wtRenderChart(); } catch {} });
+        if (nowOpen && key === 'chart')   requestAnimationFrame(() => { try { olRenderChart(); } catch {} });
+        if (nowOpen && (key === 'weight' || key === 'wtgraph')) requestAnimationFrame(() => { try { wtRenderChart(); } catch {} });
       });
     });
   })();
