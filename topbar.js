@@ -774,25 +774,34 @@ body.topbar-modal-open {
       return el;
     }
 
-    const _today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    const CHAT_SYS =
-      "You are the user's personal AI system — sophisticated, precise, and authoritative, like J.A.R.V.I.S. " +
-      "You have full access to their life-tracking data. Today is " + _today + ". " +
-      "Your replies are delivered via ElevenLabs TTS in voice mode — " +
-      "never disclaim or reference being text-only. Rules: " +
-      "Never repeat prior statements. Never re-introduce yourself. " +
-      "Never restate data the user already knows. " +
-      "Answer concisely and precisely — one to two sentences, or a tight bullet list. " +
-      "Be formal and professional. Build naturally on conversation history. " +
-      "If more information is needed, ask one focused question. " +
-      "Dashboard data as JSON:\n";
-    const PROACTIVE_SYS =
-      "You are a sophisticated AI system conducting a status sweep of the user's life-tracking dashboard. " +
-      "Identify the 1-3 most critical items requiring attention right now: overdue targets, upcoming deadlines, " +
-      "missed daily goals, schedule conflicts, anything time-sensitive across fitness/health/finance/marathon/etc. " +
-      "Today is " + _today + ". " +
-      "Report only what actually matters — not a full status dump. If nothing stands out, deliver a concise all-clear. " +
-      "Be direct, formal, and precise. No preamble.";
+    // Compute fresh on every call, using the same 6 AM rollover as activeDateKey()
+    // so the date the coach states always matches the date keys used for goals/supplements/water.
+    function coachTodayLabel() {
+      const now = new Date();
+      const d = new Date(now);
+      if (now.getHours() < 6) d.setDate(d.getDate() - 1);
+      return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    function CHAT_SYS() {
+      return "You are the user's personal AI system — sophisticated, precise, and authoritative, like J.A.R.V.I.S. " +
+        "You have full access to their life-tracking data. Today is " + coachTodayLabel() + ". " +
+        "Your replies are delivered via ElevenLabs TTS in voice mode — " +
+        "never disclaim or reference being text-only. Rules: " +
+        "Never repeat prior statements. Never re-introduce yourself. " +
+        "Never restate data the user already knows. " +
+        "Answer concisely and precisely — one to two sentences, or a tight bullet list. " +
+        "Be formal and professional. Build naturally on conversation history. " +
+        "If more information is needed, ask one focused question. " +
+        "Dashboard data as JSON:\n";
+    }
+    function PROACTIVE_SYS() {
+      return "You are a sophisticated AI system conducting a status sweep of the user's life-tracking dashboard. " +
+        "Identify the 1-3 most critical items requiring attention right now: overdue targets, upcoming deadlines, " +
+        "missed daily goals, schedule conflicts, anything time-sensitive across fitness/health/finance/marathon/etc. " +
+        "Today is " + coachTodayLabel() + ". " +
+        "Report only what actually matters — not a full status dump. If nothing stands out, deliver a concise all-clear. " +
+        "Be direct, formal, and precise. No preamble.";
+    }
 
     // ── Persistence helpers ──────────────────────────────────────
     const HIST_KEY = 'coach_chat_history';
@@ -816,7 +825,7 @@ body.topbar-modal-open {
 
     // Conversation history sent to the AI — rebuilt from localStorage on load.
     const chatHistory = [];
-    const DATA_SYS = CHAT_SYS + JSON.stringify(dashboardData());
+    function DATA_SYS() { return CHAT_SYS() + JSON.stringify(dashboardData()); }
 
     async function callAI(system, userText, addToHistory) {
       const msgs = addToHistory
@@ -853,7 +862,7 @@ body.topbar-modal-open {
       input.value = '';
       const loading = addLoading();
       try {
-        const reply = await callAI(DATA_SYS, text, true);
+        const reply = await callAI(DATA_SYS(), text, true);
         loading.remove();
         addMsg('coach', reply, false);  // persists coach reply
         speak(reply);
@@ -870,7 +879,7 @@ body.topbar-modal-open {
       }
       const loading = addLoading();
       try {
-        const text = await callAI(PROACTIVE_SYS + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
+        const text = await callAI(PROACTIVE_SYS() + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
         loading.remove();
         addMsg('coach', text, true);  // persists to chat history
         localStorage.setItem(proactiveDayKey(), '1');
