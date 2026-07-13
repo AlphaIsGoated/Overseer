@@ -907,6 +907,51 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 .nw-activity-empty.hidden { display: none; }
 .nw-activity-list.hidden { display: none; }
 
+/* Transfer card */
+.tx-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 10px;
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+}
+.tx-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--text-tertiary); font-weight: 700; margin-bottom: 12px;
+}
+.tx-row {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.tx-sel, .tx-input {
+  flex: 1; min-width: 100px; background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.10); border-radius: 8px;
+  padding: 8px 10px; font-size: 13px; color: var(--text-primary);
+  font-family: inherit;
+}
+.tx-input { min-width: 90px; }
+.tx-arrow { color: var(--text-tertiary); font-size: 15px; flex-shrink: 0; }
+.tx-btn {
+  width: 100%; padding: 10px; border-radius: 8px; border: none;
+  background: rgba(125,211,252,0.12); color: #7DD3FC;
+  font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+  letter-spacing: 0.02em; margin-top: 4px;
+}
+.tx-btn:active { opacity: 0.7; }
+.tx-hist-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  font-size: 12px;
+}
+.tx-hist-row:last-child { border-bottom: none; }
+.tx-hist-arrow { color: #7DD3FC; font-size: 12px; flex-shrink: 0; }
+.tx-hist-from { color: #FF8A8A; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-hist-to   { color: #6BE3A4; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-hist-amt  { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.tx-hist-date { color: var(--text-tertiary); font-size: 10px; flex-shrink: 0; }
+.tx-hist-del  { background: none; border: none; color: var(--text-tertiary); font-size: 12px; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+.tx-hist-del:hover { color: #FF8A8A; }
+.tx-hist-note { font-size: 10px; color: var(--text-tertiary); width: 100%; padding-left: 18px; margin-top: -4px; padding-bottom: 2px; }
+.tx-empty { text-align: center; color: var(--text-tertiary); font-size: 11px; font-style: italic; padding: 10px 0 4px; }
+
 /* ============================================================
    ORDERS — full-spec form (name, cost, ccy, from-category, date)
    ============================================================ */
@@ -2203,6 +2248,33 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         </div>
       </div>
     </div>
+
+    <!-- Transfer between accounts -->
+    <div class="tx-card" id="txCard">
+      <div class="tx-label">↔ Transfer Between Accounts</div>
+      <div class="tx-row">
+        <select id="txFrom" class="tx-sel">
+          <option value="cash">💵 Cash</option>
+        </select>
+        <div class="tx-arrow">→</div>
+        <select id="txTo" class="tx-sel">
+          <option value="cash">💵 Cash</option>
+        </select>
+      </div>
+      <div class="tx-row">
+        <input type="number" id="txAmount" class="tx-input" placeholder="Amount" step="0.01" inputmode="decimal">
+        <select id="txCurrency" class="tx-sel" style="flex:0 0 80px;min-width:70px">
+          <option value="USD">USD</option>
+          <option value="CHF">CHF</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+        </select>
+        <input type="date" id="txDate" class="tx-input" style="flex:0 0 130px;min-width:110px">
+      </div>
+      <input type="text" id="txNote" class="tx-input" placeholder="Note (optional)" style="width:100%;margin-bottom:8px;box-sizing:border-box">
+      <button type="button" id="txBtn" class="tx-btn" onclick="window._doTransfer&&window._doTransfer()">↔ Transfer</button>
+      <div id="txHistory" style="margin-top:12px"></div>
+    </div>
   </div>
 </div>
 
@@ -2592,6 +2664,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     if (name === 'employ' && typeof otiPopulateDestination === 'function') {
       otiPopulateDestination();
     }
+    if (name === 'net' && typeof populateTxDropdowns === 'function') {
+      populateTxDropdowns();
+    }
   }
   tabs.forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
   const savedTab = storeGet(TAB_KEY);
@@ -2760,6 +2835,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     if (typeof updateOrdPreview === 'function') updateOrdPreview();
     if (typeof renderEmploymentSummary === 'function') renderEmploymentSummary(grand);
     if (typeof otiPopulateDestination === 'function') otiPopulateDestination();
+    if (typeof populateTxDropdowns    === 'function') populateTxDropdowns();
+    if (typeof renderTxHistory        === 'function') renderTxHistory();
   }
 
   // ============================================================
@@ -4830,10 +4907,77 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     renderOnetimeIncome();
   }
 
+  // ============================================================
+  // TRANSFERS
+  // ============================================================
+  const TX_KEY = 'nw:transfers';
+
+  function _txAccountOptions(excludeVal) {
+    const bankItems = storeGet('nw:bank') || [];
+    const cashOpt = '<option value="cash">💵 Cash</option>';
+    const bankOpts = bankItems.map(b =>
+      '<option value="bank:' + escapeHtml(b.name) + '"' + (b.name === excludeVal ? ' disabled' : '') + '>🏦 ' + escapeHtml(b.name) + '</option>'
+    ).join('');
+    return cashOpt + bankOpts;
+  }
+
+  function populateTxDropdowns() {
+    const fromSel = document.getElementById('txFrom');
+    const toSel   = document.getElementById('txTo');
+    if (!fromSel || !toSel) return;
+    const curFrom = fromSel.value, curTo = toSel.value;
+    fromSel.innerHTML = _txAccountOptions();
+    toSel.innerHTML   = _txAccountOptions();
+    if ([...fromSel.options].some(o => o.value === curFrom)) fromSel.value = curFrom;
+    if ([...toSel.options].some(o => o.value === curTo))     toSel.value   = curTo;
+  }
+
+  function renderTxHistory() {
+    const wrap = document.getElementById('txHistory');
+    if (!wrap) return;
+    const all = (storeGet(TX_KEY) || []).slice().reverse();
+    if (!all.length) { wrap.innerHTML = '<div class="tx-empty">No transfers yet</div>'; return; }
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtTxDate(ts) {
+      const d = new Date(ts);
+      return mons[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    }
+    function acctLabel(val) {
+      if (!val || val === 'cash') return '💵 Cash';
+      return '🏦 ' + val.replace(/^bank:/, '');
+    }
+    wrap.innerHTML = all.slice(0, 20).map((t, i) => {
+      const realIdx = all.length - 1 - i;
+      const dispAmt = (t.enteredCurrency && t.enteredCurrency !== 'USD')
+        ? t.enteredCurrency + ' ' + Number(t.enteredAmount).toFixed(2)
+        : fmtMoney(t.amount);
+      return '<div class="tx-hist-row">'
+        + '<span class="tx-hist-from">' + escapeHtml(acctLabel(t.from)) + '</span>'
+        + '<span class="tx-hist-arrow">→</span>'
+        + '<span class="tx-hist-to">' + escapeHtml(acctLabel(t.to)) + '</span>'
+        + '<span class="tx-hist-amt">' + dispAmt + '</span>'
+        + '<span class="tx-hist-date">' + fmtTxDate(t.ts) + '</span>'
+        + '<button class="tx-hist-del" data-tx-idx="' + realIdx + '" type="button">×</button>'
+        + '</div>'
+        + (t.note ? '<div class="tx-hist-note">' + escapeHtml(t.note) + '</div>' : '');
+    }).join('');
+    wrap.querySelectorAll('.tx-hist-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.txIdx, 10);
+        const arr = storeGet(TX_KEY) || [];
+        arr.splice(idx, 1);
+        storeSet(TX_KEY, arr);
+        renderTxHistory();
+      });
+    });
+  }
+
   // Expose render hooks so the standalone script block can trigger re-renders
   window._finOtiRender  = renderOnetimeIncome;
   window._finNwRender   = renderAllNetWorth;
   window._finGetRates   = function() { return exchangeRates; };
+  window._finTxRender   = renderTxHistory;
+  window._finTxPopulate = populateTxDropdowns;
 
   // Set default date on the OTI date input
   (function() {
@@ -4928,11 +5072,101 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </script>
 
 <script>
+// ── Transfer between accounts ── standalone, no async closure ─────────────
+(function () {
+  function _doTransfer() {
+    var fromSel = document.getElementById('txFrom');
+    var toSel   = document.getElementById('txTo');
+    var amtEl   = document.getElementById('txAmount');
+    var ccyEl   = document.getElementById('txCurrency');
+    var dateEl  = document.getElementById('txDate');
+    var noteEl  = document.getElementById('txNote');
+    if (!fromSel || !toSel || !amtEl) return;
+
+    var fromVal = fromSel.value || 'cash';
+    var toVal   = toSel.value   || 'cash';
+    var rawAmt  = parseFloat((amtEl.value || '').replace(/[^\d.]/g, ''));
+    if (!(rawAmt > 0))              { amtEl.focus(); return; }
+    if (fromVal === toVal)          { alert('Choose different From and To accounts.'); return; }
+
+    var ccyVal  = ccyEl  ? (ccyEl.value  || 'USD') : 'USD';
+    var dateVal = dateEl ? (dateEl.value || '') : '';
+    var noteVal = noteEl ? (noteEl.value || '').trim() : '';
+
+    var rates   = (typeof window._finGetRates === 'function') ? window._finGetRates() : { USD:1, CHF:1, EUR:1, GBP:1 };
+    var amtUSD  = rawAmt / (rates[ccyVal] || 1);
+
+    // Apply balance changes
+    var bank = [];
+    try { bank = JSON.parse(localStorage.getItem('nw:bank') || '[]'); } catch(e) {}
+
+    if (fromVal !== 'cash') {
+      var fromName = fromVal.replace(/^bank:/, '');
+      for (var i = 0; i < bank.length; i++) {
+        if (bank[i].name === fromName) {
+          bank[i].amount = Math.max(0, (Number(bank[i].amount) || 0) - amtUSD);
+          break;
+        }
+      }
+    }
+    if (toVal !== 'cash') {
+      var toName = toVal.replace(/^bank:/, '');
+      for (var j = 0; j < bank.length; j++) {
+        if (bank[j].name === toName) {
+          bank[j].amount = (Number(bank[j].amount) || 0) + amtUSD;
+          break;
+        }
+      }
+    }
+    localStorage.setItem('nw:bank', JSON.stringify(bank));
+
+    // Save transfer record
+    var txKey = 'nw:transfers';
+    var txArr = [];
+    try { txArr = JSON.parse(localStorage.getItem(txKey) || '[]'); } catch(e) {}
+    txArr.push({ id: Date.now(), ts: Date.now(), from: fromVal, to: toVal, amount: amtUSD, enteredAmount: rawAmt, enteredCurrency: ccyVal, date: dateVal, note: noteVal });
+    localStorage.setItem(txKey, JSON.stringify(txArr));
+
+    // Clear inputs
+    amtEl.value = '';
+    if (noteEl) noteEl.value = '';
+
+    // Re-render
+    if (typeof window._finNwRender   === 'function') window._finNwRender();
+    if (typeof window._finTxRender   === 'function') window._finTxRender();
+    if (typeof window._finTxPopulate === 'function') window._finTxPopulate();
+  }
+
+  window._doTransfer = _doTransfer;
+
+  function wire() {
+    var btn = document.getElementById('txBtn');
+    if (btn) {
+      btn.addEventListener('click', _doTransfer);
+      btn.addEventListener('touchend', function(e) { e.preventDefault(); _doTransfer(); });
+    }
+    // Set default date to today
+    var dateEl = document.getElementById('txDate');
+    if (dateEl && !dateEl.value) {
+      var n = new Date();
+      dateEl.value = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
+</script>
+
+<script>
 document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'finance',
-    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'employment_jobs', 'onetime_income', 'nw_currency', 'nw:activity', 'nw:history'],
+    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'employment_jobs', 'onetime_income', 'nw_currency', 'nw:activity', 'nw:history', 'nw:transfers'],
     syncedPrefixes: ['nw:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
