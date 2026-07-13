@@ -2721,6 +2721,29 @@ img, video, canvas, svg { max-width: 100%; }
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
   let state = loadState();
+
+  // One-time cleanup: remove "Sharms" day (superseded by Shoulders/Arms)
+  // and remove default seed exercises from Push/Pull/Legs days (replaced by
+  // the imported strength plan). Runs exactly once, gated by a flag.
+  (function applyCleanupV1() {
+    const FLAG = 'po_coach_cleanup_v1';
+    if (localStorage.getItem(FLAG)) return;
+    let changed = false;
+    // Remove Sharms day
+    const sharmsBefore = state.days.length;
+    state.days = state.days.filter(d => d.name.toLowerCase() !== 'sharms' && d.id.toLowerCase() !== 'sharms');
+    if (state.days.length !== sharmsBefore) changed = true;
+    // Remove seed exercises from push/pull/legs (the 3 default exercises per day
+    // that were replaced by the imported plan — seed IDs start with "seed_")
+    const exBefore = state.exercises.length;
+    state.exercises = state.exercises.filter(ex =>
+      !(ex.id && ex.id.startsWith('seed_') && ['push', 'pull', 'legs'].indexOf(ex.day) !== -1)
+    );
+    if (state.exercises.length !== exBefore) changed = true;
+    if (changed) saveState();
+    try { localStorage.setItem(FLAG, '1'); } catch (_) {}
+  })();
+
   document.getElementById('appTitle').textContent = CONFIG.appTitle || 'Progressive Overload Coach';
 
   // ============================================================
