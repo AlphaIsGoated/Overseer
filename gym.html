@@ -5490,6 +5490,15 @@ Be direct and encouraging. No bullet points in the response.`;
     const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
     const lastBw = getLastBodyWeight();
     const html = (data.days || []).map(d => {
+      const existingDay = findImportDay(d.dayName);
+      const existingCount = existingDay ? state.exercises.filter(ex => ex.day === existingDay.id).length : 0;
+      const isReplace = existingDay && existingCount > 0;
+      const dayLabel = existingDay && existingDay.name.toLowerCase() !== (d.dayName || '').toLowerCase()
+        ? escapeHtmlGym(d.dayName) + ' → <span style="color:#6BE3A4">' + escapeHtmlGym(existingDay.name) + '</span>'
+        : escapeHtmlGym(d.dayName);
+      const badge = isReplace
+        ? ' <span style="font-size:9px;padding:2px 5px;border-radius:4px;background:rgba(255,138,138,0.15);color:#FF8A8A;font-weight:700;vertical-align:middle">REPLACES ' + existingCount + '</span>'
+        : ' <span style="font-size:9px;padding:2px 5px;border-radius:4px;background:rgba(107,227,164,0.12);color:#6BE3A4;font-weight:700;vertical-align:middle">NEW</span>';
       const rows = (d.exercises || []).map(ex => {
         const w = ex.bodyweight
           ? ('bodyweight' + (lastBw > 0 ? ' (' + lastBw + ' ' + state.units + ')' : ''))
@@ -5501,7 +5510,7 @@ Be direct and encouraging. No bullet points in the response.`;
           + '</div>';
       }).join('');
       return '<div style="margin-bottom:12px">'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#7DD3FC;margin-bottom:4px">' + escapeHtmlGym(d.dayName) + '</div>'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#7DD3FC;margin-bottom:4px">' + dayLabel + badge + '</div>'
         + (rows || '<div style="font-size:12px;color:var(--text-3)">No exercises</div>')
         + '</div>';
     }).join('');
@@ -5580,6 +5589,38 @@ Be direct and encouraging. No bullet points in the response.`;
 
   function slugify(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'day'; }
 
+  // Groups of day names that should all resolve to the same existing day.
+  // Local wins: if ANY name in a group matches an existing day name, the import
+  // goes into that day instead of creating a new one.
+  const DAY_NAME_GROUPS = [
+    ['push', 'push day', 'chest/triceps', 'chest & triceps', 'chest and triceps'],
+    ['pull', 'pull day', 'back/biceps', 'back & biceps', 'back and biceps'],
+    ['legs', 'leg day', 'lower body', 'lower', 'legs/glutes'],
+    ['sharms', 'shoulders/arms', 'shoulders & arms', 'shoulders and arms', 'shoulder/arms',
+     'arms/shoulders', 'arms & shoulders', 'shoulders+arms', 'shoulders', 'arms'],
+    ['rest', 'rest day', 'off', 'recovery', 'active recovery'],
+  ];
+
+  // Find an existing state.days entry that matches importedName, using exact
+  // name, slugified-id, or the equivalence groups above.
+  function findImportDay(importedName) {
+    const key = (importedName || '').toLowerCase().trim();
+    // 1. Exact name match
+    let match = state.days.find(x => x.name.toLowerCase().trim() === key);
+    if (match) return match;
+    // 2. Slugified-id match  (e.g. "Shoulders/Arms" → "shoulders-arms")
+    const keySlug = slugify(key);
+    match = state.days.find(x => x.id === keySlug || slugify(x.name) === keySlug);
+    if (match) return match;
+    // 3. Equivalence-group match
+    const group = DAY_NAME_GROUPS.find(g => g.includes(key));
+    if (group) {
+      match = state.days.find(x => group.includes(x.name.toLowerCase().trim()) || group.includes(x.id.toLowerCase()));
+      if (match) return match;
+    }
+    return null;
+  }
+
   function getLastBodyWeight() {
     // Returns the most recent known body weight in state.units (lb or kg).
     // Checks both the manual weight log and InBody scans; whichever is newer wins.
@@ -5606,27 +5647,26 @@ Be direct and encouraging. No bullet points in the response.`;
     const data = planImportPending;
     if (!data) return;
     const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
-    const lastBw = getLastBodyWeight(); // seed bodyweight exercises with actual body weight
+    const lastBw = getLastBodyWeight();
     (data.days || []).forEach(d => {
-      let day = state.days.find(x => x.name.toLowerCase() === (d.dayName || '').toLowerCase());
+      // Resolve to existing day using name/slug/equivalence matching
+      let day = findImportDay(d.dayName);
       if (!day) {
         day = { id: slugify(d.dayName), name: d.dayName || 'Day' };
-        // Avoid id collisions with an existing day under a different name.
         let n = 1;
         while (state.days.some(x => x.id === day.id)) { day = { id: slugify(d.dayName) + '-' + (++n), name: d.dayName || 'Day' }; }
         state.days.push(day);
       }
+      // Replace all exercises for this day — import is authoritative for its days
+      state.exercises = state.exercises.filter(ex => ex.day !== day.id);
       (d.exercises || []).forEach(ex => {
         const isBw = !!ex.bodyweight;
-        const existing = state.exercises.find(e => e.day === day.id && e.name.toLowerCase() === (ex.name || '').toLowerCase());
-        const payload = {
+        state.exercises.push(Object.assign({ id: uid() }, {
           name: ex.name, gym: 'both', day: day.id, bw: isBw,
           startWeight: isBw ? lastBw : Math.round((ex.startWeight || 0) * unitConv * 2) / 2,
           repMin: ex.repMin || 6, repMax: ex.repMax || 8,
-          step: isBw ? 2.5 : 2.5
-        };
-        if (existing) Object.assign(existing, payload);
-        else state.exercises.push(Object.assign({ id: uid() }, payload));
+          step: 2.5
+        }));
       });
     });
     saveState();
