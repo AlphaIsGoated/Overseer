@@ -2885,7 +2885,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       const sign = e.delta >= 0 ? '+' : '—';
       const cls = e.delta >= 0 ? 'up' : 'down';
       const amt = fmtMoney(Math.abs(e.delta));
-      const kind = e.kind === 'edit' ? 'EDIT' : (e.kind === 'delete' ? 'DELETE' : 'ADD');
+      const kind = e.kind === 'edit' ? 'EDIT' : (e.kind === 'delete' ? 'DELETE' : (e.kind === 'transfer' ? 'TRANSFER' : 'ADD'));
       return '<div class="nw-activity-row" style="color:' + meta.color + '">'
         + '<span class="nw-activity-bar" style="background:' + meta.color + '"></span>'
         + '<div class="nw-activity-info">'
@@ -5096,29 +5096,43 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     var rates   = (typeof window._finGetRates === 'function') ? window._finGetRates() : { USD:1, CHF:1, EUR:1, GBP:1 };
     var amtUSD  = rawAmt / (rates[ccyVal] || 1);
 
-    // Apply balance changes
+    // Apply balance changes — Cash is tracked as a bank account named "Cash"
     var bank = [];
     try { bank = JSON.parse(localStorage.getItem('nw:bank') || '[]'); } catch(e) {}
 
-    if (fromVal !== 'cash') {
-      var fromName = fromVal.replace(/^bank:/, '');
-      for (var i = 0; i < bank.length; i++) {
-        if (bank[i].name === fromName) {
-          bank[i].amount = Math.max(0, (Number(bank[i].amount) || 0) - amtUSD);
-          break;
-        }
+    // Resolve account name for both sides (cash → "Cash" entry in nw:bank)
+    var fromName = (fromVal === 'cash') ? 'Cash' : fromVal.replace(/^bank:/, '');
+    var toName   = (toVal   === 'cash') ? 'Cash' : toVal.replace(/^bank:/, '');
+
+    // Auto-create Cash account if it doesn't exist yet
+    if (!bank.some(function(b) { return b.name === fromName; })) {
+      bank.push({ name: fromName, amount: 0 });
+    }
+    if (!bank.some(function(b) { return b.name === toName; })) {
+      bank.push({ name: toName, amount: 0 });
+    }
+
+    for (var i = 0; i < bank.length; i++) {
+      if (bank[i].name === fromName) {
+        bank[i].amount = Math.max(0, (Number(bank[i].amount) || 0) - amtUSD);
+        break;
       }
     }
-    if (toVal !== 'cash') {
-      var toName = toVal.replace(/^bank:/, '');
-      for (var j = 0; j < bank.length; j++) {
-        if (bank[j].name === toName) {
-          bank[j].amount = (Number(bank[j].amount) || 0) + amtUSD;
-          break;
-        }
+    for (var j = 0; j < bank.length; j++) {
+      if (bank[j].name === toName) {
+        bank[j].amount = (Number(bank[j].amount) || 0) + amtUSD;
+        break;
       }
     }
     localStorage.setItem('nw:bank', JSON.stringify(bank));
+
+    // Log to activity feed
+    var actKey = 'nw:activity';
+    var acts = [];
+    try { acts = JSON.parse(localStorage.getItem(actKey) || '[]'); } catch(e) {}
+    acts.push({ ts: Date.now(), cat: 'bank', name: fromName + ' → ' + toName, delta: amtUSD, kind: 'transfer' });
+    if (acts.length > 50) acts.splice(0, acts.length - 50);
+    localStorage.setItem(actKey, JSON.stringify(acts));
 
     // Save transfer record
     var txKey = 'nw:transfers';
