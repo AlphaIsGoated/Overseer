@@ -2523,10 +2523,23 @@ img, video, canvas, svg { max-width: 100%; }
 
     <div id="planImportErrorBox" class="hidden" style="font-size:13px;color:#FF8A8A;margin-bottom:14px"></div>
 
-    <div id="planImportReview" class="hidden">
-      <div id="planImportSummary" style="max-height:50vh;overflow-y:auto;margin-bottom:14px"></div>
+    <div id="planImportCoach" class="hidden">
+      <!-- Coach bubble -->
+      <div id="coachBubble" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:14px">
+        <div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6BE3A4,#7DD3FC);display:flex;align-items:center;justify-content:center;font-size:15px">🏋️</div>
+        <div id="coachMsg" style="background:rgba(107,227,164,0.08);border:1px solid rgba(107,227,164,0.18);border-radius:0 12px 12px 12px;padding:10px 13px;font-size:13px;line-height:1.55;color:var(--text-1);flex:1"></div>
+      </div>
+      <!-- Plan preview -->
+      <div id="coachPlanPreview" style="max-height:38vh;overflow-y:auto;margin-bottom:14px;border:1px solid var(--border);border-radius:10px;padding:10px 13px;background:rgba(0,0,0,0.2)"></div>
+      <!-- Change request -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.05em;color:var(--text-3);margin-bottom:5px">REQUEST CHANGES</div>
+        <textarea id="coachChangeInput" rows="2" placeholder="e.g. 'Change Push day to 4×8, add Cable Fly after Bench, remove RDL'" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:rgba(0,0,0,0.3);color:var(--text-1);font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div id="coachChangeBusy" class="hidden" style="font-size:12px;color:var(--text-3);padding:6px 0">Applying changes…</div>
       <div class="po-modal-actions">
         <button class="po-btn-secondary" id="planImportCancel2" type="button">Cancel</button>
+        <button class="po-btn-secondary" id="coachApplyChanges" type="button">Apply Changes</button>
         <button class="po-btn-primary" id="planImportSave" type="button">Save to my plan</button>
       </div>
     </div>
@@ -5170,13 +5183,29 @@ Be direct and encouraging. No bullet points in the response.`;
     + "'DL' → 'Barbell Deadlift', 'CGP' → 'Close-Grip Bench Press', 'CG Row' → 'Close-Grip Cable Row'. "
     + "If the input only says 'pull-ups' write 'Pull-Ups', not an abbreviation. "
     + "Capitalise each word. Never output an abbreviation as the exercise name. "
+    + "SETS × REPS: When the plan writes 'N×M' or 'N x M' (e.g. '4×5', '3x10'), N is the number of SETS "
+    + "and M is the number of REPS — capture M as both repMin and repMax (or as the rep range if a dash is used). "
+    + "Example: '4×5' → repMin=5, repMax=5. '3×8-10' → repMin=8, repMax=10. Never capture the set count as a rep number. "
     + "Group exercises under whatever day labels the program uses (Push/Pull/Legs, Upper/Lower, Day 1/2/3, "
     + "specific muscle groups, etc.) — preserve the program's own day names rather than inventing new ones. "
     + "If a rep range is given as a single number (e.g. \"10 reps\"), use it for both repMin and repMax. "
-    + "If sets are mentioned but not used by the schema, ignore them — only reps/weight/day/name matter here. "
     + "Only set readable=false if this clearly isn't a strength training plan.";
 
-  function planImportShow(id) { ['planImportChoice', 'planImportBusy', 'planImportErrorBox', 'planImportReview'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
+  const PLAN_COACH_SYSTEM =
+    "You are a concise personal strength coach reviewing a workout plan that was just parsed from user input. "
+    + "In 2-4 sentences: greet briefly, summarize what you found (number of days, key lifts), flag any likely "
+    + "misreadings or missing info (e.g. no starting weights set, rep ranges that look off, unusual abbreviations "
+    + "that may have been wrong), and ask at most 1-2 short clarifying questions if something is genuinely unclear. "
+    + "Be friendly and direct. Do not list every exercise. Speak in first person as a coach.";
+
+  const PLAN_CHANGE_SYSTEM =
+    "You are modifying a parsed strength training plan based on the user's instructions. "
+    + "Always call the import_strength_plan tool exactly once with the COMPLETE updated plan — include all days "
+    + "and all exercises (both changed and unchanged). Apply the user's requested changes faithfully. "
+    + "Keep all existing exercise names in their full proper form. "
+    + "SETS × REPS: N×M means N sets of M reps — repMin=repMax=M. '3×8-10' → repMin=8, repMax=10.";
+
+  function planImportShow(id) { ['planImportChoice', 'planImportBusy', 'planImportErrorBox', 'planImportCoach'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
   function planImportError(msg) { $('planImportErrorBox').textContent = '⚠ ' + msg; planImportShow('planImportErrorBox'); }
 
   async function planImportRunImage(file) {
@@ -5218,27 +5247,94 @@ Be direct and encouraging. No bullet points in the response.`;
   }
 
   let planImportPending = null; // the raw tool output, pending Save
-  function planImportShowReview(data) {
-    planImportPending = data;
+
+  function planImportBuildPreviewHtml(data) {
     const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
-    let totalEx = 0;
     const html = (data.days || []).map(d => {
-      totalEx += (d.exercises || []).length;
       const rows = (d.exercises || []).map(ex => {
         const w = ex.bodyweight ? 'bodyweight' : Math.round((ex.startWeight || 0) * unitConv) + ' ' + state.units;
-        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">'
+        const reps = ex.repMin === ex.repMax ? ex.repMin + ' reps' : ex.repMin + '–' + ex.repMax + ' reps';
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px">'
           + '<span>' + escapeHtmlGym(ex.name) + '</span>'
-          + '<span style="color:var(--text-3);flex-shrink:0">' + ex.repMin + '–' + ex.repMax + ' reps · ' + w + '</span>'
+          + '<span style="color:var(--text-3);flex-shrink:0">' + reps + (ex.bodyweight ? '' : ' · ' + w) + '</span>'
           + '</div>';
       }).join('');
-      return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px">' + escapeHtmlGym(d.dayName) + '</div>' + rows + '</div>';
+      return '<div style="margin-bottom:12px">'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#7DD3FC;margin-bottom:4px">' + escapeHtmlGym(d.dayName) + '</div>'
+        + (rows || '<div style="font-size:12px;color:var(--text-3)">No exercises</div>')
+        + '</div>';
     }).join('');
-    $('planImportSummary').innerHTML =
-      '<div style="font-size:11px;color:var(--text-3);margin-bottom:12px;padding:8px 10px;background:rgba(125,211,252,0.06);border:1px solid rgba(125,211,252,0.15);border-radius:8px">'
-      + '✦ Claude\'s interpretation — review exercise names below and tap <b>Save</b> to confirm, or <b>Cancel</b> to discard.</div>'
-      + (html || '<div style="color:var(--text-3);font-size:13px">No exercises found.</div>');
-    planImportShow('planImportReview');
+    return html || '<div style="color:var(--text-3);font-size:13px">No exercises found.</div>';
   }
+
+  async function planImportShowReview(data) {
+    planImportPending = data;
+    // Show coach screen immediately with a loading state for the message
+    $('coachMsg').textContent = 'Reviewing your plan…';
+    $('coachPlanPreview').innerHTML = planImportBuildPreviewHtml(data);
+    $('coachChangeInput').value = '';
+    $('coachChangeBusy').classList.add('hidden');
+    planImportShow('planImportCoach');
+
+    // Fetch coach commentary
+    try {
+      const planSummary = (data.days || []).map(d =>
+        d.dayName + ': ' + (d.exercises || []).map(ex =>
+          ex.name + ' ' + ex.repMin + (ex.repMin !== ex.repMax ? '–' + ex.repMax : '') + ' reps'
+          + (ex.bodyweight ? ' (bodyweight)' : ex.startWeight ? ' @ ' + ex.startWeight + ' ' + (data.weightUnit || 'lb') : '')
+        ).join(', ')
+      ).join('\n');
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({
+          system: PLAN_COACH_SYSTEM,
+          messages: [{ role: 'user', content: 'Here is the parsed plan:\n\n' + planSummary }]
+        })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
+      const d = await res.json();
+      $('coachMsg').textContent = (d && d.text) ? d.text : 'Plan parsed — review below and save or request changes.';
+    } catch (_) {
+      $('coachMsg').textContent = 'Plan parsed — review below and save or request changes.';
+    }
+  }
+
+  async function planImportApplyChanges() {
+    const instruction = ($('coachChangeInput').value || '').trim();
+    if (!instruction) { $('coachChangeInput').focus(); return; }
+    if (!planImportPending) return;
+    $('coachChangeBusy').classList.remove('hidden');
+    $('coachApplyChanges').disabled = true;
+    try {
+      const planJson = JSON.stringify(planImportPending);
+      const res = await fetch('/api/ai/ai-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
+        body: JSON.stringify({
+          system: PLAN_CHANGE_SYSTEM,
+          tool: PLAN_IMPORT_TOOL,
+          messages: [{
+            role: 'user',
+            content: 'Current plan JSON:\n' + planJson + '\n\nChanges requested: ' + instruction
+          }]
+        })
+      });
+      if (window.logApiUsage) window.logApiUsage(res.headers.get('X-Usage-Input-Tokens'), res.headers.get('X-Usage-Output-Tokens'), res.headers.get('X-Usage-Model'), 'gym');
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Change failed');
+      planImportPending = data;
+      $('coachPlanPreview').innerHTML = planImportBuildPreviewHtml(data);
+      $('coachChangeInput').value = '';
+      $('coachMsg').textContent = 'Done! Changes applied — review the updated plan below or request more adjustments.';
+    } catch (e) {
+      $('coachMsg').textContent = '⚠ ' + ((e && e.message) || 'Could not apply changes — try again.');
+    } finally {
+      $('coachChangeBusy').classList.add('hidden');
+      $('coachApplyChanges').disabled = false;
+    }
+  }
+
   function escapeHtmlGym(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function slugify(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'day'; }
@@ -5301,6 +5397,8 @@ Be direct and encouraging. No bullet points in the response.`;
     planImportRunText(text);
   });
   $('planImportSave').addEventListener('click', planImportSave);
+  $('coachApplyChanges').addEventListener('click', planImportApplyChanges);
+  $('coachChangeInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); planImportApplyChanges(); } });
 
   // ---- UI state ----
   let ibPendingImage = null;   // { dataUrl, base64, mediaType } for the scan currently in the confirm card
