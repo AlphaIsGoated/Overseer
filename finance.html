@@ -2426,7 +2426,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <option value="cash">💵 Cash (no account change)</option>
       </select>
       <input type="date"   id="otiDate"        class="emp-input emp-input-full">
-      <button class="emp-add-btn" id="otiAddBtn" type="button">+ Log Payment</button>
+      <button class="emp-add-btn" id="otiAddBtn" type="button" onclick="if(window.otiDoAdd)window.otiDoAdd()">+ Log Payment</button>
     </div>
   </div>
   <div id="otiList" class="card" style="padding:0 16px;display:none"></div>
@@ -4830,8 +4830,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     renderOnetimeIncome();
   }
 
+  window.otiDoAdd = otiDoAdd;
+
   document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'otiAddBtn') otiDoAdd();
+    if (e.target && e.target.closest && e.target.closest('#otiAddBtn')) otiDoAdd();
   });
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && e.target) {
