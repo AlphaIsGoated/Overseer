@@ -2426,7 +2426,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <option value="cash">💵 Cash (no account change)</option>
       </select>
       <input type="date"   id="otiDate"        class="emp-input emp-input-full">
-      <button class="emp-add-btn" id="otiAddBtn">+ Log Payment</button>
+      <button class="emp-add-btn" id="otiAddBtn" type="button">+ Log Payment</button>
     </div>
   </div>
   <div id="otiList" class="card" style="padding:0 16px;display:none"></div>
@@ -4783,69 +4783,72 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     });
   }
 
-  (function() {
-    const addBtn  = document.getElementById('otiAddBtn');
-    const srcEl   = document.getElementById('otiSource');
-    const amtEl   = document.getElementById('otiAmount');
-    const ccyEl   = document.getElementById('otiCurrency');
-    const destEl  = document.getElementById('otiDestination');
-    const dateEl  = document.getElementById('otiDate');
-    if (!addBtn) return;
+  function otiDoAdd() {
+    const srcEl  = document.getElementById('otiSource');
+    const amtEl  = document.getElementById('otiAmount');
+    const ccyEl  = document.getElementById('otiCurrency');
+    const destEl = document.getElementById('otiDestination');
+    const dateEl = document.getElementById('otiDate');
+    if (!srcEl || !amtEl) return;
+    const source = (srcEl.value || '').trim();
+    const rawAmt = parseFloat(amtEl.value);
+    const ccy    = (ccyEl && ccyEl.value) || 'USD';
+    const dest   = (destEl && destEl.value) || 'cash';
+    const date   = (dateEl && dateEl.value) || '';
+    if (!source || isNaN(rawAmt) || rawAmt <= 0) { srcEl.focus(); return; }
+    const amtUSD = rawAmt / (exchangeRates[ccy] || 1);
 
-    // Default date to today
+    const entry = {
+      id: Date.now(), source,
+      amount: amtUSD, enteredAmount: rawAmt, enteredCurrency: ccy,
+      destination: dest, date,
+    };
+    const arr = storeGet(OTI_KEY) || [];
+    arr.push(entry);
+    storeSet(OTI_KEY, arr);
+
+    if (dest.startsWith('bank:')) {
+      const accountName = dest.slice(5);
+      const bankItems = storeGet('nw:bank') || [];
+      const found = bankItems.find(b => b.name === accountName);
+      if (found) {
+        found.amount = (Number(found.amount) || 0) + amtUSD;
+        storeSet('nw:bank', bankItems);
+        logActivity('bank', accountName + ' (income: ' + escapeHtml(source) + ')', amtUSD, 'add');
+      }
+      renderAllNetWorth();
+    }
+
+    srcEl.value = '';
+    amtEl.value = '';
+    if (dateEl) {
+      const now = new Date();
+      dateEl.value = now.getFullYear() + '-'
+        + String(now.getMonth() + 1).padStart(2, '0') + '-'
+        + String(now.getDate()).padStart(2, '0');
+    }
+    renderOnetimeIncome();
+  }
+
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'otiAddBtn') otiDoAdd();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target) {
+      const id = e.target.id;
+      if (id === 'otiSource' || id === 'otiAmount') otiDoAdd();
+    }
+  });
+
+  // Set default date on the OTI date input
+  (function() {
+    const dateEl = document.getElementById('otiDate');
     if (dateEl && !dateEl.value) {
       const now = new Date();
       dateEl.value = now.getFullYear() + '-'
         + String(now.getMonth() + 1).padStart(2, '0') + '-'
         + String(now.getDate()).padStart(2, '0');
     }
-
-    function doAdd() {
-      const source = (srcEl.value || '').trim();
-      const rawAmt = parseFloat(amtEl.value);
-      const ccy = ccyEl.value || 'USD';
-      const dest = destEl.value || 'cash';
-      const date = dateEl.value || '';
-      if (!source || isNaN(rawAmt) || rawAmt <= 0) { srcEl.focus(); return; }
-      const amtUSD = rawAmt / (exchangeRates[ccy] || 1);
-
-      const entry = {
-        id: Date.now(), source,
-        amount: amtUSD, enteredAmount: rawAmt, enteredCurrency: ccy,
-        destination: dest, date,
-      };
-      const arr = storeGet(OTI_KEY) || [];
-      arr.push(entry);
-      storeSet(OTI_KEY, arr);
-
-      // If destination is a bank account, add to its balance
-      if (dest.startsWith('bank:')) {
-        const accountName = dest.slice(5);
-        const bankItems = storeGet('nw:bank') || [];
-        const found = bankItems.find(b => b.name === accountName);
-        if (found) {
-          found.amount = (Number(found.amount) || 0) + amtUSD;
-          storeSet('nw:bank', bankItems);
-          logActivity('bank', accountName + ' (income: ' + escapeHtml(source) + ')', amtUSD, 'add');
-        }
-        renderAllNetWorth();
-      }
-
-      srcEl.value = '';
-      amtEl.value = '';
-      // Reset date to today
-      const now = new Date();
-      if (dateEl) dateEl.value = now.getFullYear() + '-'
-        + String(now.getMonth() + 1).padStart(2, '0') + '-'
-        + String(now.getDate()).padStart(2, '0');
-
-      renderOnetimeIncome();
-    }
-
-    addBtn.addEventListener('click', doAdd);
-    [srcEl, amtEl].forEach(el => {
-      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
-    });
   })();
 
   renderOnetimeIncome();
