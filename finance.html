@@ -2589,6 +2589,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     });
     storeSet(TAB_KEY, name);
     window.scrollTo({ top: 0, behavior: 'instant' });
+    if (name === 'employ' && typeof otiPopulateDestination === 'function') {
+      otiPopulateDestination();
+    }
   }
   tabs.forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
   const savedTab = storeGet(TAB_KEY);
