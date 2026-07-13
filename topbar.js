@@ -599,8 +599,13 @@ body.topbar-modal-open {
     let log = [];
     try { log = JSON.parse(localStorage.getItem(USAGE_KEY)) || []; } catch (e) {}
     log.push({ ts: Date.now(), model: model || 'claude-opus-4-8', inputTokens: Number(inputTokens) || 0, outputTokens: Number(outputTokens) || 0, source: source || 'other' });
-    if (log.length > 2000) log = log.slice(log.length - 2000);
-    localStorage.setItem(USAGE_KEY, JSON.stringify(log));
+    if (log.length > 500) log = log.slice(log.length - 500);
+    try {
+      localStorage.setItem(USAGE_KEY, JSON.stringify(log));
+    } catch (e) {
+      // Storage full — keep only the last 100 entries and retry once
+      try { localStorage.setItem(USAGE_KEY, JSON.stringify(log.slice(-100))); } catch (_) {}
+    }
 
     // Budget alert: check if this month's spend has crossed the user's
     // configured threshold. Runs after every logged call so the warning

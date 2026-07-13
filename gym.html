@@ -5250,9 +5250,12 @@ Be direct and encouraging. No bullet points in the response.`;
 
   function planImportBuildPreviewHtml(data) {
     const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
+    const lastBw = getLastBodyWeight();
     const html = (data.days || []).map(d => {
       const rows = (d.exercises || []).map(ex => {
-        const w = ex.bodyweight ? 'bodyweight' : Math.round((ex.startWeight || 0) * unitConv) + ' ' + state.units;
+        const w = ex.bodyweight
+          ? ('bodyweight' + (lastBw > 0 ? ' (' + lastBw + ' ' + state.units + ')' : ''))
+          : Math.round((ex.startWeight || 0) * unitConv) + ' ' + state.units;
         const reps = ex.repMin === ex.repMax ? ex.repMin + ' reps' : ex.repMin + '–' + ex.repMax + ' reps';
         return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px">'
           + '<span>' + escapeHtmlGym(ex.name) + '</span>'
@@ -5338,10 +5341,34 @@ Be direct and encouraging. No bullet points in the response.`;
   function escapeHtmlGym(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function slugify(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'day'; }
+
+  function getLastBodyWeight() {
+    // Returns the most recent known body weight in state.units (lb or kg).
+    // Checks both the manual weight log and InBody scans; whichever is newer wins.
+    let best = null; // { dateKey: string, weight: number }
+    try {
+      const wts = JSON.parse(localStorage.getItem('po_coach_weights') || '[]');
+      if (Array.isArray(wts) && wts.length) {
+        const last = wts.slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey)).pop();
+        if (last && last.weight > 0) best = last;
+      }
+    } catch (_) {}
+    try {
+      const scans = JSON.parse(localStorage.getItem('po_coach_inbody') || '[]');
+      if (Array.isArray(scans)) {
+        const last = scans.filter(s => s && s.weight > 0)
+          .sort((a, b) => (a.dateKey || '').localeCompare(b.dateKey || '')).pop();
+        if (last && (!best || last.dateKey > best.dateKey)) best = { dateKey: last.dateKey, weight: last.weight };
+      }
+    } catch (_) {}
+    return best ? Math.round(best.weight * 2) / 2 : 0;
+  }
+
   function planImportSave() {
     const data = planImportPending;
     if (!data) return;
     const unitConv = data.weightUnit === state.units ? 1 : (data.weightUnit === 'kg' ? KG_TO_LB : 1 / KG_TO_LB);
+    const lastBw = getLastBodyWeight(); // seed bodyweight exercises with actual body weight
     (data.days || []).forEach(d => {
       let day = state.days.find(x => x.name.toLowerCase() === (d.dayName || '').toLowerCase());
       if (!day) {
@@ -5356,9 +5383,9 @@ Be direct and encouraging. No bullet points in the response.`;
         const existing = state.exercises.find(e => e.day === day.id && e.name.toLowerCase() === (ex.name || '').toLowerCase());
         const payload = {
           name: ex.name, gym: 'both', day: day.id, bw: isBw,
-          startWeight: isBw ? 0 : Math.round((ex.startWeight || 0) * unitConv * 2) / 2,
+          startWeight: isBw ? lastBw : Math.round((ex.startWeight || 0) * unitConv * 2) / 2,
           repMin: ex.repMin || 6, repMax: ex.repMax || 8,
-          step: isBw ? 1 : 2.5
+          step: isBw ? 2.5 : 2.5
         };
         if (existing) Object.assign(existing, payload);
         else state.exercises.push(Object.assign({ id: uid() }, payload));
