@@ -1901,6 +1901,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .emp-nw-right { text-align: right; flex-shrink: 0; }
 .emp-nw-annual { font-size: 14px; font-weight: 600; color: #6BE3A4; font-variant-numeric: tabular-nums; }
 .emp-nw-annual-label { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+
+/* Next paycheck badge on job card */
+.emp-row-next { font-size: 10px; color: #6BE3A4; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* One-time income history rows */
+.oti-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 0.5px solid rgba(255,255,255,0.06);
+}
+.oti-row:last-child { border-bottom: none; }
+.oti-row-left { flex: 1; min-width: 0; }
+.oti-row-source { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oti-row-dest { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+.oti-row-date { font-size: 10px; color: var(--text-tertiary); text-align: right; white-space: nowrap; flex-shrink: 0; }
+.oti-row-amt { font-size: 14px; font-weight: 700; color: #6BE3A4; font-variant-numeric: tabular-nums; flex-shrink: 0; text-align: right; }
+.oti-row-del { background: none; border: 0.5px solid rgba(255,138,138,0.15); border-radius: 6px; color: var(--text-tertiary); font-size: 12px; cursor: pointer; padding: 2px 7px; line-height: 1; flex-shrink: 0; }
+.oti-row-del:hover { color: #FF8A8A; border-color: rgba(255,138,138,0.3); }
+
 @media (max-width: 600px) {
   .emp-stat-grid { grid-template-columns: 1fr 1fr; }
   .emp-add-grid { grid-template-columns: 1fr; }
@@ -2371,6 +2389,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <option value="semimonthly">Semi-monthly (twice a month)</option>
         <option value="monthly">Monthly</option>
       </select>
+      <input type="date" id="empLastPaycheck" class="emp-input emp-input-full" title="Date of last paycheck — used to calculate your next pay date">
       <button class="emp-add-btn" id="empAddBtn">+ Add Job</button>
     </div>
   </div>
@@ -2385,6 +2404,36 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="wish-empty-icon">💼</div>
     <div class="wish-empty-title">No jobs added yet</div>
     <div class="wish-empty-sub">Add a job or internship above to track your income and see how it stacks up against your subscriptions, wishlist, and net worth.</div>
+  </div>
+
+  <!-- One-time income -->
+  <div class="emp-section-h" style="margin-top:24px">
+    <span class="emp-section-label">ONE-TIME INCOME</span>
+    <span class="emp-section-count" id="otiCount">0 payments</span>
+  </div>
+  <div class="emp-add-card">
+    <div class="emp-add-eyebrow">+ LOG A ONE-TIME PAYMENT</div>
+    <div class="emp-add-grid">
+      <input type="text"   id="otiSource"      placeholder="Source (e.g. Freelance, Gift)"  class="emp-input emp-input-full">
+      <input type="number" id="otiAmount"      placeholder="Amount"  step="0.01"             class="emp-input">
+      <select id="otiCurrency" class="emp-input">
+        <option value="USD">USD</option>
+        <option value="CHF">CHF</option>
+        <option value="EUR">EUR</option>
+        <option value="GBP">GBP</option>
+      </select>
+      <select id="otiDestination" class="emp-input emp-input-full">
+        <option value="cash">💵 Cash (no account change)</option>
+      </select>
+      <input type="date"   id="otiDate"        class="emp-input emp-input-full">
+      <button class="emp-add-btn" id="otiAddBtn">+ Log Payment</button>
+    </div>
+  </div>
+  <div id="otiList" class="card" style="padding:0 16px;display:none"></div>
+  <div id="otiEmpty" class="wish-empty-card" style="margin-top:0">
+    <div class="wish-empty-icon">💸</div>
+    <div class="wish-empty-title">No one-time income yet</div>
+    <div class="wish-empty-sub">Log freelance payments, gifts, or any single deposit above — they'll be added to the linked bank account automatically.</div>
   </div>
 </div>
 
@@ -2707,6 +2756,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     if (typeof renderOrders   === 'function') renderOrders();
     if (typeof updateOrdPreview === 'function') updateOrdPreview();
     if (typeof renderEmploymentSummary === 'function') renderEmploymentSummary(grand);
+    if (typeof otiPopulateDestination === 'function') otiPopulateDestination();
   }
 
   // ============================================================
@@ -4521,6 +4571,35 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
   }
 
+  function empNextPaycheckDate(lastDateStr, freq) {
+    if (!lastDateStr) return null;
+    const [y, m, d] = lastDateStr.split('-').map(Number);
+    const last = new Date(y, m - 1, d);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let next = new Date(last);
+    let iters = 0;
+    while (next <= today && iters < 400) {
+      iters++;
+      if (freq === 'weekly')        { next.setDate(next.getDate() + 7); }
+      else if (freq === 'biweekly') { next.setDate(next.getDate() + 14); }
+      else if (freq === 'semimonthly') {
+        if (next.getDate() < 15) next.setDate(15);
+        else { next.setMonth(next.getMonth() + 1, 1); }
+      }
+      else { next.setMonth(next.getMonth() + 1); }
+    }
+    return next;
+  }
+  function empFmtNextDate(d) {
+    if (!d) return null;
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const diff = Math.round((d - today) / 86400000);
+    const label = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : days[d.getDay()] + ', ' + mons[d.getMonth()] + ' ' + d.getDate();
+    return 'Next paycheck: ' + label + (diff > 1 ? ' (' + diff + 'd)' : '');
+  }
+
   function renderEmployment() {
     const jobs = storeGet(EMP_KEY) || [];
     const list  = document.getElementById('empList');
@@ -4548,10 +4627,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       const paycheckDisplay = (job.entered_currency && job.entered_currency !== 'USD')
         ? job.entered_currency + ' ' + Number(job.entered_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : fmtMoney(Number(job.amount));
+      const nextD = empNextPaycheckDate(job.lastPaycheckDate, job.frequency);
+      const nextLabel = nextD ? empFmtNextDate(nextD) : '';
       left.innerHTML =
         '<div class="emp-row-title">' + escapeHtml(job.title) + '</div>' +
         (job.company ? '<div class="emp-row-company">' + escapeHtml(job.company) + '</div>' : '') +
-        '<div class="emp-row-badge">' + (EMP_FREQ_LABELS[job.frequency] || job.frequency) + '</div>';
+        '<div class="emp-row-badge">' + (EMP_FREQ_LABELS[job.frequency] || job.frequency) + '</div>' +
+        (nextLabel ? '<div class="emp-row-next">' + escapeHtml(nextLabel) + '</div>' : '');
 
       const right = document.createElement('div');
       right.className = 'emp-row-right';
@@ -4581,7 +4663,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     renderAllNetWorth();
   }
 
-  // Wire up the add button
+  // Wire up the job add button
   (function() {
     const addBtn  = document.getElementById('empAddBtn');
     const titleEl = document.getElementById('empTitle');
@@ -4589,6 +4671,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     const amtEl   = document.getElementById('empAmount');
     const ccyEl   = document.getElementById('empCurrency');
     const freqEl  = document.getElementById('empFrequency');
+    const lpcEl   = document.getElementById('empLastPaycheck');
     if (!addBtn) return;
 
     function doAdd() {
@@ -4610,6 +4693,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         entered_currency: ccy,
         currency: 'USD',
         frequency: freq,
+        lastPaycheckDate: (lpcEl && lpcEl.value) || null,
       };
       const arr = storeGet(EMP_KEY) || [];
       arr.push(job);
@@ -4617,6 +4701,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       titleEl.value = '';
       compEl.value  = '';
       amtEl.value   = '';
+      if (lpcEl) lpcEl.value = '';
       renderEmployment();
     }
 
@@ -4625,6 +4710,142 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
     });
   })();
+
+  // ============================================================
+  // ONE-TIME INCOME
+  // ============================================================
+  const OTI_KEY = 'onetime_income';
+
+  function otiPopulateDestination() {
+    const sel = document.getElementById('otiDestination');
+    if (!sel) return;
+    const bankItems = storeGet('nw:bank') || [];
+    const current = sel.value;
+    sel.innerHTML = '<option value="cash">💵 Cash (no account change)</option>'
+      + bankItems.map(b =>
+          '<option value="bank:' + escapeHtml(b.name) + '">🏦 ' + escapeHtml(b.name) + '</option>'
+        ).join('');
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  }
+
+  function renderOnetimeIncome() {
+    otiPopulateDestination();
+    const items = (storeGet(OTI_KEY) || []).slice().reverse();
+    const list  = document.getElementById('otiList');
+    const empty = document.getElementById('otiEmpty');
+    const count = document.getElementById('otiCount');
+    if (!list) return;
+    const n = items.length;
+    if (count) count.textContent = n + ' payment' + (n === 1 ? '' : 's');
+    if (!n) {
+      list.style.display = 'none';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    list.style.display = '';
+    list.innerHTML = items.map((it, idx) => {
+      const realIdx = (storeGet(OTI_KEY) || []).length - 1 - idx;
+      const destLabel = it.destination === 'cash'
+        ? '💵 Cash'
+        : '🏦 ' + (it.destination || '').replace(/^bank:/, '');
+      const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      let dateStr = '';
+      if (it.date) {
+        const [dy, dm, dd] = it.date.split('-').map(Number);
+        dateStr = mons[dm - 1] + ' ' + dd + ', ' + dy;
+      }
+      const displayAmt = (it.enteredCurrency && it.enteredCurrency !== 'USD')
+        ? it.enteredCurrency + ' ' + Number(it.enteredAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : fmtMoney(it.amount);
+      return '<div class="oti-row">'
+        + '<div class="oti-row-left">'
+        +   '<div class="oti-row-source">' + escapeHtml(it.source || '(unnamed)') + '</div>'
+        +   '<div class="oti-row-dest">' + destLabel + '</div>'
+        + '</div>'
+        + '<div class="oti-row-amt">' + displayAmt + '</div>'
+        + '<div class="oti-row-date">' + escapeHtml(dateStr) + '</div>'
+        + '<button class="oti-row-del" data-oti-idx="' + realIdx + '">×</button>'
+        + '</div>';
+    }).join('');
+    list.querySelectorAll('.oti-row-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.otiIdx, 10);
+        const arr = storeGet(OTI_KEY) || [];
+        if (arr[idx]) arr.splice(idx, 1);
+        storeSet(OTI_KEY, arr);
+        renderOnetimeIncome();
+        renderAllNetWorth();
+      });
+    });
+  }
+
+  (function() {
+    const addBtn  = document.getElementById('otiAddBtn');
+    const srcEl   = document.getElementById('otiSource');
+    const amtEl   = document.getElementById('otiAmount');
+    const ccyEl   = document.getElementById('otiCurrency');
+    const destEl  = document.getElementById('otiDestination');
+    const dateEl  = document.getElementById('otiDate');
+    if (!addBtn) return;
+
+    // Default date to today
+    if (dateEl && !dateEl.value) {
+      const now = new Date();
+      dateEl.value = now.getFullYear() + '-'
+        + String(now.getMonth() + 1).padStart(2, '0') + '-'
+        + String(now.getDate()).padStart(2, '0');
+    }
+
+    function doAdd() {
+      const source = (srcEl.value || '').trim();
+      const rawAmt = parseFloat(amtEl.value);
+      const ccy = ccyEl.value || 'USD';
+      const dest = destEl.value || 'cash';
+      const date = dateEl.value || '';
+      if (!source || isNaN(rawAmt) || rawAmt <= 0) { srcEl.focus(); return; }
+      const amtUSD = rawAmt / (exchangeRates[ccy] || 1);
+
+      const entry = {
+        id: Date.now(), source,
+        amount: amtUSD, enteredAmount: rawAmt, enteredCurrency: ccy,
+        destination: dest, date,
+      };
+      const arr = storeGet(OTI_KEY) || [];
+      arr.push(entry);
+      storeSet(OTI_KEY, arr);
+
+      // If destination is a bank account, add to its balance
+      if (dest.startsWith('bank:')) {
+        const accountName = dest.slice(5);
+        const bankItems = storeGet('nw:bank') || [];
+        const found = bankItems.find(b => b.name === accountName);
+        if (found) {
+          found.amount = (Number(found.amount) || 0) + amtUSD;
+          storeSet('nw:bank', bankItems);
+          logActivity('bank', accountName + ' (income: ' + escapeHtml(source) + ')', amtUSD, 'add');
+        }
+        renderAllNetWorth();
+      }
+
+      srcEl.value = '';
+      amtEl.value = '';
+      // Reset date to today
+      const now = new Date();
+      if (dateEl) dateEl.value = now.getFullYear() + '-'
+        + String(now.getMonth() + 1).padStart(2, '0') + '-'
+        + String(now.getDate()).padStart(2, '0');
+
+      renderOnetimeIncome();
+    }
+
+    addBtn.addEventListener('click', doAdd);
+    [srcEl, amtEl].forEach(el => {
+      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+    });
+  })();
+
+  renderOnetimeIncome();
 
   renderEmployment();
 
@@ -4636,7 +4857,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'finance',
-    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'employment_jobs', 'nw_currency', 'nw:activity', 'nw:history'],
+    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'employment_jobs', 'onetime_income', 'nw_currency', 'nw:activity', 'nw:history'],
     syncedPrefixes: ['nw:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
