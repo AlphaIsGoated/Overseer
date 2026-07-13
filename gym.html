@@ -6394,10 +6394,18 @@ Be direct and encouraging. No bullet points in the response.`;
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
             continue;
           }
-          // Merge: additive union of exercises and logs, local wins on conflict
+          // Merge: additive union of exercises, days, gyms, and logs, local wins on conflict
           const exMap = new Map();
           for (const e of (remoteSt.exercises || [])) if (e && e.id) exMap.set(e.id, e);
           for (const e of (localSt.exercises  || [])) if (e && e.id) exMap.set(e.id, e);
+          // Days merged by id so imported plan days are never lost on cross-device sync
+          const daysMap = new Map();
+          for (const d of (remoteSt.days || [])) if (d && d.id) daysMap.set(d.id, d);
+          for (const d of (localSt.days  || [])) if (d && d.id) daysMap.set(d.id, d);
+          // Gyms merged by id so custom gym names survive sync
+          const gymsMap = new Map();
+          for (const g of (remoteSt.gyms || [])) if (g && g.id) gymsMap.set(g.id, g);
+          for (const g of (localSt.gyms  || [])) if (g && g.id) gymsMap.set(g.id, g);
           const mergedLogs = {};
           for (const [exId, logs] of Object.entries(remoteSt.logs || {})) {
             const dateMap = new Map();
@@ -6414,6 +6422,8 @@ Be direct and encouraging. No bullet points in the response.`;
           }
           const merged = { ...remoteSt, ...localSt,
             exercises: Array.from(exMap.values()),
+            days: Array.from(daysMap.values()),
+            gyms: gymsMap.size ? Array.from(gymsMap.values()) : (localSt.gyms || remoteSt.gyms || []),
             logs: mergedLogs };
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
