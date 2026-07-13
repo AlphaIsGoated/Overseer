@@ -163,19 +163,53 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   });
   $('linkUrlInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('linkAdd').click(); });
 
-  // ---- Web Share Target receiver (best-effort — see manifest.json) ----
-  // iOS PWA support for share_target is inconsistent; this only fires
-  // when the OS actually routes a share here. The paste box above is
-  // the reliable path regardless of platform support.
+  // ---- Web Share Target receiver + AI auto-categorize ----
   (function handleSharedParams() {
     const params = new URLSearchParams(location.search);
-    const sharedUrl = params.get('url') || (params.get('text') && /^https?:\/\//i.test(params.get('text')) ? params.get('text') : '');
+    const rawText = params.get('text') || '';
+    const sharedUrl = params.get('url') || (/^https?:\/\//i.test(rawText) ? rawText : '');
     const sharedTitle = params.get('title') || '';
-    if (sharedUrl) {
-      addLink(sharedUrl, sharedTitle, '');
-      $('shareBanner').innerHTML = '<div class="share-banner">Saved from share sheet ✓</div>';
-      history.replaceState(null, '', location.pathname);
-    }
+    if (!sharedUrl) return;
+    history.replaceState(null, '', location.pathname);
+
+    // Save immediately so nothing is lost if the tab closes
+    const id = 'lk_' + Date.now();
+    const items = load();
+    items.push({ id, url: sharedUrl, title: sharedTitle || guessTitle(sharedUrl), category: '', savedAt: Date.now() });
+    save(items);
+    render();
+    $('shareBanner').innerHTML = '<div class="share-banner">Analyzing link…</div>';
+
+    // Ask Claude to categorize and title the link
+    const secret = (window.DASH_APP_SECRET || '');
+    fetch('/api/ai/ai-chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-app-secret': secret },
+      body: JSON.stringify({
+        system: 'You categorize shared links from social apps. Given a URL and optional title, return a category and clean short title. Categories to use: Fitness, Fashion & Style, Food & Recipes, Entertainment, Shopping, Gaming, Art & Design, Travel, Tech, News, Education, Lifestyle. For TikTok/Instagram, infer from the title if provided; otherwise default to Entertainment. For shopping sites (amazon, asos, zara, h&m, nordstrom, shein, etc.) use Shopping or Fashion & Style.',
+        tool: {
+          name: 'classify_link',
+          description: 'Classify a shared URL.',
+          input_schema: { type: 'object', required: ['category', 'title'], properties: {
+            category: { type: 'string', description: 'One of the allowed categories.' },
+            title: { type: 'string', description: 'Clean descriptive title, max 60 chars.' }
+          }}
+        },
+        messages: [{ role: 'user', content: 'URL: ' + sharedUrl + (sharedTitle ? '\nTitle: ' + sharedTitle : '') }]
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      const category = (data && data.category) ? data.category : 'Saved';
+      const title    = (data && data.title)    ? data.title    : sharedTitle || guessTitle(sharedUrl);
+      const all = load();
+      const idx = all.findIndex(x => x.id === id);
+      if (idx !== -1) { all[idx].category = category; all[idx].title = title; save(all); render(); }
+      $('shareBanner').innerHTML = '<div class="share-banner">Saved to <b>' + escapeHtml(category) + '</b> ✓</div>';
+    })
+    .catch(() => {
+      $('shareBanner').innerHTML = '<div class="share-banner">Saved ✓ (couldn\'t auto-categorize)</div>';
+    });
   })();
 
   render();
