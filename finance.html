@@ -2426,7 +2426,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <option value="cash">💵 Cash (no account change)</option>
       </select>
       <input type="date"   id="otiDate"        class="emp-input emp-input-full">
-      <button class="emp-add-btn" id="otiAddBtn" type="button" onclick="if(window.otiDoAdd)window.otiDoAdd()">+ Log Payment</button>
+      <button class="emp-add-btn" id="otiAddBtn" type="button" onclick="window._doOtiAdd&&window._doOtiAdd()">+ Log Payment</button>
     </div>
   </div>
   <div id="otiList" class="card" style="padding:0 16px;display:none"></div>
@@ -4830,17 +4830,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     renderOnetimeIncome();
   }
 
-  window.otiDoAdd = otiDoAdd;
-
-  document.addEventListener('click', function(e) {
-    if (e.target && e.target.closest && e.target.closest('#otiAddBtn')) otiDoAdd();
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && e.target) {
-      const id = e.target.id;
-      if (id === 'otiSource' || id === 'otiAmount') otiDoAdd();
-    }
-  });
+  // Expose render hooks so the standalone script block can trigger re-renders
+  window._finOtiRender  = renderOnetimeIncome;
+  window._finNwRender   = renderAllNetWorth;
+  window._finGetRates   = function() { return exchangeRates; };
 
   // Set default date on the OTI date input
   (function() {
@@ -4857,6 +4850,80 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   renderEmployment();
 
+})();
+</script>
+
+<script>
+// ── One-time income button ── standalone, no async closure needed ──────────
+(function () {
+  function _doOtiAdd() {
+    var src  = document.getElementById('otiSource');
+    var amt  = document.getElementById('otiAmount');
+    var ccy  = document.getElementById('otiCurrency');
+    var dest = document.getElementById('otiDestination');
+    var date = document.getElementById('otiDate');
+    if (!src || !amt) return;
+
+    var source  = (src.value || '').trim();
+    var rawText = (amt.value || '').replace(/[^\d.]/g, '');
+    var rawAmt  = parseFloat(rawText);
+    if (!source || !(rawAmt > 0)) { src.focus(); return; }
+
+    var ccyVal  = ccy  ? (ccy.value  || 'USD') : 'USD';
+    var destVal = dest ? (dest.value || 'cash') : 'cash';
+    var dateVal = date ? (date.value || '') : '';
+
+    // Convert to USD
+    var rates   = (typeof window._finGetRates === 'function') ? window._finGetRates() : { USD:1, CHF:1, EUR:1, GBP:1 };
+    var amtUSD  = rawAmt / (rates[ccyVal] || 1);
+
+    // Save one-time income entry
+    var otiKey = 'onetime_income';
+    var arr = [];
+    try { arr = JSON.parse(localStorage.getItem(otiKey) || '[]'); } catch(e) {}
+    arr.push({ id: Date.now(), source: source, amount: amtUSD, enteredAmount: rawAmt, enteredCurrency: ccyVal, destination: destVal, date: dateVal });
+    localStorage.setItem(otiKey, JSON.stringify(arr));
+
+    // Credit the chosen bank account
+    if (destVal.indexOf('bank:') === 0) {
+      var acctName = destVal.slice(5);
+      var bank = [];
+      try { bank = JSON.parse(localStorage.getItem('nw:bank') || '[]'); } catch(e) {}
+      for (var i = 0; i < bank.length; i++) {
+        if (bank[i].name === acctName) { bank[i].amount = (Number(bank[i].amount) || 0) + amtUSD; break; }
+      }
+      localStorage.setItem('nw:bank', JSON.stringify(bank));
+      if (typeof window._finNwRender === 'function') window._finNwRender();
+    }
+
+    // Clear inputs, reset date to today
+    src.value = ''; amt.value = '';
+    if (date) { var n = new Date(); date.value = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0'); }
+
+    // Re-render OTI list
+    if (typeof window._finOtiRender === 'function') window._finOtiRender();
+  }
+
+  window._doOtiAdd = _doOtiAdd;
+
+  function wire() {
+    var btn = document.getElementById('otiAddBtn');
+    if (btn) {
+      btn.addEventListener('click', _doOtiAdd);
+      btn.addEventListener('touchend', function(e) { e.preventDefault(); _doOtiAdd(); });
+    }
+    // Enter key on source or amount fields
+    ['otiSource','otiAmount'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') _doOtiAdd(); });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();
 </script>
 
