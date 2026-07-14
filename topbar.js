@@ -671,7 +671,7 @@ body.topbar-modal-open {
         'settings:budget_alerted','settings:conservation_mode','settings:model',
         'settings:theme','settings:monthly_budget',
         'google_last_sync','canvas_last_sync','strava_last_sync','whoop_last_sync',
-        'finance_active_tab','po_coach_units_migrated_lb_v1','po_coach_workout_done',
+        'finance_active_tab','po_coach_units_migrated_lb_v1',
         'wish-hero-pct-num','app_secret',
       ]);
       const SKIP_PFX = ['photo_','google_tokens','tpl:','coach_proactive','coach_chat_history','nova_chat_history'];
@@ -722,6 +722,18 @@ body.topbar-modal-open {
             status:o.status, deadline:o.deadline }));
         } else if (k === 'nw:history' && Array.isArray(v)) {
           out[k] = v.slice(-6);
+        } else if (k === 'po_coach_v1' && v && typeof v === 'object') {
+          // Slim the gym state: keep exercises/days/gyms, but restrict logs to
+          // the most recent 60 entries per exercise (enough for trend analysis).
+          const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(); // 60 days
+          const slimLogs = {};
+          if (v.logs && typeof v.logs === 'object') {
+            Object.keys(v.logs).forEach(exId => {
+              const arr = (v.logs[exId] || []).filter(l => l && l.date && l.date >= cutoff);
+              if (arr.length) slimLogs[exId] = arr.slice(-10).map(l => ({ date: l.date.slice(0, 10), sets: l.sets, weight: l.weight, reps: l.reps }));
+            });
+          }
+          out[k] = { exercises: v.exercises, days: v.days, gyms: v.gyms, logs: slimLogs };
         } else if (k === 'po_coach_weights' && Array.isArray(v)) {
           out[k] = v.slice(-20);
         } else if ((k === 'po_coach_photos' || k === 'po_coach_inbody') && v) {
@@ -797,15 +809,29 @@ body.topbar-modal-open {
         "Answer concisely and precisely — one to two sentences, or a tight bullet list. " +
         "Be formal and professional. Build naturally on conversation history. " +
         "If more information is needed, ask one focused question. " +
+        "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
+        "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a date field — any entry dated today or yesterday means that workout IS done. " +
         "Dashboard data as JSON:\n";
     }
     function PROACTIVE_SYS() {
+      let prevBriefing = '';
+      try {
+        const hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+        const prev = hist.slice().reverse().find(function(m) { return m.proactive && m.role === 'coach'; });
+        if (prev) prevBriefing = '\n\nPrevious briefing (do NOT repeat the same points — only escalate, update, or report new issues): ' + prev.text;
+      } catch (e) {}
       return "You are a sophisticated AI system conducting a status sweep of the user's life-tracking dashboard. " +
         "Identify the 1-3 most critical items requiring attention right now: overdue targets, upcoming deadlines, " +
         "missed daily goals, schedule conflicts, anything time-sensitive across fitness/health/finance/marathon/etc. " +
         "Today is " + coachTodayLabel() + ". " +
+        "DATA NOTES — read before generating output: " +
+        "(1) goals:YYYY-MM-DD is [{text,done}]. done=true = ALREADY COMPLETED — never flag completed goals as outstanding. Only flag done=false items. " +
+        "(2) strava_activities_v1 entries have a date field. An entry dated today or yesterday means that workout WAS completed — do not say the user hasn't worked out if a recent entry exists. " +
+        "(3) po_coach_workout_done is {YYYY-MM-DD:true} — presence of today's or yesterday's date means a gym session was logged that day. " +
+        "(4) Undone goals carry over day to day — if you mentioned a pending item in the previous briefing and it is still pending with no change, skip it or give a one-word update; do not re-explain it. " +
         "Report only what actually matters — not a full status dump. If nothing stands out, deliver a concise all-clear. " +
-        "Be direct, formal, and precise. No preamble.";
+        "Be direct, formal, and precise. No preamble." +
+        prevBriefing;
     }
 
     // ── Persistence helpers ──────────────────────────────────────
