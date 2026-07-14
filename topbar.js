@@ -712,7 +712,8 @@ body.topbar-modal-open {
           out[k] = v.slice(-30).map(a => {
             const actDay = a.date ? new Date(a.date.slice(0,10) + 'T00:00:00') : null;
             const daysAgo = actDay ? Math.round((todayMidnight - actDay) / 86400000) : null;
-            return { name:a.name, type:a.type, date:a.date, daysAgo,
+            const when = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : daysAgo != null ? daysAgo + ' days ago' : 'unknown';
+            return { name:a.name, type:a.type, when,
               distanceMi:a.distanceMi,
               durationMin:a.movingSec ? Math.round(a.movingSec/60) : null,
               paceMinPerMi:a.paceSecPerMi ? (a.paceSecPerMi/60).toFixed(2) : null };
@@ -815,7 +816,7 @@ body.topbar-modal-open {
         "Be formal and professional. Build naturally on conversation history. " +
         "If more information is needed, ask one focused question. " +
         "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
-        "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a precomputed daysAgo field (0=today, 1=yesterday) — always use daysAgo to say when an activity happened, never guess from the date string. " +
+        "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
         "Dashboard data as JSON:\n";
     }
     function PROACTIVE_SYS() {
@@ -831,7 +832,7 @@ body.topbar-modal-open {
         "Today is " + coachTodayLabel() + ". " +
         "DATA NOTES — read before generating output: " +
         "(1) goals:YYYY-MM-DD is [{text,done}]. done=true = ALREADY COMPLETED — never flag completed goals as outstanding. Only flag done=false items. " +
-        "(2) strava_activities_v1 entries each have a precomputed daysAgo field (0=today, 1=yesterday, 2=2 days ago, etc.). ALWAYS use daysAgo to describe when an activity happened — never say 'yesterday' for daysAgo=2 or higher. Use the exact date or 'N days ago' phrasing. " +
+        "(2) strava_activities_v1 entries have a precomputed 'when' string ('today', 'yesterday', '2 days ago', etc.). Use it verbatim — the raw date is NOT included so do not attempt to recompute timing from any other field. " +
         "(3) po_coach_workout_done is {YYYY-MM-DD:true} — presence of today's or yesterday's date means a gym session was logged that day. " +
         "(4) Undone goals carry over day to day — if you mentioned a pending item in the previous briefing and it is still pending with no change, skip it or give a one-word update; do not re-explain it. " +
         "Report only what actually matters — not a full status dump. If nothing stands out, deliver a concise all-clear. " +
