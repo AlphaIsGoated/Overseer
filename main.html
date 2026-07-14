@@ -1143,7 +1143,6 @@ body::after {
     del.textContent = '×';
     del.addEventListener('click', () => {
       const list = getGoals(key);
-      if (idx < 0 || idx >= list.length) return;
       list.splice(idx, 1);
       setGoals(key, list);
       reload();
@@ -1406,33 +1405,33 @@ body::after {
   window.addEventListener('storage', () => {
     loadToday(); loadTomorrow(); renderStreak();
   });
-})();
-</script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  if (typeof initCloudSync !== 'function') return;
-  initCloudSync({
-    appKey: 'goals',
-    syncedPrefixes: ['goals:'],
-    onApplied: function () {
-      // Only re-run rollover if sync actually restored past-date keys.
-      // Calling rollover unconditionally caused a delete-wipes-all bug:
-      // the 30s poll fires right after a delete (before the push reaches
-      // the server), applyRemote restores the pre-delete server state,
-      // then rollover() runs on top of that restored state.
-      const todayStr = getActiveDateString();
-      const hasPastKeys = storeListKeys('goals:').some(function (k) {
-        const d = k.slice('goals:'.length);
-        return /^\d{4}-\d{2}-\d{2}$/.test(d) && d < todayStr;
-      });
-      if (hasPastKeys) rollover();
-      processStreak();
-      window.dispatchEvent(new CustomEvent('goals-changed'));
-      window.dispatchEvent(new Event('storage'));
-    }
-  });
-});
+  // Cloud sync — must live inside this IIFE so onApplied can call
+  // getActiveDateString, storeListKeys, rollover, processStreak etc.
+  if (typeof initCloudSync === 'function') {
+    initCloudSync({
+      appKey: 'goals',
+      syncedPrefixes: ['goals:'],
+      onApplied: function () {
+        // applyRemote does a full replace: it deletes any local key that
+        // isn't in the server snapshot. If the server only knows about
+        // yesterday's key (rollover ran locally but hasn't pushed yet),
+        // applyRemote silently removes goals:today. Re-run rollover to
+        // carry those past-day items back into today, then push.
+        const todayStr = getActiveDateString();
+        const hasPastKeys = storeListKeys('goals:').some(function (k) {
+          const d = k.slice('goals:'.length);
+          return /^\d{4}-\d{2}-\d{2}$/.test(d) && d < todayStr;
+        });
+        if (hasPastKeys) rollover();
+        processStreak();
+        loadToday();
+        loadTomorrow();
+        renderStreak();
+      }
+    });
+  }
+})();
 </script>
 </body>
 </html>
