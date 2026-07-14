@@ -809,6 +809,7 @@ body::after {
     const todayK = 'goals:' + todayDateStr;
     let today = getGoals(todayK);
     const texts = new Set(today.map(g => g.text));
+    let changed = false;
 
     storeListKeys('goals:').forEach(k => {
       const dateStr = k.slice('goals:'.length);
@@ -819,11 +820,17 @@ body::after {
         if (!g.done && g.text && !texts.has(g.text)) {
           today.push({ text: g.text, done: false });
           texts.add(g.text);
+          changed = true;
         }
       });
       storeDelete(k);
     });
-    setGoals(todayK, today);
+    // Only persist if we actually added carried-over goals. Calling setGoals
+    // unconditionally was safe at boot but dangerous when rollover is called
+    // from onApplied — if applyRemote had just wiped today's key (server had
+    // an old date key), today would be [] with no past keys, and an
+    // unconditional save would overwrite the user's goals with an empty list.
+    if (changed) setGoals(todayK, today);
   }
 
   // ---------- streak ----------
