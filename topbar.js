@@ -1115,6 +1115,23 @@ body.topbar-modal-open {
         });
       }
     }
+
+    // Sync coach history + today's proactive flag to the cloud so they survive
+    // cache clears, PWA evictions, and cross-device opens. Without this, every
+    // fresh localStorage causes an empty panel and forces a manual status sweep.
+    if (window.initCloudSync) {
+      window.initCloudSync({
+        appKey: 'coach',
+        syncedKeys: ['coach_chat_history'],
+        syncedPrefixes: ['coach_proactive_'],
+        onApplied: function () {
+          if (!historyLoaded) return; // panel not open yet — fresh open will read from updated localStorage
+          // Panel is already open: wipe and reload so server-restored history is visible
+          feed.innerHTML = '';
+          loadChatHistory();
+        }
+      });
+    }
   }
 
   // -------- Boot --------
