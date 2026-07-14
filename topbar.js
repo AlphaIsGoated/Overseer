@@ -1116,21 +1116,32 @@ body.topbar-modal-open {
       }
     }
 
-    // Sync coach history + today's proactive flag to the cloud so they survive
-    // cache clears, PWA evictions, and cross-device opens. Without this, every
-    // fresh localStorage causes an empty panel and forces a manual status sweep.
+    // Sync coach conversation history to the cloud so it survives cache clears
+    // and cross-device opens. coach_proactive_* keys are intentionally NOT synced —
+    // they are ephemeral per-day flags that must be local-only so that:
+    //   a) a fresh session always re-runs the scan with the current prompt code, and
+    //   b) build upgrades that fix the scan can take effect the same day.
+    //
+    // onApplied is intentionally a no-op. applyRemote() could fire at ANY time
+    // (30 s poll or slow init fetch) and overwrites localStorage with server state.
+    // If we then cleared feed.innerHTML, any message the user was typing or had just
+    // sent would vanish — the feed wipe was exactly what caused "deleting
+    // conversations as I enter a question". The init() pre-populates localStorage
+    // before the user can open the panel, so history is always current on open.
     if (window.initCloudSync) {
       window.initCloudSync({
         appKey: 'coach',
         syncedKeys: ['coach_chat_history'],
-        syncedPrefixes: ['coach_proactive_'],
-        onApplied: function () {
-          if (!historyLoaded) return; // panel not open yet — fresh open will read from updated localStorage
-          // Panel is already open: wipe and reload so server-restored history is visible
-          feed.innerHTML = '';
-          loadChatHistory();
-        }
       });
+    }
+
+    // Clear today's proactive scan flag whenever the prompt build version changes.
+    // This ensures bug fixes to the scan (e.g. strava date wording) take effect
+    // the same day rather than waiting until midnight for a new proactive key.
+    const COACH_PROMPT_BUILD = '2026-07-14-v3';
+    if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
+      try { localStorage.removeItem(proactiveDayKey()); } catch (e) {}
+      try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) {}
     }
   }
 
