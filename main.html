@@ -1143,6 +1143,7 @@ body::after {
     del.textContent = '×';
     del.addEventListener('click', () => {
       const list = getGoals(key);
+      if (idx < 0 || idx >= list.length) return;
       list.splice(idx, 1);
       setGoals(key, list);
       reload();
@@ -1415,10 +1416,17 @@ document.addEventListener('DOMContentLoaded', function () {
     appKey: 'goals',
     syncedPrefixes: ['goals:'],
     onApplied: function () {
-      // Sync may have restored old goals:YYYY-MM-DD keys from another device,
-      // undoing the rollover that ran at boot. Re-run rollover so any past-day
-      // keys get carried forward and archived with the now-correct server data.
-      rollover();
+      // Only re-run rollover if sync actually restored past-date keys.
+      // Calling rollover unconditionally caused a delete-wipes-all bug:
+      // the 30s poll fires right after a delete (before the push reaches
+      // the server), applyRemote restores the pre-delete server state,
+      // then rollover() runs on top of that restored state.
+      const todayStr = getActiveDateString();
+      const hasPastKeys = storeListKeys('goals:').some(function (k) {
+        const d = k.slice('goals:'.length);
+        return /^\d{4}-\d{2}-\d{2}$/.test(d) && d < todayStr;
+      });
+      if (hasPastKeys) rollover();
       processStreak();
       window.dispatchEvent(new CustomEvent('goals-changed'));
       window.dispatchEvent(new Event('storage'));
