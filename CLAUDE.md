@@ -71,6 +71,13 @@ These are ephemeral per-day keys (`coach_proactive_YYYY-MM-DD = "1"`) that recor
 ### 7. COACH_PROMPT_BUILD version key
 When the coach scan prompt or `dashboardData()` formatting changes, bump the constant `COACH_PROMPT_BUILD` in `topbar.js`. On page load, `initCoach()` compares `localStorage.getItem('coach_prompt_build')` to this constant. If they differ, today's proactive key is cleared and the scan re-runs with the new code. Without this, users see the old (wrong) cached scan until the next calendar day.
 
+### 8. Never share an appKey between pages that sync different key sets
+`sync.js` `pushNow()` sends the **complete** `collect()` snapshot for a given `initCloudSync` instance — not just changed keys. If page A syncs `{stack:items, po_water_v1}` under `appKey: 'health'`, and page B syncs only `{po_water_v1}` under the same `appKey: 'health'`, then a push from page B sends `{po_water_v1: ...}` to the server — overwriting the entire `health` row and deleting `stack:items` from the server. The next `applyRemote` on page A then removes `stack:items` from localStorage.
+
+**Rule:** Each `appKey` must be owned by one logical domain. If two pages need to sync overlapping but non-identical key sets, give each domain its own `appKey`. See the appKey registry table in the Project Map.
+
+**Fixed in:** `po-water.html`, `index.html`, `health.html` — previously all shared `appKey: 'health'`. `po_water_v1` moved to `appKey: 'profile'`.
+
 ---
 
 ## Project Map
@@ -93,18 +100,42 @@ When the coach scan prompt or `dashboardData()` formatting changes, bump the con
 
 **localStorage key namespaces** (important for sync scoping):
 
-| Prefix | Module | Synced? |
-|--------|--------|---------|
-| `goals:YYYY-MM-DD` | Goals | Yes (`main.html` sync, prefix `goals:`) |
-| `goals_history_v1` | Goals | No (local archive only) |
-| `coach_chat_history` | Coach | Yes (`topbar.js` coach sync, key exact) |
-| `coach_proactive_YYYY-MM-DD` | Coach | **No** — must never be synced |
-| `coach_prompt_build` | Coach | No |
-| `apiusage:log` | Usage | Yes (`topbar.js` apiusage sync) |
-| `strava_activities_v1` | Strava | No (pulled fresh by integration) |
-| `po_coach_v1` | Workout Coach | No |
-| `po_coach_workout_done` | Workout | No |
-| `savedlinks:items` | Saved Links | Yes (`saved-links.html` sync) |
+| Prefix | Module | Synced? | appKey |
+|--------|--------|---------|--------|
+| `goals:YYYY-MM-DD` | Goals | Yes (prefix `goals:`) | `goals` |
+| `goals_history_v1` | Goals | No (local archive only) | — |
+| `coach_chat_history` | Coach | Yes (exact key) | `coach` |
+| `coach_proactive_YYYY-MM-DD` | Coach | **No** — must never be synced | — |
+| `coach_prompt_build` | Coach | No | — |
+| `apiusage:log` | Usage | Yes (exact key) | `apiusage` |
+| `strava_activities_v1` | Strava | No (pulled fresh by integration) | — |
+| `po_coach_v1` | Workout Coach | No | — |
+| `po_coach_workout_done` | Workout | No | — |
+| `savedlinks:items` | Saved Links | Yes (exact key) | `savedlinks` |
+| `stack:items`, `stack:version`, `stack:low`, `stack:taken:*` | Supplements | Yes (keys + prefix) | `health` |
+| `po_water_v1` | Profile / Water | Yes (exact key) | `profile` |
+| `subs`, `wishlist`, `nw:*` etc. | Finance | Yes | `finance` |
+| `caf:logs`, `caf:custom` | Caffeine | Yes | `caffeine` |
+
+**appKey registry** — each appKey must be unique to its data domain. Never share an appKey between two pages that sync different sets of keys (Invariant §8).
+
+| appKey | Owner pages | Keys synced |
+|--------|-------------|-------------|
+| `goals` | `main.html` | prefix `goals:` |
+| `coach` | `topbar.js` (all pages) | `coach_chat_history` |
+| `apiusage` | `topbar.js` (all pages) | `apiusage:log` |
+| `health` | `health.html` | `stack:items`, `stack:version`, `stack:low`, prefix `stack:taken:` |
+| `profile` | `health.html`, `index.html`, `po-water.html` | `po_water_v1` |
+| `finance` | `finance.html` | `subs`, `wishlist`, `nw:*`, etc. |
+| `savedlinks` | `saved-links.html` | `savedlinks:items` |
+| `caffeine` | `caffeine.html` | `caf:logs`, `caf:custom` |
+| `marathon` | `marathon.html` | `PLAN_KEY` |
+| `nutrition` | `nutrition.html` | store key |
+| `notes` | `notes.html` | store key, cat key |
+| `shopping` | `shopping.html` | purchase key |
+| `personalcare` | `personal-care.html` | store key |
+| `skincare` | `skincare.html` | store key |
+| `chores` | `chores.html` | store key |
 
 ---
 
@@ -204,5 +235,35 @@ Check `dashboardData()` in `topbar.js`, the `strava_activities_v1` branch. The e
 ### "Clicking a button does nothing (finance/other page)"
 Check if the handler function is defined inside an IIFE but called via `onclick` attribute or `addEventListener` from outside. Handlers wired via `onclick` attributes or global calls need to be exposed on `window`. See the OTI Log Payment bug history in `finance.html` changelog.
 
+### "Supplement stack data disappeared (stack:items, stack:taken:*)"
+A page that only knows about `po_water_v1` pushed to the `health` server row, overwriting it with just `{po_water_v1: ...}`. On next `applyRemote` in health.html, stack keys weren't in the server snapshot → deleted locally. See Invariant §8. Fixed: `po_water_v1` now lives under `appKey: 'profile'`, stack data under `appKey: 'health'`.
+
+### "Two pages syncing the same appKey are overwriting each other's data"
+See Invariant §8. Check the appKey registry table in the Project Map. Each appKey must own a non-overlapping set of keys.
+
 ### "Data pushed to wrong server row / sync conflict between pages"
-Each `initCloudSync` call must have a unique `appKey`. Check that no two pages use the same `appKey`. Current keys in use: `goals`, `coach`, `apiusage`, `savedlinks` (check each page's `initCloudSync` call).
+Each `initCloudSync` call must use an appKey from the registry in the Project Map. If adding a new sync, add a new row to the registry first and verify no existing page uses the same appKey with different keys.
+
+---
+
+### `health.html` — Supplements
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-14 | *(this session)* | Removed `po_water_v1` from `appKey: 'health'` syncedKeys. Added separate `initCloudSync({appKey: 'profile', syncedKeys: ['po_water_v1']})`. Prevents index.html/po-water.html pushes from wiping supplement stack data on the server. | If any future page needs to sync po_water_v1, it must use `appKey: 'profile'`, not `appKey: 'health'`. |
+
+---
+
+### `index.html` — Home / Bento Grid
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-14 | *(this session)* | Changed sync from `appKey: 'health'` to `appKey: 'profile'` for po_water_v1. Prevents profile saves from overwriting the supplement stack on the server. | — |
+
+---
+
+### `po-water.html` — Water Tracker
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-14 | *(this session)* | Changed sync from `appKey: 'health'` to `appKey: 'profile'` for po_water_v1. Same fix as index.html. | — |

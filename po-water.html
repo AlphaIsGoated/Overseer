@@ -1264,12 +1264,13 @@ html, body {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // When embedded in health.html, the parent owns sync for the 'health'
-  // row — running our own sync here would race and wipe sibling keys.
+  // When embedded in health.html, the parent owns sync — skip to avoid racing.
   try { if (window.self !== window.top) return; } catch (e) { return; }
   if (typeof initCloudSync !== 'function') return;
+  // Use 'profile' appKey (not 'health') so pushing po_water_v1 here cannot
+  // overwrite the supplement stack data that health.html stores under 'health'.
   initCloudSync({
-    appKey: 'health',
+    appKey: 'profile',
     syncedKeys: ['po_water_v1'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));

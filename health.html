@@ -1471,10 +1471,23 @@ main {
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
+  // Stack supplement data — separate from profile so a push from
+  // index.html or po-water.html (which only know about po_water_v1)
+  // cannot overwrite this row and wipe supplement data.
   initCloudSync({
     appKey: 'health',
-    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'po_water_v1'],
+    syncedKeys: ['stack:items', 'stack:version', 'stack:low'],
     syncedPrefixes: ['stack:taken:'],
+    onApplied: function () {
+      window.dispatchEvent(new Event('storage'));
+    }
+  });
+  // Profile data (weight, height, birthday, etc.) in its own row so
+  // po-water.html and index.html can push updates without touching the
+  // supplement stack keys above.
+  initCloudSync({
+    appKey: 'profile',
+    syncedKeys: ['po_water_v1'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
     }

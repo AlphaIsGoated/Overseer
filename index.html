@@ -1555,12 +1555,10 @@ body::after {
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
-  // Mirrors the same 'health'/po_water_v1 row that health.html and
-  // po-water.html sync, so profile edits made here (weight/height/
-  // birthday/sex/activity) reach every device and every module that
-  // reads that profile, instead of staying local-only.
+  // Profile data lives in its own 'profile' row so pushing po_water_v1
+  // here never touches the 'health' row that stores supplement stack data.
   initCloudSync({
-    appKey: 'health',
+    appKey: 'profile',
     syncedKeys: ['po_water_v1'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
