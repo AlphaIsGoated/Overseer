@@ -793,11 +793,14 @@ body::after {
     if (!goals || !goals.length) return;
     let hist; try { hist = storeGet(HIST_KEY) || []; } catch { hist = []; }
     if (!Array.isArray(hist)) hist = [];
-    if (!hist.find(h => h.date === dateStr)) {
+    const idx = hist.findIndex(h => h.date === dateStr);
+    if (idx !== -1) {
+      hist[idx] = { date: dateStr, goals };
+    } else {
       hist.unshift({ date: dateStr, goals });
       if (hist.length > 90) hist.length = 90;
-      storeSet(HIST_KEY, hist);
     }
+    storeSet(HIST_KEY, hist);
   }
 
   // ---------- rollover: pull undone older goals into today ----------
@@ -1405,6 +1408,11 @@ document.addEventListener('DOMContentLoaded', function () {
     appKey: 'goals',
     syncedPrefixes: ['goals:'],
     onApplied: function () {
+      // Sync may have restored old goals:YYYY-MM-DD keys from another device,
+      // undoing the rollover that ran at boot. Re-run rollover so any past-day
+      // keys get carried forward and archived with the now-correct server data.
+      rollover();
+      processStreak();
       window.dispatchEvent(new CustomEvent('goals-changed'));
       window.dispatchEvent(new Event('storage'));
     }
