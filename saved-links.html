@@ -56,6 +56,16 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
 .share-banner { padding: 10px 14px; border-radius: 10px; background: rgba(107,227,164,0.1); border: 1px solid rgba(107,227,164,0.3); color: var(--success); font-size: 12.5px; font-weight: 600; margin-bottom: 14px; }
 
+.shortcut-card { margin-top: 14px; }
+.shortcut-steps { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.shortcut-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
+.shortcut-steps .step-num { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-tertiary); margin-top: 1px; }
+.shortcut-url { font-size: 11px; font-family: ui-monospace, monospace; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 10px; word-break: break-all; color: var(--text-primary); margin: 6px 0 0; display: block; }
+.shortcut-copy { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 7px 13px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; font-family: inherit; }
+.shortcut-copy:active { background: rgba(255,255,255,0.1); }
+.shortcut-copy.copied { color: var(--success); border-color: rgba(107,227,164,0.3); }
+.shortcut-note { font-size: 11px; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; }
+
 @media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
 </style>
 </head>
@@ -81,7 +91,23 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       <datalist id="linkCatOptions"></datalist>
       <button class="gm-add" id="linkAdd" type="button">Save</button>
     </div>
-    <div class="link-hint">On iPhone: share a link to this app from the share sheet (if it shows up — iOS PWA share support is inconsistent) or just paste it above.</div>
+    <div class="link-hint">Paste any link above, or use the iOS Shortcut below to share directly from TikTok, Instagram, Safari, etc.</div>
+  </div>
+
+  <div class="gm-card shortcut-card">
+    <div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:2px">Share from iOS — one-time setup</div>
+    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:0">iOS doesn't support Web Share Target, so install this Shortcut instead — it adds Overseer to every app's share sheet.</div>
+    <ol class="shortcut-steps">
+      <li><span class="step-num">1</span><span>Open the <b>Shortcuts</b> app → tap <b>+</b> to create a new shortcut.</span></li>
+      <li><span class="step-num">2</span><span>Tap <b>Add Action</b> → search <b>"URL"</b> → select the <b>URL</b> action. Paste this into the URL field:<br>
+        <code id="shortcutUrl" class="shortcut-url"></code>
+        <button class="shortcut-copy" id="copyUrlBtn" type="button">Copy URL</button>
+      </span></li>
+      <li><span class="step-num">3</span><span>Tap <b>+</b> → search <b>"Open URLs"</b> → add it. It will automatically use the URL from step 2.</span></li>
+      <li><span class="step-num">4</span><span>Tap the shortcut name at the top → rename it <b>Save to Overseer</b>.</span></li>
+      <li><span class="step-num">5</span><span>Tap <b>···</b> (top right) → enable <b>"Show in Share Sheet"</b> → done.</span></li>
+    </ol>
+    <div class="shortcut-note">Now when you're on a TikTok, Instagram post, or any link — tap Share → <b>Save to Overseer</b>. It opens Overseer with the link pre-filled and Claude auto-categorizes it.</div>
   </div>
 
   <div id="linksByCategory" style="margin-top:18px"></div>
@@ -216,6 +242,21 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'savedlinks', syncedKeys: [STORE_KEY], onApplied: render });
+  }
+
+  // iOS Shortcut setup card
+  const shortcutUrlEl = document.getElementById('shortcutUrl');
+  const copyBtn = document.getElementById('copyUrlBtn');
+  if (shortcutUrlEl) {
+    const savedLinksUrl = window.location.origin + '/saved-links.html';
+    shortcutUrlEl.textContent = savedLinksUrl;
+    copyBtn.addEventListener('click', function () {
+      navigator.clipboard.writeText(savedLinksUrl).then(function () {
+        copyBtn.textContent = 'Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(function () { copyBtn.textContent = 'Copy URL'; copyBtn.classList.remove('copied'); }, 2000);
+      });
+    });
   }
 })();
 </script>
