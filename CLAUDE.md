@@ -205,6 +205,8 @@ Entries are newest-first within each section. Add a new entry at the **top** of 
 
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
+| 2026-07-15 | *(this session)* | Fixed sync race condition: moved `initCloudSync` to before `handleSharedParams` so setItem patch is active when the share is saved. Added `pendingSharedLink` — `onApplied` re-inserts the link if `applyRemote` REPLACE-ALL wiped it before the push fired. Claude response handler also re-adds if not found by ID. Fixed Shortcut setup card steps (Text + Open URLs, `?url=` in copy URL). | If `pendingSharedLink` is not cleared (fetch never resolves), `onApplied` will re-insert on every 30s poll. Both `.then` and `.catch` clear it to prevent this. |
+| 2026-07-14 | `36dda8b` | Added iOS Shortcut setup card. | — |
 | 2026-07-14 | `164962a` | Added AI auto-categorize on share sheet receive. | Requires `/api/ai/ai-chat`. If Claude returns unexpected JSON shape, category defaults to `'Saved'`. |
 
 ---

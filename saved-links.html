@@ -98,16 +98,16 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     <div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:2px">Share from iOS — one-time setup</div>
     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:0">iOS doesn't support Web Share Target, so install this Shortcut instead — it adds Overseer to every app's share sheet.</div>
     <ol class="shortcut-steps">
-      <li><span class="step-num">1</span><span>Open the <b>Shortcuts</b> app → tap <b>+</b> to create a new shortcut.</span></li>
-      <li><span class="step-num">2</span><span>Tap <b>Add Action</b> → search <b>"URL"</b> → select the <b>URL</b> action. Paste this into the URL field:<br>
+      <li><span class="step-num">1</span><span>Open the <b>Shortcuts</b> app → tap <b>+</b> (top right) → tap the title to rename it <b>Save to Overseer</b>.</span></li>
+      <li><span class="step-num">2</span><span>Tap <b>Add Action</b> → search <b>Text</b> → select the <b>Text</b> action.</span></li>
+      <li><span class="step-num">3</span><span>In the Text field, paste this URL exactly:<br>
         <code id="shortcutUrl" class="shortcut-url"></code>
         <button class="shortcut-copy" id="copyUrlBtn" type="button">Copy URL</button>
-      </span></li>
-      <li><span class="step-num">3</span><span>Tap <b>+</b> → search <b>"Open URLs"</b> → add it. It will automatically use the URL from step 2.</span></li>
-      <li><span class="step-num">4</span><span>Tap the shortcut name at the top → rename it <b>Save to Overseer</b>.</span></li>
-      <li><span class="step-num">5</span><span>Tap <b>···</b> (top right) → enable <b>"Show in Share Sheet"</b> → done.</span></li>
+        Then tap the <b>variable button</b> (small icon in the bar above your keyboard) → select <b>Shortcut Input</b>. The field should end with a blue <b>[Shortcut Input]</b> pill.</span></li>
+      <li><span class="step-num">4</span><span>Tap <b>+</b> below the Text action → search <b>Open URLs</b> → add it. It auto-connects to the Text above.</span></li>
+      <li><span class="step-num">5</span><span>Tap the <b>ⓘ</b> icon (bottom toolbar) → enable <b>Show in Share Sheet</b> → set Receive Input to include <b>URLs</b> → tap Done.</span></li>
     </ol>
-    <div class="shortcut-note">Now when you're on a TikTok, Instagram post, or any link — tap Share → <b>Save to Overseer</b>. It opens Overseer with the link pre-filled and Claude auto-categorizes it.</div>
+    <div class="shortcut-note">Now when you're on a TikTok, Instagram reel, or any link — tap Share → <b>Save to Overseer</b>. Overseer opens, saves the link instantly, and Claude auto-categorizes it in the background.</div>
   </div>
 
   <div id="linksByCategory" style="margin-top:18px"></div>
@@ -189,6 +189,29 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   });
   $('linkUrlInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('linkAdd').click(); });
 
+  // Tracks a shared link that is in-flight (saved locally but not yet confirmed on server).
+  // onApplied re-inserts it if applyRemote's REPLACE-ALL wiped it before the push fired.
+  let pendingSharedLink = null;
+
+  // initCloudSync MUST come before handleSharedParams so the setItem patch is in place
+  // when handleSharedParams calls save(), scheduling an immediate push to the server.
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'savedlinks',
+      syncedKeys: [STORE_KEY],
+      onApplied: function () {
+        if (pendingSharedLink) {
+          const items = load();
+          if (!items.find(function (x) { return x.id === pendingSharedLink.id; })) {
+            items.push(pendingSharedLink);
+            save(items);
+          }
+        }
+        render();
+      }
+    });
+  }
+
   // ---- Web Share Target receiver + AI auto-categorize ----
   (function handleSharedParams() {
     const params = new URLSearchParams(location.search);
@@ -198,15 +221,15 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     if (!sharedUrl) return;
     history.replaceState(null, '', location.pathname);
 
-    // Save immediately so nothing is lost if the tab closes
     const id = 'lk_' + Date.now();
+    pendingSharedLink = { id, url: sharedUrl, title: sharedTitle || guessTitle(sharedUrl), category: '', savedAt: Date.now() };
+
     const items = load();
-    items.push({ id, url: sharedUrl, title: sharedTitle || guessTitle(sharedUrl), category: '', savedAt: Date.now() });
+    items.push(pendingSharedLink);
     save(items);
     render();
     $('shareBanner').innerHTML = '<div class="share-banner">Analyzing link…</div>';
 
-    // Ask Claude to categorize and title the link
     const secret = (window.DASH_APP_SECRET || '');
     fetch('/api/ai/ai-chat', {
       method: 'POST',
@@ -224,31 +247,42 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         messages: [{ role: 'user', content: 'URL: ' + sharedUrl + (sharedTitle ? '\nTitle: ' + sharedTitle : '') }]
       })
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
       const category = (data && data.category) ? data.category : 'Saved';
       const title    = (data && data.title)    ? data.title    : sharedTitle || guessTitle(sharedUrl);
+      // Update pendingSharedLink with final values in case onApplied fires after this
+      if (pendingSharedLink && pendingSharedLink.id === id) {
+        pendingSharedLink = { id, url: sharedUrl, title, category, savedAt: pendingSharedLink.savedAt };
+      }
       const all = load();
-      const idx = all.findIndex(x => x.id === id);
-      if (idx !== -1) { all[idx].category = category; all[idx].title = title; save(all); render(); }
+      const idx = all.findIndex(function (x) { return x.id === id; });
+      if (idx !== -1) {
+        all[idx].category = category;
+        all[idx].title = title;
+        save(all);
+      } else {
+        // applyRemote wiped the link before Claude responded — re-add it with the category
+        all.push({ id, url: sharedUrl, title, category, savedAt: Date.now() });
+        save(all);
+      }
+      pendingSharedLink = null;
+      render();
       $('shareBanner').innerHTML = '<div class="share-banner">Saved to <b>' + escapeHtml(category) + '</b> ✓</div>';
     })
-    .catch(() => {
+    .catch(function () {
+      pendingSharedLink = null;
       $('shareBanner').innerHTML = '<div class="share-banner">Saved ✓ (couldn\'t auto-categorize)</div>';
     });
   })();
 
   render();
 
-  if (window.initCloudSync) {
-    window.initCloudSync({ appKey: 'savedlinks', syncedKeys: [STORE_KEY], onApplied: render });
-  }
-
-  // iOS Shortcut setup card
+  // iOS Shortcut setup card — URL includes ?url= so user pastes it into the Text action
   const shortcutUrlEl = document.getElementById('shortcutUrl');
   const copyBtn = document.getElementById('copyUrlBtn');
   if (shortcutUrlEl) {
-    const savedLinksUrl = window.location.origin + '/saved-links.html';
+    const savedLinksUrl = window.location.origin + '/saved-links.html?url=';
     shortcutUrlEl.textContent = savedLinksUrl;
     copyBtn.addEventListener('click', function () {
       navigator.clipboard.writeText(savedLinksUrl).then(function () {
