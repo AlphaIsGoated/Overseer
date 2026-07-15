@@ -231,6 +231,15 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     $('shareBanner').innerHTML = '<div class="share-banner">Analyzing link…</div>';
 
     const secret = (window.DASH_APP_SECRET || '');
+
+    // Push immediately to server with keepalive so iOS can't kill it before it completes.
+    // sync.js debounce + iOS background throttling means the debounced push often never fires.
+    fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+      body: JSON.stringify({ key: 'savedlinks', data: { 'savedlinks:items': items } }),
+      keepalive: true
+    }).catch(function () {});
     fetch('/api/ai/ai-chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-app-secret': secret },
@@ -266,6 +275,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         all.push({ id, url: sharedUrl, title, category, savedAt: Date.now() });
         save(all);
       }
+      // Push categorized result immediately so other devices get the category too
+      fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+        body: JSON.stringify({ key: 'savedlinks', data: { 'savedlinks:items': load() } }),
+        keepalive: true
+      }).catch(function () {});
       pendingSharedLink = null;
       render();
       $('shareBanner').innerHTML = '<div class="share-banner">Saved to <b>' + escapeHtml(category) + '</b> ✓</div>';
