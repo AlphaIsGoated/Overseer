@@ -191,7 +191,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
       arr.push({ role, text, ts: Date.now() });
       if (arr.length > NOVA_MAX_SAVED) arr.splice(0, arr.length - NOVA_MAX_SAVED);
       localStorage.setItem(NOVA_HIST_KEY, JSON.stringify(arr));
-    } catch (e) {}
+    } catch (e) { console.warn('[Nova] novaPersist failed', e); }
   }
 
   function addUser(t, save){
@@ -304,7 +304,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
     unlockAudio();
     voiceOn = !voiceOn;
     voiceToggle.classList.toggle('on', voiceOn);
-    try { localStorage.setItem('nova_voice_on', voiceOn ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('nova_voice_on', voiceOn ? '1' : '0'); } catch (e) { console.warn('[Nova] voice_on save failed', e); }
     if (voiceOn) {
       // Immediately re-speak the last Nova reply so voice feels instant.
       const msgs = feed.querySelectorAll('.msg.coach .bubble div');

@@ -256,7 +256,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         saveAccounts(accounts);
         return updated;
       }
-    } catch(e) {}
+    } catch(e) { console.warn('[Calendar] Google token refresh failed', e); }
     return null;
   }
 

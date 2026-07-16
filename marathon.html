@@ -445,7 +445,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   function loadJSON(k, f) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch (e) { return f; } }
-  function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn('[Marathon] saveJSON failed for', k, e); } }
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function dateKey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function parseKey(k) { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); }
@@ -692,7 +692,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         const next = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: (j.expires_at ? j.expires_at * 1000 : Date.now() + 21600e3) };
         saveJSON(STRAVA_KEY, next); return next;
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[Marathon] Strava token refresh failed', e); }
     return null;
   }
   async function stravaFetch(path, t) {

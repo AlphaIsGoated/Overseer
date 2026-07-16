@@ -2574,7 +2574,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     catch (e) { return null; }
   }
   function storeSet(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn('[Finance] storeSet failed for', key, e); }
   }
 
   // ============================================================
@@ -2594,7 +2594,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       const res = await fetch('https://open.er-api.com/v6/latest/CHF');
       const data = await res.json();
       if (data && data.rates && data.rates.USD) k = data.rates.USD;
-    } catch (e) {}
+    } catch (e) { console.warn('[Finance] CHF→USD rate fetch failed, will retry on next load', e); }
     if (!k) return;
     ['nw:bank', 'nw:stocks', 'nw:crypto', 'nw:other'].forEach(key => {
       const items = storeGet(key);
@@ -2701,7 +2701,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         renderAllNetWorth();
         if (typeof renderSubs === 'function') renderSubs();
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[Finance] exchange rate fetch failed, using defaults', e); }
   }
   loadExchangeRates();
 

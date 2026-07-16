@@ -731,12 +731,12 @@ body::after {
   const WAKE_HOUR  = 8;
   const SLEEP_HOUR = 24;
 
-  // ---------- storage helpers ----------
+  // ===== STORAGE HELPERS =====
   function storeGet(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
   }
   function storeSet(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn('[Goals] localStorage.setItem failed for', key, e); }
     if (typeof key === 'string' && key.indexOf('goals:') === 0) {
       window.dispatchEvent(new CustomEvent('goals-changed'));
       // Push immediately with keepalive so a sync.js poll arriving within the
@@ -755,11 +755,11 @@ body::after {
           headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
           body: JSON.stringify({ key: 'goals', data: data }),
           keepalive: true
-        }).catch(function () {});
+        }).catch(function (e) { console.warn('[Goals] immediate push failed', e); });
       })();
     }
   }
-  function storeDelete(key) { try { localStorage.removeItem(key); } catch (e) {} }
+  function storeDelete(key) { try { localStorage.removeItem(key); } catch (e) { console.warn('[Goals] localStorage.removeItem failed for', key, e); } }
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function storeListKeys(prefix) {
     const out = [];
@@ -770,7 +770,7 @@ body::after {
     return out;
   }
 
-  // ---------- date helpers ----------
+  // ===== DATE HELPERS =====
   function pad2(n) { return String(n).padStart(2, '0'); }
   function dateToKey(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function getActiveDateString() {
@@ -805,7 +805,7 @@ body::after {
   }
   function setGoals(key, list) { storeSet(key, list); }
 
-  // ---------- history ----------
+  // ===== GOAL HISTORY =====
   const HIST_KEY = 'goals_history_v1';
   function saveToHistory(dateStr, goals) {
     if (!goals || !goals.length) return;
@@ -821,7 +821,7 @@ body::after {
     storeSet(HIST_KEY, hist);
   }
 
-  // ---------- rollover: pull undone older goals into today ----------
+  // ===== ROLLOVER (carry undone goals from past days into today) =====
   function rollover() {
     const todayDateStr = getActiveDateString();
     const todayK = 'goals:' + todayDateStr;
@@ -851,7 +851,7 @@ body::after {
     if (changed) setGoals(todayK, today);
   }
 
-  // ---------- streak ----------
+  // ===== STREAK TRACKING =====
   function loadStreak() {
     const s = storeGet('goal_streak_v1');
     if (s && typeof s.count === 'number') return s;
@@ -877,7 +877,7 @@ body::after {
     saveStreak(s);
   }
 
-  // ---------- Goal Ticker ----------
+  // ===== GOAL TICKER (animated topbar banner) =====
   const tickerStage = document.getElementById('goalTickerStage');
   const tickerMeta  = document.getElementById('goalTickerMeta');
   let cycleIdx = 0;
@@ -945,7 +945,7 @@ body::after {
     tick();
   });
 
-  // ---------- Day Ring ----------
+  // ===== DAY RING (clock/progress circle) =====
   const PALETTE = [
     [0,    [255, 216, 158]],
     [12.5, [255, 205, 121]],
@@ -1043,7 +1043,7 @@ body::after {
     remainingEl.textContent = formatRemaining(minsLeft) + ' awake time left';
   }
 
-  // ---------- Row building ----------
+  // ===== GOAL ROW BUILDER (drag, inline edit) =====
   function makeInlineEdit(textEl, goals, idx, key, reload) {
     textEl.addEventListener('click', () => {
       if (textEl.getAttribute('contenteditable') === 'true') return;
@@ -1171,7 +1171,7 @@ body::after {
     return li;
   }
 
-  // ---------- Renderers ----------
+  // ===== RENDERERS =====
   function renderTodayHeader() {
     const goals = getGoals(todayKey());
     const total = goals.length;
@@ -1259,7 +1259,7 @@ body::after {
     renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), tomorrowKey(), true);
   }
 
-  // ---------- History ----------
+  // ===== HISTORY RENDERER =====
   function renderHistory() {
     let hist; try { hist = storeGet(HIST_KEY) || []; } catch { hist = []; }
     if (!Array.isArray(hist)) hist = [];
@@ -1304,7 +1304,7 @@ body::after {
     if (open) renderHistory();
   });
 
-  // ---------- Push remaining ----------
+  // ===== PUSH REMAINING TO TOMORROW =====
   document.getElementById('gmPushBtn').addEventListener('click', () => {
     const today    = getGoals(todayKey());
     const remaining = today.filter(g => !g.done);
@@ -1320,7 +1320,7 @@ body::after {
     loadToday(); loadTomorrow();
   });
 
-  // ---------- Add + Polish handlers ----------
+  // ===== ADD + POLISH HANDLERS =====
   function showStatus(el, message, isError) {
     el.textContent = message;
     el.classList.toggle('gm-status-error', !!isError);
@@ -1409,7 +1409,7 @@ body::after {
     loadTomorrow
   );
 
-  // ---------- Boot ----------
+  // ===== BOOT + CLOUD SYNC INIT =====
   // processStreak MUST run before rollover: rollover deletes past-date goal keys,
   // and processStreak reads those same keys to increment the streak. Wrong order
   // means streak keys are gone before they are counted → streak always stays 0.

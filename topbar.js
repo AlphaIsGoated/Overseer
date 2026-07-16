@@ -396,7 +396,7 @@ body.topbar-modal-open {
     try { initCoach(); } catch (e) { console.error('[coach]', e); }
   }
 
-  // -------- Active-date helpers (match the goals page 6 AM rollover) --------
+  // ===== DATE HELPERS =====
   function activeDateKey() {
     const now = new Date();
     const d = new Date(now);
@@ -412,7 +412,7 @@ body.topbar-modal-open {
       String(d.getDate()).padStart(2, '0');
   }
 
-  // -------- Read progress from localStorage --------
+  // ===== PROGRESS READERS (read-only, called on every render) =====
   function getGoalsProgress() {
     const key = 'goals:' + activeDateKey();
     let goals = [];
@@ -487,7 +487,7 @@ body.topbar-modal-open {
     setPillStatus(waterEl, classifyStatus(w.done, w.total));
   }
 
-  // -------- Water +1 (works from any page) --------
+  // ===== WATER TRACKER (+1 button, works from any page) =====
   function defaultWaterState() {
     return {
       unit: 'bottle', bottleMl: 500, glassMl: 250, weightUnit: 'lb',
@@ -526,7 +526,7 @@ body.topbar-modal-open {
     state.logs = state.logs || {};
     const k = calendarDateKey();
     state.logs[k] = (state.logs[k] || 0) + 1;
-    try { localStorage.setItem('po_water_v1', JSON.stringify(state)); } catch (e) {}
+    try { localStorage.setItem('po_water_v1', JSON.stringify(state)); } catch (e) { console.warn('[Topbar] localStorage.setItem po_water_v1 failed', e); }
     render();
 
     const btn = document.getElementById('topbarWaterAdd');
@@ -538,7 +538,7 @@ body.topbar-modal-open {
     pushWaterMergedToSupabase(state);
   }
 
-  // -------- Mobile lockdown helpers --------
+  // ===== MOBILE GESTURE LOCKDOWN (modal fullscreen) =====
   // Belt-and-suspenders zoom prevention — iOS Safari sometimes ignores
   // user-scalable=no, so we also kill the gesture events directly.
   function blockGesture(e) { e.preventDefault(); }
@@ -585,7 +585,7 @@ body.topbar-modal-open {
     sync();
   }
 
-  // -------- API usage/spend logging --------
+  // ===== API USAGE / SPEND LOGGING =====
   // Every AI proxy endpoint (ai-chat, vision-tool, nova, scan) returns its
   // Anthropic token usage as response headers (see api/_lib/security.js
   // setUsageHeaders) without changing their JSON body contracts. Pages
@@ -632,7 +632,7 @@ body.topbar-modal-open {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[Topbar] Budget alert calculation failed', e); }
   };
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'apiusage', syncedKeys: [USAGE_KEY] });
@@ -652,11 +652,9 @@ body.topbar-modal-open {
     document.body.insertBefore(bar, document.body.firstChild);
   }
 
-  // -------- Your Coach — JARVIS-styled, present on every page --------
-  // Present everywhere (this file is loaded on every page) rather than
-  // living on one dedicated page, since the point is an always-available
-  // assistant, not a destination you navigate to. Proactively surfaces
-  // something noteworthy once per day (cached in localStorage by date),
+  // ===== COACH (AI assistant, present on every page) =====
+  // Lives in topbar.js (not a separate page) so it's always available.
+  // Proactively surfaces something noteworthy once per day (cached in localStorage by date),
   // persists chat history across sessions so follow-ups have full context.
   function initCoach() {
     const fab = document.getElementById('coachFab');
@@ -665,6 +663,7 @@ body.topbar-modal-open {
     const input = document.getElementById('coachInput');
     if (!fab || !panelBg) return;
 
+    // ===== COACH — DASHBOARD DATA (payload sent to AI) =====
     function dashboardData() {
       const SKIP = new Set([
         'strava_tokens_v1','whoop_tokens_v1','google_accounts_v1','brain:obs_creds',
@@ -856,7 +855,7 @@ body.topbar-modal-open {
         prevBriefing;
     }
 
-    // ── Persistence helpers ──────────────────────────────────────
+    // ===== COACH — HISTORY PERSISTENCE =====
     const HIST_KEY = 'coach_chat_history';
     const MAX_SAVED = 80;   // visual messages kept in localStorage
     const MAX_CTX   = 40;   // AI context turns (user+assistant pairs)
@@ -929,8 +928,7 @@ body.topbar-modal-open {
       return reply;
     }
 
-    // Pull fresh data from all major server rows into localStorage so dashboardData()
-    // has current information regardless of which pages have been visited this session.
+    // ===== COACH — DATA PRIMING (fetches server rows into localStorage before AI calls) =====
     async function primeCoachData() {
       const secret = window.DASH_APP_SECRET || '';
       // On main.html, goals: keys are actively managed by initCloudSync — writing
@@ -951,9 +949,9 @@ body.topbar-modal-open {
             if (onGoalsPage && k.startsWith('goals:')) return; // managed by initCloudSync on main.html
             try {
               localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
-            } catch (e) {}
+            } catch (e) { console.warn('[Coach] primeCoachData setItem failed for', k, e); }
           });
-        } catch (e) {}
+        } catch (e) { console.warn('[Coach] primeCoachData fetch failed', e); }
       }));
     }
 
@@ -976,7 +974,7 @@ body.topbar-modal-open {
             if (mem.length > 20) mem.splice(0, mem.length - 20);
             localStorage.setItem('coach_memory', JSON.stringify(mem));
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Coach] coach_memory save failed', e); }
       }
       const loading = addLoading();
       try {
@@ -990,6 +988,7 @@ body.topbar-modal-open {
       busy = false;
     }
 
+    // ===== COACH — PROACTIVE SCAN (once-per-day briefing) =====
     async function runProactiveScan() {
       if (window.isConservationMode && window.isConservationMode()) {
         addMsg('coach', 'Conservation mode is on, so I skipped the automatic scan — ask me anything directly instead.', true);
@@ -1008,7 +1007,7 @@ body.topbar-modal-open {
             const k = localStorage.key(i);
             if (k && k.startsWith('coach_proactive_') && k !== todayKey) localStorage.removeItem(k);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Coach] proactive key pruning failed', e); }
         speak(text);
       } catch (e) {
         loading.remove();
@@ -1046,7 +1045,7 @@ body.topbar-modal-open {
     // Show the insight dot if today's briefing hasn't run yet
     if (!localStorage.getItem(proactiveDayKey())) fab.classList.add('has-insight');
 
-    // ---- Voice ----
+    // ===== COACH — VOICE =====
     // Pre-unlock an HTMLAudioElement during a user gesture so it can be reused
     // for TTS later — even after async gaps. iOS Safari blocks AudioContext.resume()
     // when called outside a gesture, but a pre-played Audio element stays unlocked.
@@ -1064,13 +1063,13 @@ body.topbar-modal-open {
 
     let voiceOn = false;
     const voiceToggle = document.getElementById('coachVoiceToggle');
-    try { voiceOn = localStorage.getItem('coach_voice_on') === '1'; } catch (e) {}
+    try { voiceOn = localStorage.getItem('coach_voice_on') === '1'; } catch (e) { console.warn('[Coach] voice_on read failed', e); }
     voiceToggle.classList.toggle('on', voiceOn);
     voiceToggle.addEventListener('click', () => {
       unlockAudio();
       voiceOn = !voiceOn;
       voiceToggle.classList.toggle('on', voiceOn);
-      try { localStorage.setItem('coach_voice_on', voiceOn ? '1' : '0'); } catch (e) {}
+      try { localStorage.setItem('coach_voice_on', voiceOn ? '1' : '0'); } catch (e) { console.warn('[Coach] voice_on save failed', e); }
       if (voiceOn) {
         // Speak the most recent coach message so the user gets immediate audio feedback.
         const lastCoachMsg = [...feed.querySelectorAll('.coach-msg.coach')].pop();
@@ -1227,13 +1226,13 @@ body.topbar-modal-open {
             if (msgArr.length > serverArr.length) {
               // We have local messages the server doesn't know about yet.
               // Restore in-memory state and push so the server catches up.
-              try { localStorage.setItem(HIST_KEY, JSON.stringify(msgArr)); } catch (e) {}
+              try { localStorage.setItem(HIST_KEY, JSON.stringify(msgArr)); } catch (e) { console.warn('[Coach] onApplied HIST_KEY restore failed', e); }
               const secret = window.DASH_APP_SECRET || '';
               fetch('/api/db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
                 body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': msgArr } })
-              }).catch(function() {});
+              }).catch(function(e) { console.warn('[Coach] onApplied restore push failed', e); });
             } else if (serverArr.length > msgArr.length) {
               // Server has more messages (another device added history).
               // Adopt server state so we stay in sync.
@@ -1253,12 +1252,12 @@ body.topbar-modal-open {
     // the same day rather than waiting until midnight for a new proactive key.
     const COACH_PROMPT_BUILD = '2026-07-16-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
-      try { localStorage.removeItem(proactiveDayKey()); } catch (e) {}
-      try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) {}
+      try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
+      try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
     }
   }
 
-  // -------- Boot --------
+  // ===== BOOT — GOAL ROLLOVER + INIT =====
   // Roll undone goals from past days into today on every page load,
   // not just when main.html is open. Mirrors the rollover() logic in main.html.
   function rolloverGoals() {
@@ -1381,7 +1380,7 @@ body.topbar-modal-open {
       const t = localStorage.getItem('settings:theme') || 'default';
       if (t && t !== 'default') document.documentElement.setAttribute('data-theme', t);
       else document.documentElement.removeAttribute('data-theme');
-    } catch (e) {}
+    } catch (e) { console.warn('[Topbar] applyTheme failed', e); }
   }
   applyTheme();
   window.applyTheme = applyTheme; // expose so settings.html can call it live

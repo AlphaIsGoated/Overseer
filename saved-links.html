@@ -239,7 +239,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
       body: JSON.stringify({ key: 'savedlinks', data: { 'savedlinks:items': items } }),
       keepalive: true
-    }).catch(function () {});
+    }).catch(function (e) { console.warn('[SavedLinks] initial push failed', e); });
     fetch('/api/ai/ai-chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-app-secret': secret },
@@ -281,7 +281,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
         body: JSON.stringify({ key: 'savedlinks', data: { 'savedlinks:items': load() } }),
         keepalive: true
-      }).catch(function () {});
+      }).catch(function (e) { console.warn('[SavedLinks] categorized push failed', e); });
       pendingSharedLink = null;
       render();
       $('shareBanner').innerHTML = '<div class="share-banner">Saved to <b>' + escapeHtml(category) + '</b> ✓</div>';

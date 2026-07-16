@@ -2725,7 +2725,7 @@ img, video, canvas, svg { max-width: 100%; }
       });
     }
     s.units = 'lb';
-    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) {}
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) { console.warn('[Gym] migration write to LS_KEY failed', e); }
     // Bodyweight log ('po_coach_weights') shares the same global units —
     // convert it alongside so the weigh-in chart stays correct too.
     try {
@@ -2737,8 +2737,8 @@ img, video, canvas, svg { max-width: 100%; }
         });
         localStorage.setItem('po_coach_weights', JSON.stringify(wtArr));
       }
-    } catch (e) {}
-    try { localStorage.setItem(UNITS_MIGRATED_KEY, '1'); } catch (e) {}
+    } catch (e) { console.warn('[Gym] bodyweight migration write failed', e); }
+    try { localStorage.setItem(UNITS_MIGRATED_KEY, '1'); } catch (e) { console.warn('[Gym] migration flag write failed', e); }
     return s;
   }
   function normalize(s) {
@@ -2778,7 +2778,7 @@ img, video, canvas, svg { max-width: 100%; }
     return s;
   }
   function saveState() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { console.warn('[Gym] saveState failed', e); }
   }
   let state = loadState();
 
@@ -3724,7 +3724,7 @@ Be direct and encouraging. No bullet points in the response.`;
     catch (e) { return {}; }
   }
   function saveDoneDays(d) {
-    try { localStorage.setItem(WORKOUT_DONE_KEY, JSON.stringify(d)); } catch (e) {}
+    try { localStorage.setItem(WORKOUT_DONE_KEY, JSON.stringify(d)); } catch (e) { console.warn('[Gym] saveDoneDays failed', e); }
   }
   let doneDays = loadDoneDays();
 
@@ -4462,7 +4462,7 @@ Be direct and encouraging. No bullet points in the response.`;
     } catch (e) { return []; }
   }
   function wtSave(arr) {
-    try { localStorage.setItem(WT_KEY, JSON.stringify(arr)); } catch (e) {}
+    try { localStorage.setItem(WT_KEY, JSON.stringify(arr)); } catch (e) { console.warn('[Gym] wtSave failed', e); }
   }
   function wtDateKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -5249,7 +5249,7 @@ Be direct and encouraging. No bullet points in the response.`;
       const kg = state.units === 'lb' ? weightInAppUnits / KG_TO_LB : weightInAppUnits;
       w.profile.weightKg = +kg.toFixed(1);
       localStorage.setItem('po_water_v1', JSON.stringify(w));
-    } catch (e) {}
+    } catch (e) { console.warn('[Gym] syncProfileWeight write failed', e); }
   }
 
   // Definitions shown under every metric so the numbers are legible,
@@ -6816,7 +6816,7 @@ Be direct and encouraging. No bullet points in the response.`;
       pcSuppressSync = false;
     }
     if (changed) {
-      try { pcRerender(); } catch (e) {}
+      try { pcRerender(); } catch (e) { console.warn('[Gym] pcRerender after applyRemote failed', e); }
       // Push the merged state back to the cloud so remote reflects the full union
       pcSchedulePush();
     }

@@ -731,7 +731,7 @@ html, body {
     return s;
   }
   function saveState() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { console.warn('[Water] saveState failed', e); }
   }
   let state = loadState();
   $('appTitle').textContent = CONFIG.appTitle || 'Water Coach';

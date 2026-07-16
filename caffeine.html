@@ -432,7 +432,7 @@ body::after {
         if(s0.end){ const d=new Date(s0.end); wakeHour=clamp(d.getHours()+d.getMinutes()/60,4,11); }
       }
       renderAll();
-    }catch(e){}
+    }catch(e){ console.warn('[Caffeine] WHOOP data fetch failed', e); }
   }
 
   /* ============ Analysis: peak window, crash, coffee cutoff ============ */
