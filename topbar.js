@@ -504,7 +504,8 @@ body.topbar-modal-open {
 
     const secret = window.DASH_APP_SECRET || '';
     try {
-      const readRes = await fetch('/api/db?key=health', {
+      // po_water_v1 lives under appKey:'profile' (not 'health') — see Invariant §8
+      const readRes = await fetch('/api/db?key=profile', {
         headers: { 'X-App-Secret': secret },
       });
       const readJson = readRes.ok ? await readRes.json() : {};
@@ -513,7 +514,7 @@ body.topbar-modal-open {
       await fetch('/api/db', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
-        body: JSON.stringify({ key: 'health', data: merged }),
+        body: JSON.stringify({ key: 'profile', data: merged }),
       });
     } catch (e) { /* offline — local change will sync next time user visits health */ }
   }
@@ -806,6 +807,14 @@ body.topbar-modal-open {
       return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
     function CHAT_SYS() {
+      let memory = '';
+      try {
+        const m = JSON.parse(localStorage.getItem('coach_memory') || '[]');
+        if (Array.isArray(m) && m.length) {
+          memory = '\n\nPERSISTENT USER INSTRUCTIONS — always follow these, they override defaults and never expire:\n' +
+            m.map(function(x, i) { return (i + 1) + '. ' + x; }).join('\n');
+        }
+      } catch (e) {}
       return "You are the user's personal AI system — sophisticated, precise, and authoritative, like J.A.R.V.I.S. " +
         "You have full access to their life-tracking data. Today is " + coachTodayLabel() + ". " +
         "Your replies are delivered via ElevenLabs TTS in voice mode — " +
@@ -817,33 +826,39 @@ body.topbar-modal-open {
         "If more information is needed, ask one focused question. " +
         "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
         "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
-        "Dashboard data as JSON:\n";
+        memory +
+        "\n\nDashboard data as JSON:\n";
     }
     function PROACTIVE_SYS() {
       let prevBriefing = '';
       try {
         const hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
-        const prev = hist.slice().reverse().find(function(m) { return m.proactive && m.role === 'coach'; });
-        if (prev) prevBriefing = '\n\nPrevious briefing (do NOT repeat the same points — only escalate, update, or report new issues): ' + prev.text;
+        // Collect ALL previous proactive briefings to build a full picture of what's been said
+        const prevProactives = hist.filter(function(m) { return m.proactive && m.role === 'coach'; }).slice(-3);
+        if (prevProactives.length) {
+          prevBriefing = '\n\nPREVIOUS BRIEFINGS (do NOT repeat any point already covered unless it has materially changed — no updates, no reminders of what you already said, no restating pending items):\n' +
+            prevProactives.map(function(m, i) { return 'Briefing ' + (i + 1) + ': ' + m.text; }).join('\n---\n');
+        }
       } catch (e) {}
-      return "You are a sophisticated AI system conducting a status sweep of the user's life-tracking dashboard. " +
-        "Identify the 1-3 most critical items requiring attention right now: overdue targets, upcoming deadlines, " +
-        "missed daily goals, schedule conflicts, anything time-sensitive across fitness/health/finance/marathon/etc. " +
-        "Today is " + coachTodayLabel() + ". " +
-        "DATA NOTES — read before generating output: " +
-        "(1) goals:YYYY-MM-DD is [{text,done}]. done=true = ALREADY COMPLETED — never flag completed goals as outstanding. Only flag done=false items. " +
-        "(2) strava_activities_v1 entries have a precomputed 'when' string ('today', 'yesterday', '2 days ago', etc.). Use it verbatim — the raw date is NOT included so do not attempt to recompute timing from any other field. " +
-        "(3) po_coach_workout_done is {YYYY-MM-DD:true} — presence of today's or yesterday's date means a gym session was logged that day. " +
-        "(4) Undone goals carry over day to day — if you mentioned a pending item in the previous briefing and it is still pending with no change, skip it or give a one-word update; do not re-explain it. " +
-        "Report only what actually matters — not a full status dump. If nothing stands out, deliver a concise all-clear. " +
-        "Be direct, formal, and precise. No preamble." +
+      const todayGoalsKey = 'goals:' + activeDateKey();
+      return "You are a sophisticated AI system delivering the user's daily status briefing. Today is " + coachTodayLabel() + ". " +
+        "REQUIRED STRUCTURE — always output in this exact order with no preamble:\n" +
+        "1. TODAY'S TASKS: Read '" + todayGoalsKey + "' from the data. List every item where done=false as a bullet list. " +
+        "These are the user's actual tasks — surface all of them, no filtering. If all tasks are complete, say so in one line. " +
+        "If the key is missing or empty, say 'No tasks set for today.' " +
+        "2. ALERTS (optional): If and only if something genuinely critical exists beyond the tasks — an overdue deadline, a missed target, a health flag — add 1-2 bullets. Skip entirely if nothing new stands out. " +
+        "DATA RULES: " +
+        "(1) done=true = COMPLETED — never list a completed goal as a task. " +
+        "(2) strava 'when' field is precomputed — use it verbatim, never recalculate from dates. " +
+        "(3) po_coach_workout_done {YYYY-MM-DD:true} = gym session logged that day. " +
+        "(4) STRICT: any item you mentioned in a previous briefing that has NOT changed must be completely omitted — no updates, no 'still pending', nothing. Only new information." +
         prevBriefing;
     }
 
     // ── Persistence helpers ──────────────────────────────────────
     const HIST_KEY = 'coach_chat_history';
-    const MAX_SAVED = 60;   // visual messages kept in localStorage
-    const MAX_CTX   = 20;   // AI context turns (user+assistant pairs)
+    const MAX_SAVED = 80;   // visual messages kept in localStorage
+    const MAX_CTX   = 40;   // AI context turns (user+assistant pairs)
 
     function todayDateStr() {
       const d = new Date();
@@ -890,6 +905,28 @@ body.topbar-modal-open {
       return reply;
     }
 
+    // Pull fresh data from all major server rows into localStorage so dashboardData()
+    // has current information regardless of which pages have been visited this session.
+    async function primeCoachData() {
+      const secret = window.DASH_APP_SECRET || '';
+      const rows = ['goals', 'health', 'profile', 'marathon', 'caffeine', 'gym'];
+      await Promise.allSettled(rows.map(async function(rowKey) {
+        try {
+          const r = await fetch('/api/db?key=' + encodeURIComponent(rowKey), {
+            headers: { 'X-App-Secret': secret }
+          });
+          if (!r.ok) return;
+          const json = await r.json();
+          if (!json || !json.data) return;
+          Object.entries(json.data).forEach(function([k, v]) {
+            try {
+              localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+            } catch (e) {}
+          });
+        } catch (e) {}
+      }));
+    }
+
     let busy = false;
     async function ask(text) {
       text = (text || '').trim();
@@ -897,6 +934,20 @@ body.topbar-modal-open {
       busy = true;
       addMsg('user', text);  // persists user message
       input.value = '';
+
+      // Detect explicit user instructions and persist them so they survive
+      // beyond the MAX_CTX conversation window and across sessions.
+      const INSTR_RE = /^(always |never |remember |from now on|going forward|please always|please never|make sure you|stop |don't |do not |i want you to|i need you to)/i;
+      if (INSTR_RE.test(text)) {
+        try {
+          const mem = JSON.parse(localStorage.getItem('coach_memory') || '[]');
+          if (!mem.includes(text)) {
+            mem.push(text);
+            if (mem.length > 20) mem.splice(0, mem.length - 20);
+            localStorage.setItem('coach_memory', JSON.stringify(mem));
+          }
+        } catch (e) {}
+      }
       const loading = addLoading();
       try {
         const reply = await callAI(DATA_SYS(), text, true);
@@ -941,9 +992,12 @@ body.topbar-modal-open {
       if (!historyLoaded) {
         historyLoaded = true;
         loadChatHistory();
-        // Run proactive scan only if we haven't done one today
+        // Pull fresh data from all server rows, then run scan so dashboardData()
+        // has current goals/health/etc. even on a device that hasn't visited those pages.
         if (!localStorage.getItem(proactiveDayKey())) {
-          runProactiveScan();
+          primeCoachData().then(function() { runProactiveScan(); });
+        } else {
+          primeCoachData(); // still refresh data even when no scan needed
         }
       }
       setTimeout(() => input.focus(), 80);
@@ -1132,13 +1186,22 @@ body.topbar-modal-open {
       window.initCloudSync({
         appKey: 'coach',
         syncedKeys: ['coach_chat_history'],
+        onApplied: function() {
+          // Reload history only if the panel has been opened but the feed is still
+          // empty — meaning loadChatHistory() ran before server data arrived (rare
+          // race where user opens panel within ~200ms of page load).
+          // Never touch the feed when it has messages — that's an active session.
+          if (historyLoaded && feed.children.length === 0) {
+            loadChatHistory();
+          }
+        }
       });
     }
 
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-14-v3';
+    const COACH_PROMPT_BUILD = '2026-07-16-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) {}
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) {}
