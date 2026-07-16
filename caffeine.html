@@ -342,7 +342,14 @@ body::after {
   /* ============ Storage ============ */
   const LOGS_KEY='caf:logs', CUSTOM_KEY='caf:custom';
   function loadJSON(k,f){ try { return JSON.parse(localStorage.getItem(k)) || f; } catch(e){ return f; } }
-  function saveJSON(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+  function saveJSON(k,v){
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ console.error('[caffeine] localStorage full:', e); }
+    if (k === LOGS_KEY || k === CUSTOM_KEY) {
+      fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+        body: JSON.stringify({ key: 'caffeine', data: { [LOGS_KEY]: k === LOGS_KEY ? v : logs, [CUSTOM_KEY]: k === CUSTOM_KEY ? v : custom } })
+      }).catch(function(e) { console.warn('[caffeine] push failed:', e); });
+    }
+  }
   let logs = loadJSON(LOGS_KEY, []);
   let custom = loadJSON(CUSTOM_KEY, []);
 

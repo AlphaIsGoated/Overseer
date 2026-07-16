@@ -132,7 +132,11 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   function defaultState() { return { goal: 'maintain', proteinPerLb: 1, fatPct: 25, logs: {} }; }
   function load() { return Object.assign(defaultState(), loadJSON(STORE_KEY, {})); }
-  function save(s) { saveJSON(STORE_KEY, s); }
+  function save(s) {
+    saveJSON(STORE_KEY, s);
+    fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+      body: JSON.stringify({ key: 'nutrition', data: { [STORE_KEY]: s } }) }).catch(function(e) { console.warn('[nutrition] push failed:', e); });
+  }
   let state = load();
 
   // Reads the same shared profile (weight/height/age/sex) the rest of

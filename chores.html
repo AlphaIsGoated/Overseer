@@ -111,7 +111,11 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   const thisWeek = isoWeekKey(new Date());
 
   function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { return []; } }
-  function save(items) { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+  function save(items) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(items)); } catch (e) { console.error('[chores] localStorage full:', e); }
+    fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+      body: JSON.stringify({ key: 'chores', data: { [STORE_KEY]: items } }) }).catch(function(e) { console.warn('[chores] push failed:', e); });
+  }
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   // A recurring item's "done" state is derived from when it was last

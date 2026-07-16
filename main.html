@@ -1410,8 +1410,11 @@ body::after {
   );
 
   // ---------- Boot ----------
-  rollover();
+  // processStreak MUST run before rollover: rollover deletes past-date goal keys,
+  // and processStreak reads those same keys to increment the streak. Wrong order
+  // means streak keys are gone before they are counted → streak always stays 0.
   processStreak();
+  rollover();
   loadToday();
   loadTomorrow();
   renderStreak();
@@ -1441,8 +1444,8 @@ body::after {
           const d = k.slice('goals:'.length);
           return /^\d{4}-\d{2}-\d{2}$/.test(d) && d < todayStr;
         });
+        processStreak(); // before rollover deletes past keys
         if (hasPastKeys) rollover();
-        processStreak();
         loadToday();
         loadTomorrow();
         renderStreak();

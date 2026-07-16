@@ -119,7 +119,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   const selectedStyles = new Set();
 
   function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
-  function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+  function saveJSON(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.error('[shopping] localStorage full:', e); }
+  }
+  function savePurchasesImmediate(list) {
+    fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+      body: JSON.stringify({ key: 'shopping', data: { [PURCHASE_KEY]: list } }) }).catch(function(e) { console.warn('[shopping] push failed:', e); });
+  }
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   $('styleChips').querySelectorAll('.style-chip').forEach(chip => {
@@ -167,7 +173,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // ---- Purchase log: manual entry + receipt scan (reuses the same
   // vision-tool pattern as finance.html's receipt scanner / InBody scans) ----
   function loadPurchases() { return loadJSON(PURCHASE_KEY, []); }
-  function savePurchases(list) { saveJSON(PURCHASE_KEY, list); }
+  function savePurchases(list) { saveJSON(PURCHASE_KEY, list); savePurchasesImmediate(list); }
   function renderPurchases() {
     const list = loadPurchases().slice().sort((a, b) => b.addedAt - a.addedAt);
     const wrap = $('purchaseList');

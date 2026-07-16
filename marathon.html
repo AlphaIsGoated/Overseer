@@ -567,7 +567,11 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   let plan = loadJSON(PLAN_KEY, defaultPlan());
   if (!Array.isArray(plan.entries)) plan.entries = [];
 
-  function savePlan() { saveJSON(PLAN_KEY, plan); }
+  function savePlan() {
+    saveJSON(PLAN_KEY, plan);
+    fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+      body: JSON.stringify({ key: 'marathon', data: { [PLAN_KEY]: plan } }) }).catch(function(e) { console.warn('[marathon] push failed:', e); });
+  }
 
   /* ============================================================
      RACE GOAL

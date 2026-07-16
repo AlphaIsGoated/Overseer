@@ -78,6 +78,44 @@ When the coach scan prompt or `dashboardData()` formatting changes, bump the con
 
 **Fixed in:** `po-water.html`, `index.html`, `health.html` — previously all shared `appKey: 'health'`. `po_water_v1` moved to `appKey: 'profile'`.
 
+### 9. Every save function must fire an immediate push
+`sync.js` debounces pushes 250 ms after `localStorage.setItem`. If `applyRemote` fires within that 250 ms window (e.g. a 30-second poll coincides with a save), the local write is overwritten by stale server data before the push fires.
+
+**Rule:** Every `save()` / `savePlan()` / `savePurchases()` function must fire its own `fetch('/api/db', { method: 'POST' })` immediately after `localStorage.setItem` — no `keepalive: true` (64 KB limit), use regular fetch with `.catch(function(e) { console.warn(..., e); })`. The debounced sync.js push still fires as a backup; both are idempotent.
+
+**Anti-pattern to avoid:**
+```js
+function save(items) { localStorage.setItem(KEY, JSON.stringify(items)); } // ← missing immediate push
+```
+**Correct pattern:**
+```js
+function save(items) {
+  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e) { console.error('[module] localStorage full:', e); }
+  fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+    body: JSON.stringify({ key: 'APPKEY', data: { [KEY]: items } }) }).catch(function(e) { console.warn('[module] push failed:', e); });
+}
+```
+
+### 10. processStreak must run before rollover
+`rollover()` deletes past-date goal keys from localStorage. `processStreak()` reads those same keys to decide whether to increment the streak. Calling them in the wrong order means `processStreak` always sees an empty set of past keys → streak count never increments.
+
+**Rule:** Always call `processStreak()` BEFORE `rollover()` at boot and inside `onApplied`. This applies both to the boot sequence in `main.html` and to `topbar.js`'s `rolloverGoals()` if it ever gains streak logic.
+
+### 11. persistActive must be applyRemote-resilient
+If `applyRemote` fires while a note (or any record) editor is open, it can wipe the item from localStorage. A naive `load().find(x => x.id === activeId)` then returns `null`, and an early `return` silently loses everything the user typed.
+
+**Rule:** If the item is not found in localStorage, re-add it from the editor's current DOM state rather than returning early. `onApplied` must call `persistActive()` (or equivalent) before re-rendering so in-progress edits survive every poll cycle.
+
+### 12. Never swallow errors with empty catch blocks
+`try { ... } catch(e) {}` and `.catch(function() {})` hide failures permanently. Users see nothing; developers see nothing. This was the root cause of both the keepalive 64 KB failure (coach history) and the processStreak order bug being undetected for weeks.
+
+**Rule:** Every catch block must do at least one of:
+- `console.error('[module] what failed:', e)` — for unrecoverable internal errors
+- `console.warn('[module] what failed:', e)` — for recoverable/retry-able operations (like fetch)
+- Show a user-visible status message (for errors the user needs to act on)
+
+Never use a bare `catch(e) {}` or `.catch(function() {})` with no body.
+
 ---
 
 ## Project Map
@@ -165,6 +203,7 @@ Entries are newest-first within each section. Add a new entry at the **top** of 
 
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
+| 2026-07-16 | *(this session)* | Fixed `processStreak()` / `rollover()` order: `processStreak` now runs BEFORE `rollover` at boot and in `onApplied`. `rollover` deletes past-date keys; calling `processStreak` after meant the past keys were gone before they could be counted → streak always stayed 0. | No regressions expected — `processStreak` is idempotent and guarded by `lastProcessedDate`. |
 | 2026-07-16 | *(this session)* | Added immediate keepalive push in `storeSet` for `goals:` keys. Any goals write now immediately pushes to the server (bypassing the 250ms debounce window). Prevents applyRemote from wiping goals added between the debounce start and the push firing. | Two pushes per goals change (immediate + debounced) — idempotent. |
 | 2026-07-14 | `088d1a3` | Moved `initCloudSync` call from a separate `<script>` block into the main IIFE. This gives `onApplied` access to `getActiveDateString`, `storeListKeys`, `rollover`, `processStreak`, `loadToday`, `loadTomorrow`. Also replaced separate `storage` event dispatch with direct `loadToday()`/`loadTomorrow()` calls in `onApplied`. Removed bounds check from delete handler (root cause was empty backing store, not stale index). | If helper functions are ever moved out of the IIFE, re-examine `onApplied` scope. |
 | 2026-07-14 | `fd322af` | Added bounds check `if (idx < 0 \|\| idx >= list.length) return` to delete handler and `hasPastKeys` guard in `onApplied` to only call `rollover()` when sync genuinely restored past-date keys. | **INTRODUCED BUG** (fixed in `088d1a3`): `onApplied` was still out-of-scope in a separate `<script>` block, so `getActiveDateString` threw silently. Bounds check caused delete to do nothing because backing store was empty (wiped by applyRemote). |
@@ -251,6 +290,15 @@ See Invariant §8. Check the appKey registry table in the Project Map. Each appK
 ### "Data pushed to wrong server row / sync conflict between pages"
 Each `initCloudSync` call must use an appKey from the registry in the Project Map. If adding a new sync, add a new row to the registry first and verify no existing page uses the same appKey with different keys.
 
+### "Streak is always 0 even after completing all goals"
+`processStreak()` ran AFTER `rollover()`, which deletes past-date goal keys before they can be counted. See Invariant §10. Fix: call `processStreak()` BEFORE `rollover()` in both boot and `onApplied`.
+
+### "Note created but disappears / typed content not saved"
+`persistActive()` returned early when `applyRemote` wiped the note from localStorage mid-edit. See Invariant §11. Fix: re-add the note from editor state if `load().find(id)` returns null, then call `persistActive()` at the start of `onApplied` when `activeId` is set.
+
+### "Create/add/log in any module doesn't persist after page interaction"
+The `save()` function only called `localStorage.setItem`, relying on sync.js's 250ms debounce. If a 30s poll `applyRemote` fired within that window, the local change was wiped. See Invariant §9. Fix: every `save()` must fire an immediate fetch to `/api/db`.
+
 ---
 
 ### `health.html` — Supplements
@@ -274,6 +322,22 @@ Each `initCloudSync` call must use an appKey from the registry in the Project Ma
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
 | 2026-07-14 | *(this session)* | Changed sync from `appKey: 'health'` to `appKey: 'profile'` for po_water_v1. Same fix as index.html. | — |
+
+---
+
+### `notes.html` — Notes
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-16 | *(this session)* | Fixed create/import race: `persistActive()` now re-adds the note from editor state if `applyRemote` wiped it from localStorage while the editor was open (instead of returning early). `onApplied` now calls `persistActive()` before re-rendering when `activeId` is set. Added immediate push to `save()` and `saveCats()`. Added `console.error` on localStorage quota exceeded. | `persistActive` re-adds the note with `category: activeFolder` at re-add time, not at creation time — if user switched folders while editor was open, re-added note gets current folder instead of original. Acceptable edge case. |
+
+---
+
+### `chores.html`, `personal-care.html`, `shopping.html`, `skincare.html`, `nutrition.html`, `caffeine.html`, `marathon.html`
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-16 | *(this session)* | Added immediate push to all save functions (Invariant §9). Each module now fires `fetch('/api/db', ...)` immediately after `localStorage.setItem`, bypassing the 250ms debounce race window. Added `try/catch` with `console.error` for localStorage quota errors. Two pushes per save (immediate + debounced) — idempotent. | Each save now makes 2 HTTP requests instead of 1. If the server is slow, this doubles the load from these modules. Still idempotent. |
 
 ---
 

@@ -437,9 +437,32 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   // ── Storage ───────────────────────────────────────────────────
   function load()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; } }
-  function save(items) { localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+  function pushNotes(items) {
+    const secret = window.DASH_APP_SECRET || '';
+    fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+      body: JSON.stringify({ key: 'notes', data: { [STORE_KEY]: items, [CAT_KEY]: loadCats() } })
+    }).catch(function(e) { console.warn('[notes] immediate push failed:', e); });
+  }
+  function save(items) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(items)); } catch (e) {
+      console.error('[notes] localStorage full — could not save notes:', e);
+    }
+    pushNotes(items);
+  }
   function loadCats()  { try { return JSON.parse(localStorage.getItem(CAT_KEY))  || []; } catch { return []; } }
-  function saveCats(cats) { localStorage.setItem(CAT_KEY, JSON.stringify(cats)); }
+  function saveCats(cats) {
+    try { localStorage.setItem(CAT_KEY, JSON.stringify(cats)); } catch (e) {
+      console.error('[notes] localStorage full — could not save categories:', e);
+    }
+    const secret = window.DASH_APP_SECRET || '';
+    fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+      body: JSON.stringify({ key: 'notes', data: { [STORE_KEY]: load(), [CAT_KEY]: cats } })
+    }).catch(function(e) { console.warn('[notes] immediate push failed:', e); });
+  }
 
   // ── UI state ──────────────────────────────────────────────────
   let activeId    = null;
@@ -663,12 +686,17 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   function persistActive() {
     if (!activeId) return;
     const items = load();
-    const n = items.find(x => x.id === activeId);
-    if (!n) return;
+    let n = items.find(x => x.id === activeId);
+    if (!n) {
+      // Note was wiped from localStorage by applyRemote while the editor was open.
+      // Re-add it from the editor's current content so the user's work is not lost.
+      n = { id: activeId, title: '', body: '', pinned: false, source: 'overseer', category: activeFolder || null, createdAt: Date.now(), updatedAt: Date.now() };
+      items.unshift(n);
+    }
     n.title = $('noteTitleInput').value;
     n.body  = $('noteBodyInput').value;
     n.updatedAt = Date.now();
-    if (!n.createdAt) n.createdAt = n.updatedAt; // backfill for old notes
+    if (!n.createdAt) n.createdAt = n.updatedAt;
     save(items);
   }
   function closeNote() {
@@ -1111,7 +1139,12 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   setTimeout(backfillCreatedAt, 500);
 
   if (window.initCloudSync) {
-    window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY, CAT_KEY], onApplied: () => { renderFolders(); render(); } });
+    window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY, CAT_KEY], onApplied: () => {
+      // If the editor is open, persist its current content before re-rendering —
+      // applyRemote may have just wiped the note from localStorage.
+      if (activeId) persistActive();
+      renderFolders(); render();
+    } });
   }
 
   // ---- Full-page drag-and-drop ----
