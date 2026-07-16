@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#050506">
 <title>Notes · Dashboard</title>
 
+<script src="/api/config"></script>
 <script src="sync.js"></script>
 <script src="topbar.js" defer></script>
 
@@ -666,7 +667,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   function openNote(id) {
     const items = load();
     const n = items.find(x => x.id === id);
-    if (!n) return;
+    if (!n) { console.error('[Notes] openNote: note not found for id', id, '— items in localStorage:', items.length); return; }
     activeId = id;
     $('noteTitleInput').value = n.title || '';
     $('noteBodyInput').value  = n.body  || '';
