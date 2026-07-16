@@ -270,3 +270,11 @@ Each `initCloudSync` call must use an appKey from the registry in the Project Ma
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
 | 2026-07-14 | *(this session)* | Changed sync from `appKey: 'health'` to `appKey: 'profile'` for po_water_v1. Same fix as index.html. | — |
+
+---
+
+### `gym.html` — Workout Tracker (sync audit)
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-16 | *(this session)* | Added `po_coach_strength_goals` to `PC_SYNCED_KEYS` and added its merge handler in `pcApplyRemoteState` (object spread, local wins). Strength goals were being written to localStorage but never pushed to the cloud — lost on cross-device or cross-session. | merge is `{...remote,...local}` per lift key; if two devices set conflicting goals simultaneously, local device always wins. |

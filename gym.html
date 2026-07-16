@@ -6584,7 +6584,7 @@ Be direct and encouraging. No bullet points in the response.`;
   // the wire. The actual JPEG lives in Supabase Storage. pcCollectState
   // strips any base64 dataUrl entries before push so the payload stays
   // tiny and we never blow iOS Safari's ~5MB localStorage quota.
-  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_coach_inbody'];
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_coach_inbody', 'po_coach_strength_goals'];
 
   let pcPushTimer = null;
   let pcSuppressSync = false;
@@ -6792,6 +6792,19 @@ Be direct and encouraging. No bullet points in the response.`;
           const remoteIds = new Set(remotePhotos.map((p) => p && p.id));
           const localOnly = localPhotos.filter((p) => p && !p.url && !remoteIds.has(p.id));
           const merged = [...remotePhotos, ...localOnly];
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
+
+        // ── po_coach_strength_goals (object: {bench,squat,deadlift} goals) ─
+        if (k === 'po_coach_strength_goals') {
+          let localG = {};
+          try { const r = localStorage.getItem(k); localG = r ? JSON.parse(r) : {}; } catch {}
+          const remoteG = (remote[k] && typeof remote[k] === 'object') ? remote[k] : {};
+          const merged = { ...remoteG, ...localG }; // union, local wins
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
