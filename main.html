@@ -739,6 +739,24 @@ body::after {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
     if (typeof key === 'string' && key.indexOf('goals:') === 0) {
       window.dispatchEvent(new CustomEvent('goals-changed'));
+      // Push immediately with keepalive so a sync.js poll arriving within the
+      // 250ms debounce window can't overwrite this change with stale server data.
+      (function pushGoalsNow() {
+        var data = {};
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('goals:') === 0) {
+            var v = localStorage.getItem(k);
+            if (v != null) { try { data[k] = JSON.parse(v); } catch (_) { data[k] = v; } }
+          }
+        }
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
+          body: JSON.stringify({ key: 'goals', data: data }),
+          keepalive: true
+        }).catch(function () {});
+      })();
     }
   }
   function storeDelete(key) { try { localStorage.removeItem(key); } catch (e) {} }

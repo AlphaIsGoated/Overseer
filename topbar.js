@@ -918,6 +918,10 @@ body.topbar-modal-open {
     // has current information regardless of which pages have been visited this session.
     async function primeCoachData() {
       const secret = window.DASH_APP_SECRET || '';
+      // On main.html, goals: keys are actively managed by initCloudSync — writing
+      // stale server data here would race with user edits and wipe newly added goals.
+      // Skip goals: on this page; initCloudSync already keeps them current.
+      const onGoalsPage = /\/(main\.html)?$/.test(window.location.pathname);
       const rows = ['goals', 'health', 'profile', 'marathon', 'caffeine', 'gym'];
       await Promise.allSettled(rows.map(async function(rowKey) {
         try {
@@ -929,6 +933,7 @@ body.topbar-modal-open {
           if (!json || !json.data) return;
           Object.entries(json.data).forEach(function([k, v]) {
             if (k.startsWith('coach_')) return; // never overwrite coach state from other rows
+            if (onGoalsPage && k.startsWith('goals:')) return; // managed by initCloudSync on main.html
             try {
               localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
             } catch (e) {}
