@@ -872,6 +872,15 @@ body.topbar-modal-open {
         arr.push({ role, text, proactive: !!proactive, ts: Date.now() });
         if (arr.length > MAX_SAVED) arr.splice(0, arr.length - MAX_SAVED);
         localStorage.setItem(HIST_KEY, JSON.stringify(arr));
+        // Push immediately with keepalive so a sync.js applyRemote arriving within
+        // the 250ms debounce window can't overwrite this message with stale server data.
+        const secret = window.DASH_APP_SECRET || '';
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+          body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': arr } }),
+          keepalive: true
+        }).catch(function() {});
       } catch (e) {}
     }
 
@@ -900,7 +909,7 @@ body.topbar-modal-open {
       if (addToHistory) {
         chatHistory.push({ role: 'user', content: userText });
         chatHistory.push({ role: 'assistant', content: reply });
-        if (chatHistory.length > 20) chatHistory.splice(0, chatHistory.length - 20);
+        if (chatHistory.length > MAX_CTX) chatHistory.splice(0, chatHistory.length - MAX_CTX);
       }
       return reply;
     }
@@ -919,6 +928,7 @@ body.topbar-modal-open {
           const json = await r.json();
           if (!json || !json.data) return;
           Object.entries(json.data).forEach(function([k, v]) {
+            if (k.startsWith('coach_')) return; // never overwrite coach state from other rows
             try {
               localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
             } catch (e) {}
