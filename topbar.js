@@ -778,6 +778,7 @@ body.topbar-modal-open {
     function loadChatHistory() {
       try {
         const arr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+        msgArr = arr.slice(); // seed in-memory authority from localStorage
         arr.forEach(m => {
           addMsg(m.role, m.text, m.proactive, false);
           // Rebuild AI context from non-proactive messages
@@ -859,6 +860,10 @@ body.topbar-modal-open {
     const HIST_KEY = 'coach_chat_history';
     const MAX_SAVED = 80;   // visual messages kept in localStorage
     const MAX_CTX   = 40;   // AI context turns (user+assistant pairs)
+    // In-memory authority for coach history. null = not yet loaded.
+    // Protects against applyRemote overwriting localStorage with a stale server
+    // snapshot within the 250ms debounce window between a user message and the push.
+    let msgArr = null;
 
     function todayDateStr() {
       const d = new Date();
@@ -867,21 +872,31 @@ body.topbar-modal-open {
     function proactiveDayKey() { return 'coach_proactive_' + todayDateStr(); }
 
     function persistMsg(role, text, proactive) {
+      // Append to in-memory authority first — this survives applyRemote overwrites.
+      if (!msgArr) msgArr = [];
+      msgArr.push({ role, text, proactive: !!proactive, ts: Date.now() });
+      if (msgArr.length > MAX_SAVED) msgArr.splice(0, msgArr.length - MAX_SAVED);
+
+      // Write to localStorage so sync.js debounce can schedule a regular push.
       try {
-        const arr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
-        arr.push({ role, text, proactive: !!proactive, ts: Date.now() });
-        if (arr.length > MAX_SAVED) arr.splice(0, arr.length - MAX_SAVED);
-        localStorage.setItem(HIST_KEY, JSON.stringify(arr));
-        // Push immediately with keepalive so a sync.js applyRemote arriving within
-        // the 250ms debounce window can't overwrite this message with stale server data.
-        const secret = window.DASH_APP_SECRET || '';
-        fetch('/api/db', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
-          body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': arr } }),
-          keepalive: true
-        }).catch(function() {});
-      } catch (e) {}
+        localStorage.setItem(HIST_KEY, JSON.stringify(msgArr));
+      } catch (storageErr) {
+        addMsg('coach', '⚠ Could not save message — storage may be full.', true, false);
+        return;
+      }
+
+      // Immediate push without keepalive. keepalive is limited to 64 KB by browsers;
+      // once the history grows past that limit the request is silently dropped.
+      const secret = window.DASH_APP_SECRET || '';
+      const snapshot = msgArr.slice();
+      fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+        body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': snapshot } })
+      }).catch(function() {
+        // sync.js debounced push will retry on the next setItem call.
+        addMsg('coach', '⚠ Cloud save failed — message is stored locally and will retry.', true, false);
+      });
     }
 
     // Conversation history sent to the AI — rebuilt from localStorage on load.
@@ -997,6 +1012,7 @@ body.topbar-modal-open {
         speak(text);
       } catch (e) {
         loading.remove();
+        addMsg('coach', '⚠ Status scan failed — ' + (e.message || 'network error') + '. You can ask me directly.', true, false);
       }
     }
 
@@ -1202,11 +1218,30 @@ body.topbar-modal-open {
         appKey: 'coach',
         syncedKeys: ['coach_chat_history'],
         onApplied: function() {
-          // Reload history only if the panel has been opened but the feed is still
-          // empty — meaning loadChatHistory() ran before server data arrived (rare
-          // race where user opens panel within ~200ms of page load).
-          // Never touch the feed when it has messages — that's an active session.
-          if (historyLoaded && feed.children.length === 0) {
+          if (msgArr !== null) {
+            // applyRemote just overwrote localStorage with the server snapshot.
+            // Compare lengths to decide who is ahead.
+            let serverArr = [];
+            try { serverArr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch (e) {}
+
+            if (msgArr.length > serverArr.length) {
+              // We have local messages the server doesn't know about yet.
+              // Restore in-memory state and push so the server catches up.
+              try { localStorage.setItem(HIST_KEY, JSON.stringify(msgArr)); } catch (e) {}
+              const secret = window.DASH_APP_SECRET || '';
+              fetch('/api/db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+                body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': msgArr } })
+              }).catch(function() {});
+            } else if (serverArr.length > msgArr.length) {
+              // Server has more messages (another device added history).
+              // Adopt server state so we stay in sync.
+              msgArr = serverArr;
+            }
+            // Equal length: no conflict, nothing to do.
+          } else if (historyLoaded && feed.children.length === 0) {
+            // Panel opened before server data arrived — load from what applyRemote wrote.
             loadChatHistory();
           }
         }
