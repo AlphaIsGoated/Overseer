@@ -468,7 +468,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     }
     if (!wrote) {
       console.error('[notes] localStorage quota exceeded, could not free enough space');
-      alert('Storage is full — old data was cleaned up. Please try again.');
+      alert('Storage is still full.\n\nTo free space:\n• Gym → Body Scans → delete older scans (images are stored locally)\n• Coach panel → clear history\n\nThen try creating the note again.');
       return;
     }
     pushNotes(items);

@@ -870,20 +870,48 @@ body.topbar-modal-open {
     }
     function proactiveDayKey() { return 'coach_proactive_' + todayDateStr(); }
 
-    // Deletes accumulated coach_proactive_YYYY-MM-DD keys older than 3 days.
-    // These are ephemeral local-only keys (Invariant §6) that pile up every day
-    // and can fill localStorage quota over time. Safe to delete — they only gate
-    // whether today's proactive scan has already run.
+    // Frees localStorage space by trimming accumulated ephemeral and archival data.
+    // Safe to call at any time — only touches data that is either re-generatable
+    // or already backed up to the server.
+    //
+    // Trimming order (safest → most impactful):
+    //   1. All coach_proactive_* keys — ephemeral flags, regenerate next scan
+    //   2. coach_chat_history → 15 messages — synced to server, will be restored
+    //   3. goals_history_v1 → 14 days — local archive (not synced), oldest days dropped
+    //   4. po_coach_inbody_img_* older than 90 days — local-only JPEG base64 blobs;
+    //      the scan metadata (po_coach_inbody) is synced, only the raw image is lost
     function pruneOldStorage() {
-      const cutoff = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+      // 1. All coach_proactive_* (each is a tiny "1" string but they accumulate daily)
       const toDelete = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('coach_proactive_') && k.slice('coach_proactive_'.length) < cutoff) {
-          toDelete.push(k);
-        }
+        if (k && k.startsWith('coach_proactive_')) toDelete.push(k);
       }
       toDelete.forEach(function(k) { try { localStorage.removeItem(k); } catch (_) {} });
+
+      // 2. Trim coach_chat_history to 15 most recent messages (synced, will restore)
+      try {
+        const hist = JSON.parse(localStorage.getItem('coach_chat_history') || '[]');
+        if (hist.length > 15) localStorage.setItem('coach_chat_history', JSON.stringify(hist.slice(-15)));
+      } catch (_) {}
+
+      // 3. Trim goals_history_v1 to last 14 days (local archive only)
+      try {
+        const hist = JSON.parse(localStorage.getItem('goals_history_v1') || '[]');
+        if (hist.length > 14) localStorage.setItem('goals_history_v1', JSON.stringify(hist.slice(0, 14)));
+      } catch (_) {}
+
+      // 4. Delete inbody scan images older than 90 days (local-only base64 JPEGs —
+      //    the largest single source of localStorage bloat; scan metadata stays intact)
+      try {
+        const cutoff90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+        const scans = JSON.parse(localStorage.getItem('po_coach_inbody') || '[]');
+        scans.forEach(function(s) {
+          if (s && s.id && s.dateKey && s.dateKey < cutoff90) {
+            try { localStorage.removeItem('po_coach_inbody_img_' + s.id); } catch (_) {}
+          }
+        });
+      } catch (_) {}
     }
     window.pruneOldStorage = pruneOldStorage; // exposed so other pages can call it on quota error
 
