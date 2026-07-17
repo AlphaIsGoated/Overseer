@@ -76,11 +76,29 @@ async function buildPayload(type, supaUrl, supaKey) {
 
     case 'reminders': {
       const thisWeek = isoWeekKey(new Date());
-      const [choresData, pcData] = await Promise.all([
+      const [goalsData, choresData, pcData] = await Promise.all([
+        fetchModuleData(supaUrl, supaKey, 'goals'),
         fetchModuleData(supaUrl, supaKey, 'chores'),
         fetchModuleData(supaUrl, supaKey, 'personalcare'),
       ]);
 
+      // Main goals (main.html) — primary source for this notification
+      const todayGoals = (goalsData && goalsData['goals:' + today]) || [];
+      const goalsPending = todayGoals.filter(g => g && !g.done).map(g => g.text).filter(Boolean);
+
+      if (goalsPending.length > 0) {
+        let body;
+        if (goalsPending.length === 1) {
+          body = `Still to do: "${goalsPending[0]}"`;
+        } else if (goalsPending.length === 2) {
+          body = `Still to do: "${goalsPending[0]}" and "${goalsPending[1]}"`;
+        } else {
+          body = `Still to do: "${goalsPending[0]}", "${goalsPending[1]}" + ${goalsPending.length - 2} more`;
+        }
+        return { tag: 'reminders', title: `✅ ${goalsPending.length} goal${goalsPending.length === 1 ? '' : 's'} remaining`, body, url: '/main.html' };
+      }
+
+      // All main goals done — fall back to chores / personal care
       const choreItems = (choresData && (Array.isArray(choresData) ? choresData : choresData['chores:items'])) || [];
       const chorePending = choreItems.filter(c => {
         if (c.recurring === 'daily') return c.lastDoneKey !== today;
@@ -98,7 +116,8 @@ async function buildPayload(type, supaUrl, supaKey) {
           : `${allPending.length} tasks pending — "${allPending[0]}" and ${allPending.length - 1} more.`;
         return { tag: 'reminders', title: '✅ Reminders · ' + allPending.length + ' pending', body, url: '/chores.html' };
       }
-      return { tag: 'reminders', title: '✅ Reminders', body: 'No overdue tasks today. Keep up the streak!', url: '/chores.html' };
+
+      return { tag: 'reminders', title: '✅ All done for today!', body: 'All goals and tasks complete. Keep it up!', url: '/main.html' };
     }
 
     case 'morning':
