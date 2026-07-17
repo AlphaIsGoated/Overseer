@@ -870,16 +870,43 @@ body.topbar-modal-open {
     }
     function proactiveDayKey() { return 'coach_proactive_' + todayDateStr(); }
 
+    // Deletes accumulated coach_proactive_YYYY-MM-DD keys older than 3 days.
+    // These are ephemeral local-only keys (Invariant §6) that pile up every day
+    // and can fill localStorage quota over time. Safe to delete — they only gate
+    // whether today's proactive scan has already run.
+    function pruneOldStorage() {
+      const cutoff = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+      const toDelete = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('coach_proactive_') && k.slice('coach_proactive_'.length) < cutoff) {
+          toDelete.push(k);
+        }
+      }
+      toDelete.forEach(function(k) { try { localStorage.removeItem(k); } catch (_) {} });
+    }
+    window.pruneOldStorage = pruneOldStorage; // exposed so other pages can call it on quota error
+
     function persistMsg(role, text, proactive) {
       // Append to in-memory authority first — this survives applyRemote overwrites.
       if (!msgArr) msgArr = [];
       msgArr.push({ role, text, proactive: !!proactive, ts: Date.now() });
       if (msgArr.length > MAX_SAVED) msgArr.splice(0, msgArr.length - MAX_SAVED);
 
-      // Write to localStorage so sync.js debounce can schedule a regular push.
-      try {
-        localStorage.setItem(HIST_KEY, JSON.stringify(msgArr));
-      } catch (storageErr) {
+      // Write to localStorage — if quota is exceeded, prune old data and retry once.
+      let wrote = false;
+      for (let attempt = 0; attempt < 2 && !wrote; attempt++) {
+        try {
+          localStorage.setItem(HIST_KEY, JSON.stringify(msgArr));
+          wrote = true;
+        } catch (_) {
+          if (attempt === 0) {
+            pruneOldStorage(); // delete accumulated coach_proactive_* keys
+            if (msgArr.length > 20) msgArr.splice(0, msgArr.length - 20); // trim history in half
+          }
+        }
+      }
+      if (!wrote) {
         addMsg('coach', '⚠ Could not save message — storage may be full.', true, false);
         return;
       }
@@ -947,6 +974,26 @@ body.topbar-modal-open {
           Object.entries(json.data).forEach(function([k, v]) {
             if (k.startsWith('coach_')) return; // never overwrite coach state from other rows
             if (onGoalsPage && k.startsWith('goals:')) return; // managed by initCloudSync on main.html
+            if (k === 'po_water_v1') {
+              // Merge water logs instead of overwriting — take max per date key so that
+              // bottles logged on this device this session are not replaced by a stale
+              // server snapshot (the server may lag if the 401 bug prevented pushes).
+              const serverData = (typeof v === 'object' && v !== null) ? v : (function() { try { return JSON.parse(v); } catch(_) { return {}; } }());
+              let localData;
+              try { localData = JSON.parse(localStorage.getItem('po_water_v1')); } catch(_) {}
+              if (localData && localData.logs && serverData && serverData.logs) {
+                const mergedLogs = Object.assign({}, serverData.logs);
+                Object.entries(localData.logs).forEach(function([dk, cnt]) {
+                  mergedLogs[dk] = Math.max(mergedLogs[dk] || 0, cnt);
+                });
+                const merged = Object.assign({}, serverData, localData, { logs: mergedLogs });
+                try { localStorage.setItem(k, JSON.stringify(merged)); } catch(e) { console.warn('[Coach] primeCoachData po_water_v1 merge failed', e); }
+              } else {
+                // No local logs to protect — write server data as-is
+                try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch(e) { console.warn('[Coach] primeCoachData setItem failed for', k, e); }
+              }
+              return;
+            }
             try {
               localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
             } catch (e) { console.warn('[Coach] primeCoachData setItem failed for', k, e); }
@@ -1318,6 +1365,7 @@ body.topbar-modal-open {
   }
 
   function boot() {
+    if (window.pruneOldStorage) window.pruneOldStorage(); // clean accumulated ephemeral keys on every load
     rolloverGoals();
     injectStyleAndHTML();
     const btn = document.getElementById('topbarWaterAdd');

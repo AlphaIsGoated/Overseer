@@ -447,8 +447,29 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     }).catch(function(e) { console.warn('[notes] immediate push failed:', e); });
   }
   function save(items) {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(items)); } catch (e) {
-      console.error('[notes] localStorage full — could not save notes:', e);
+    let wrote = false;
+    for (let attempt = 0; attempt < 2 && !wrote; attempt++) {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(items));
+        wrote = true;
+      } catch (_) {
+        if (attempt === 0) {
+          // Prune accumulated coach_proactive keys to free space, then retry
+          if (window.pruneOldStorage) {
+            window.pruneOldStorage();
+          } else {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith('coach_proactive_')) { try { localStorage.removeItem(k); } catch(_) {} }
+            }
+          }
+        }
+      }
+    }
+    if (!wrote) {
+      console.error('[notes] localStorage quota exceeded, could not free enough space');
+      alert('Storage is full — old data was cleaned up. Please try again.');
+      return;
     }
     pushNotes(items);
   }
