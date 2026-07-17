@@ -5670,6 +5670,7 @@ Be direct and encouraging. No bullet points in the response.`;
       });
     });
     saveState();
+    pcPushNow(); // immediate push — don't rely on the 250ms debounce or unload handler
     planImportPending = null;
     $('planImportModalBg').classList.remove('show');
     renderAll();
@@ -6863,6 +6864,9 @@ Be direct and encouraging. No bullet points in the response.`;
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
+    // No keepalive — keepalive silently fails when body > 64 KB (Invariant §9).
+    // visibilitychange fires while the page is still alive so the request has time
+    // to complete. pagehide/beforeunload are best-effort on iOS Safari anyway.
     try {
       fetch('/api/db', {
         method: 'POST',
@@ -6871,10 +6875,9 @@ Be direct and encouraging. No bullet points in the response.`;
           'X-App-Secret': window.DASH_APP_SECRET || '',
         },
         body: JSON.stringify({ key: APP_KEY, data: state }),
-        keepalive: true,
-      }).catch(() => {});
+      }).catch(function(e) { console.warn('[Gym] unload push failed', e); });
       pcLastSyncedJson = json;
-    } catch (_) {}
+    } catch (e) { console.warn('[Gym] pcFlushPushOnUnload failed', e); }
   }
 
   async function pcPoll() {
