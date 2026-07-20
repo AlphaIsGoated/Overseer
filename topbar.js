@@ -695,9 +695,21 @@ body.topbar-modal-open {
           // Include all completed entries (full history for trend analysis)
           // + all future planned entries (so coach knows upcoming schedule).
           // Slim each entry to avoid token bloat.
-          const slim = (e) => ({ date:e.date, type:e.type, label:e.label,
-            plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
-            actualDistanceMi:e.actualDistanceMi });
+          // Never pass raw date strings — Claude re-derives day-of-week from them
+          // and gets relative timing wrong (Invariant §5). Use precomputed when/daysAgo.
+          const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+          const slim = (e) => {
+            const entryDay = new Date(e.date + 'T00:00');
+            const daysAgo = Math.round((todayMidnight - entryDay) / 86400000);
+            const when = daysAgo === 0 ? 'today'
+              : daysAgo === 1 ? 'yesterday'
+              : daysAgo > 1  ? daysAgo + ' days ago'
+              : daysAgo === -1 ? 'tomorrow'
+              : Math.abs(daysAgo) + ' days from now';
+            return { when, daysAgo, type:e.type, label:e.label,
+              plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
+              actualDistanceMi:e.actualDistanceMi };
+          };
           const past = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() <= now).map(slim);
           const future = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() > now).map(slim);
           out[k] = { ...v, entries_completed: past, entries_upcoming: future.slice(0, 30) };
@@ -1325,7 +1337,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-16-v1';
+    const COACH_PROMPT_BUILD = '2026-07-20-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
