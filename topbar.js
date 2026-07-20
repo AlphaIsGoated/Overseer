@@ -752,6 +752,9 @@ body.topbar-modal-open {
             });
           }
           out[k] = { exercises: v.exercises, days: v.days, gyms: v.gyms, logs: slimLogs };
+        } else if (k === 'google_cal_events_v1' && Array.isArray(v)) {
+          // Already slimmed with precomputed when strings — cap to 30 upcoming events
+          out[k] = v.slice(0, 30);
         } else if (k === 'po_coach_weights' && Array.isArray(v)) {
           out[k] = v.slice(-20);
         } else if ((k === 'po_coach_photos' || k === 'po_coach_inbody') && v) {
@@ -761,6 +764,21 @@ body.topbar-modal-open {
         } else {
           out[k] = v;
         }
+      }
+
+      // Push notification status — read from browser API at call time (not in localStorage)
+      if (typeof Notification !== 'undefined') {
+        out['push_notifications'] = {
+          permission: Notification.permission, // 'granted' | 'denied' | 'default'
+          // Schedule is in ET (UTC-4 summer / UTC-5 winter). Crons run in UTC.
+          schedule: [
+            { type: 'morning check-in',         time: '8:00 AM ET',  utc: '0 12 * * *' },
+            { type: 'reminders (goals/chores)',  time: '9:00 AM ET',  utc: '0 13 * * *' },
+            { type: 'nutrition log',             time: '4:00 PM ET',  utc: '0 20 * * *' },
+            { type: 'training (marathon)',        time: '5:00 PM ET',  utc: '0 21 * * *' },
+            { type: 'skincare routine',           time: '10:00 PM ET', utc: '0 2 * * *'  },
+          ]
+        };
       }
 
       // Final guard: trim the biggest remaining values until we're under 40 KB
@@ -1337,7 +1355,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-20-v1';
+    const COACH_PROMPT_BUILD = '2026-07-20-v2';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }

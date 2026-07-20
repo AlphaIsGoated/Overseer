@@ -739,6 +739,35 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
         return calResults.reduce(function(acc, arr) { return acc.concat(arr); }, []);
       }));
       lastGoogleItems = perAccount.reduce(function(acc, arr) { return acc.concat(arr); }, []);
+
+      // Persist a slim snapshot of upcoming events so topbar.js dashboardData()
+      // can include them in coach context. Raw dates replaced with precomputed
+      // when strings — never pass raw dates to Claude (Invariant §5).
+      try {
+        var nowMs = Date.now();
+        var todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+        var slim = lastGoogleItems
+          .filter(function(ev) {
+            var start = ev.start && (ev.start.dateTime || ev.start.date);
+            return start && new Date(start).getTime() >= todayMidnight.getTime();
+          })
+          .slice(0, 50)
+          .map(function(ev) {
+            var start = ev.start && (ev.start.dateTime || ev.start.date);
+            var d = new Date(start);
+            var daysFromNow = Math.round((d - todayMidnight) / 86400000);
+            var when = daysFromNow === 0 ? 'today'
+              : daysFromNow === 1 ? 'tomorrow'
+              : daysFromNow + ' days from now';
+            var timeStr = ev.start.dateTime
+              ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : null;
+            return { when: when, daysFromNow: daysFromNow, title: ev.summary || '(no title)',
+              allDay: !ev.start.dateTime, time: timeStr, cal: ev._calName || 'Google' };
+          });
+        localStorage.setItem('google_cal_events_v1', JSON.stringify(slim));
+      } catch(e) { console.warn('[Calendar] failed to cache events for coach:', e); }
+
       renderAgenda();
       renderCalendarGrid();
       localStorage.setItem(SYNC_KEY, String(Date.now()));
