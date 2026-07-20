@@ -9,6 +9,17 @@
 // ============================================================
 import { requireAppSecret } from './_lib/security.js';
 
+// Wrap every Supabase fetch with a hard 8-second timeout.
+// Without this, a slow/hung Supabase connection waits until Vercel's
+// 10-second function limit fires and returns a 502 with no useful error.
+// With it, we abort cleanly and return a 504 before Vercel kills us.
+function supaFetch(url, opts) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  return fetch(url, { ...opts, signal: ctrl.signal })
+    .finally(() => clearTimeout(timer));
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
@@ -32,7 +43,7 @@ export default async function handler(req, res) {
     const appKey = req.query && req.query.key;
     if (!appKey) return res.status(400).json({ error: 'key required' });
     try {
-      const r = await fetch(
+      const r = await supaFetch(
         supaUrl + '/rest/v1/app_state?key=eq.' + encodeURIComponent(appKey) + '&select=data',
         { headers: authHeaders }
       );
@@ -44,6 +55,7 @@ export default async function handler(req, res) {
       const data = rows && rows[0] && rows[0].data ? rows[0].data : null;
       return res.status(200).json({ data });
     } catch (e) {
+      if (e && e.name === 'AbortError') return res.status(504).json({ error: 'upstream timeout' });
       return res.status(500).json({ error: e && e.message ? e.message : String(e) });
     }
   }
@@ -56,7 +68,7 @@ export default async function handler(req, res) {
     const data = body && body.data;
     if (!appKey) return res.status(400).json({ error: 'key required' });
     try {
-      const r = await fetch(supaUrl + '/rest/v1/app_state?on_conflict=key', {
+      const r = await supaFetch(supaUrl + '/rest/v1/app_state?on_conflict=key', {
         method: 'POST',
         headers: { ...authHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({ key: appKey, data, updated_at: new Date().toISOString() }),
@@ -67,6 +79,7 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({ ok: true });
     } catch (e) {
+      if (e && e.name === 'AbortError') return res.status(504).json({ error: 'upstream timeout' });
       return res.status(500).json({ error: e && e.message ? e.message : String(e) });
     }
   }

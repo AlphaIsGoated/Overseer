@@ -343,6 +343,14 @@ The `save()` function only called `localStorage.setItem`, relying on sync.js's 2
 
 ---
 
+### `api/db.js` — DB Proxy
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-20 | *(this session)* | Added `supaFetch()` wrapper with 8-second `AbortController` timeout on all Supabase calls. Previously, a slow/hung Supabase connection would wait until Vercel's 10-second function limit fired and returned an opaque 502. Now we abort cleanly and return 504 before Vercel kills us. Both GET and POST handlers catch `AbortError` and return `504 upstream timeout`. | None — if Supabase normally responds in <8s (it does), behavior is identical. If Supabase is slow, users now get a retryable 504 instead of a confusing 502. |
+
+---
+
 ### `gym.html` — Workout Tracker (sync audit)
 
 | Date | Commit | Change | What could break |
