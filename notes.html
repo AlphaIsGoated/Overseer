@@ -438,6 +438,13 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   // ── Storage ───────────────────────────────────────────────────
   function load()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; } }
+
+  // In-memory authority for the most recently saved note list.
+  // applyRemote (REPLACE-ALL) can wipe localStorage between a save() and the
+  // server push completing. notesArr lets onApplied re-push the local version
+  // even after the editor is closed, so notes are never silently lost.
+  let notesArr = null;
+
   function pushNotes(items) {
     const secret = window.DASH_APP_SECRET || '';
     fetch('/api/db', {
@@ -447,6 +454,9 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     }).catch(function(e) { console.warn('[notes] immediate push failed:', e); });
   }
   function save(items) {
+    // Update in-memory authority immediately — survives applyRemote overwrites.
+    notesArr = items.slice();
+
     let wrote = false;
     for (let attempt = 0; attempt < 2 && !wrote; attempt++) {
       try {
@@ -468,7 +478,10 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
     }
     if (!wrote) {
       console.error('[notes] localStorage quota exceeded, could not free enough space');
-      alert('Storage is still full.\n\nTo free space:\n• Gym → Body Scans → delete older scans (images are stored locally)\n• Coach panel → clear history\n\nThen try creating the note again.');
+      // Still push to server — note survives in the cloud and restores to
+      // localStorage on the next applyRemote once the user frees space.
+      pushNotes(items);
+      alert('Device storage is full — your note was sent to the cloud and will reappear once you free up space.\n\nTo free space:\n• Gym → Body Scans → delete older scans\n• Coach panel → clear history');
       return;
     }
     pushNotes(items);
@@ -1162,9 +1175,25 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'notes', syncedKeys: [STORE_KEY, CAT_KEY], onApplied: () => {
-      // If the editor is open, persist its current content before re-rendering —
-      // applyRemote may have just wiped the note from localStorage.
+      // If the editor is open, persist its current content first —
+      // applyRemote may have just wiped the active note from localStorage.
       if (activeId) persistActive();
+
+      // If notesArr (in-memory authority) is ahead of what applyRemote just wrote,
+      // the local version has notes the server doesn't know about yet (push is still
+      // in-flight or failed). Re-push local so the server catches up.
+      if (notesArr !== null) {
+        const serverArr = load(); // what applyRemote just wrote
+        // Find any note in local memory that isn't in the server snapshot
+        const serverIds = new Set(serverArr.map(n => n && n.id));
+        const localAhead = notesArr.some(n => n && n.id && !serverIds.has(n.id));
+        if (localAhead) {
+          // Write local back to localStorage and re-push so server catches up
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(notesArr)); } catch (_) {}
+          pushNotes(notesArr);
+        }
+      }
+
       renderFolders(); render();
     } });
   }
