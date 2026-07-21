@@ -1366,19 +1366,53 @@ body::after {
 
   async function loadWeather(lat, lon) {
     try {
+      // Request current + next 3 hourly slots so the run tip reflects what
+      // conditions will actually be like while the user is outside.
       const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon
-        + '&current=temperature_2m,precipitation,weather_code&temperature_unit=fahrenheit&timezone=auto';
+        + '&current=temperature_2m,precipitation,weather_code'
+        + '&hourly=temperature_2m,precipitation,weather_code'
+        + '&forecast_hours=4&temperature_unit=fahrenheit&timezone=auto';
       const r = await fetch(url);
       const j = await r.json();
       const cur = j.current || {};
       if (cur.temperature_2m == null) throw new Error('no temperature data');
+
+      // Current conditions drive the display widget
       const [icon, label] = weatherIcon(cur.weather_code);
       const temp = Math.round(cur.temperature_2m);
       $('todayWeather').innerHTML =
         '<span class="today-weather-icon">' + icon + '</span>' +
         '<span class="today-weather-temp">' + temp + '°F</span>' +
         '<span class="today-weather-cond">' + label + '</span>';
-      $('todayRunTip').innerHTML = runTip(temp, cur.precipitation || 0, cur.weather_code);
+
+      // Run tip uses the worst conditions across now + next 2 hours so it
+      // reflects what the user will actually encounter while outside.
+      const hourly = j.hourly || {};
+      const times = hourly.time || [];
+      const hTemps = hourly.temperature_2m || [];
+      const hPrecip = hourly.precipitation || [];
+      const hCodes = hourly.weather_code || [];
+      const nowMs = Date.now();
+      const cutoff = nowMs + 2 * 3600000; // 2 hours from now
+
+      let tipPrecip = cur.precipitation || 0;
+      let tipTemp = cur.temperature_2m;
+      let tipCode = cur.weather_code || 0;
+
+      times.forEach(function(tStr, i) {
+        const slotMs = new Date(tStr).getTime();
+        if (slotMs < nowMs || slotMs > cutoff) return;
+        const p = hPrecip[i] || 0;
+        const tp = hTemps[i] || 0;
+        const code = hCodes[i] || 0;
+        // Wettest slot wins for code (rain warning); hottest temp always kept
+        if (p > tipPrecip) { tipPrecip = p; tipCode = code; }
+        if (tp > tipTemp) tipTemp = tp;
+        // No rain anywhere → use most severe WMO code in window
+        if (tipPrecip === 0 && code > tipCode) tipCode = code;
+      });
+
+      $('todayRunTip').innerHTML = runTip(Math.round(tipTemp), tipPrecip, tipCode);
     } catch (e) {
       $('todayWeather').innerHTML = '<span class="today-weather-icon">⚠️</span><span class="today-weather-cond">Weather unavailable</span>';
       $('todayRunTip').textContent = '';
