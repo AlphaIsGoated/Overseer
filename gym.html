@@ -2782,25 +2782,29 @@ img, video, canvas, svg { max-width: 100%; }
   }
   let state = loadState();
 
-  // One-time cleanup: remove "Sharms" day (superseded by Shoulders/Arms)
-  // and remove default seed exercises from Push/Pull/Legs days (replaced by
-  // the imported strength plan). Runs exactly once, gated by a flag.
-  (function applyCleanupV1() {
-    const FLAG = 'po_coach_cleanup_v1';
+  // One-time cleanup: remove "Sharms" day and seed exercises from any day that
+  // already has real (non-seed) exercises from an imported plan.
+  // v2 re-runs on devices that already ran v1, to catch seeds that were
+  // restored by the additive-merge bug in pcApplyRemoteState.
+  (function applyCleanupV2() {
+    const FLAG = 'po_coach_cleanup_v2';
     if (localStorage.getItem(FLAG)) return;
     let changed = false;
     // Remove Sharms day
     const sharmsBefore = state.days.length;
     state.days = state.days.filter(d => d.name.toLowerCase() !== 'sharms' && d.id.toLowerCase() !== 'sharms');
     if (state.days.length !== sharmsBefore) changed = true;
-    // Remove seed exercises from push/pull/legs (the 3 default exercises per day
-    // that were replaced by the imported plan — seed IDs start with "seed_")
+    // Remove seed exercises from any day that has at least one real (non-seed) exercise.
+    // This cleans up seeds that were restored by the old additive-merge logic.
+    const daysWithRealEx = new Set(
+      state.exercises.filter(ex => ex.id && !ex.id.startsWith('seed_')).map(ex => ex.day)
+    );
     const exBefore = state.exercises.length;
     state.exercises = state.exercises.filter(ex =>
-      !(ex.id && ex.id.startsWith('seed_') && ['push', 'pull', 'legs'].indexOf(ex.day) !== -1)
+      !(ex.id && ex.id.startsWith('seed_') && daysWithRealEx.has(ex.day))
     );
     if (state.exercises.length !== exBefore) changed = true;
-    if (changed) saveState();
+    if (changed) { saveState(); pcPushNow(); }
     try { localStorage.setItem(FLAG, '1'); } catch (_) {}
   })();
 
@@ -6700,10 +6704,31 @@ Be direct and encouraging. No bullet points in the response.`;
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
             continue;
           }
-          // Merge: additive union of exercises, days, gyms, and logs, local wins on conflict
+          // Merge exercises: local is authoritative for days it has real (non-seed) exercises on.
+          // Seeds (id starts with "seed_") are first-run placeholders — never restore from remote.
+          // Remote exercises are only accepted for days the local has no real exercises yet
+          // (e.g. a brand-new day added on another device). This prevents plan-import deletions
+          // from being undone by a stale server snapshot that still has the old exercises.
           const exMap = new Map();
-          for (const e of (remoteSt.exercises || [])) if (e && e.id) exMap.set(e.id, e);
-          for (const e of (localSt.exercises  || [])) if (e && e.id) exMap.set(e.id, e);
+          const localRealDays = new Set();
+          for (const e of (localSt.exercises || [])) {
+            if (!e || !e.id) continue;
+            exMap.set(e.id, e);
+            if (!e.id.startsWith('seed_') && e.day) localRealDays.add(e.day);
+          }
+          // Bring in remote exercises only for days where local has no real exercises yet.
+          // Never bring in seeds from remote — they're transient first-run data.
+          for (const e of (remoteSt.exercises || [])) {
+            if (!e || !e.id || e.id.startsWith('seed_')) continue;
+            if (localRealDays.has(e.day)) continue; // local already owns this day
+            exMap.set(e.id, e);
+          }
+          // If remote brought real exercises for a day, remove any local seeds for that day
+          // (happens on first-time sync on a fresh device: local has seeds, remote has the real plan).
+          const allRealDays = new Set(Array.from(exMap.values()).filter(e => !e.id.startsWith('seed_')).map(e => e.day));
+          for (const [id, e] of exMap) {
+            if (id.startsWith('seed_') && allRealDays.has(e.day)) exMap.delete(id);
+          }
           // Days merged by id so imported plan days are never lost on cross-device sync
           const daysMap = new Map();
           for (const d of (remoteSt.days || [])) if (d && d.id) daysMap.set(d.id, d);
