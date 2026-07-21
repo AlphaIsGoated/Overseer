@@ -1063,6 +1063,62 @@ body.topbar-modal-open {
           });
         } catch (e) { console.warn('[Coach] primeCoachData fetch failed', e); }
       }));
+
+      // ── Refresh Strava activities (throttled: once per 30 min) ──
+      // strava_activities_v1 is local-only — only updated when marathon.html is open.
+      // Refreshing here ensures the coach always has current run data regardless
+      // of whether the user has visited the marathon page recently.
+      const stravaLastSync = parseInt(localStorage.getItem('strava_last_sync') || '0', 10);
+      if (Date.now() - stravaLastSync > 30 * 60 * 1000) {
+        await primeStravaActivities(secret);
+      }
+    }
+
+    async function primeStravaActivities(secret) {
+      try {
+        let t;
+        try { t = JSON.parse(localStorage.getItem('strava_tokens_v1')); } catch(_) {}
+        if (!t || !t.access) return; // not connected to Strava
+        // Refresh access token if it's about to expire
+        if (t.expires && Date.now() > t.expires - 60000) {
+          try {
+            const rr = await fetch('/api/integrations/strava', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+              body: JSON.stringify({ refresh_token: t.refresh }),
+            });
+            const jj = await rr.json();
+            if (jj.access_token) {
+              t = { access: jj.access_token, refresh: jj.refresh_token || t.refresh,
+                    expires: jj.expires_at ? jj.expires_at * 1000 : Date.now() + 21600000 };
+              try { localStorage.setItem('strava_tokens_v1', JSON.stringify(t)); } catch(_) {}
+            }
+          } catch (e) { console.warn('[Coach] Strava token refresh failed', e); }
+        }
+        const params = new URLSearchParams({ path: '/athlete/activities', per_page: '60' });
+        const r = await fetch('/api/integrations/strava?' + params.toString(), {
+          headers: { 'Authorization': 'Bearer ' + t.access, 'Accept': 'application/json', 'X-App-Secret': secret },
+        });
+        if (!r.ok) { console.warn('[Coach] Strava activities fetch failed:', r.status); return; }
+        const acts = await r.json();
+        const runs = (Array.isArray(acts) ? acts : [])
+          .filter(function(a) { return /run/i.test(a.type || a.sport_type || ''); })
+          .map(function(a) {
+            const distanceMi = (a.distance || 0) / 1609.344;
+            const movingSec = a.moving_time || 0;
+            return {
+              id: a.id,
+              date: (a.start_date_local || a.start_date || '').slice(0, 10),
+              distanceMi: +distanceMi.toFixed(2),
+              movingSec: movingSec,
+              paceSecPerMi: distanceMi > 0 ? movingSec / distanceMi : null,
+              type: a.type || a.sport_type || 'Run',
+              name: a.name || '',
+            };
+          });
+        try { localStorage.setItem('strava_activities_v1', JSON.stringify(runs)); } catch(e) { console.warn('[Coach] Strava write failed', e); }
+        localStorage.setItem('strava_last_sync', String(Date.now()));
+      } catch (e) { console.warn('[Coach] primeStravaActivities failed', e); }
     }
 
     let busy = false;
