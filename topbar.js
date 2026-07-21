@@ -838,13 +838,10 @@ body.topbar-modal-open {
     }
     function CHAT_SYS() {
       let memory = '';
-      try {
-        const m = JSON.parse(localStorage.getItem('coach_memory') || '[]');
-        if (Array.isArray(m) && m.length) {
-          memory = '\n\nPERSISTENT USER INSTRUCTIONS — always follow these, they override defaults and never expire:\n' +
-            m.map(function(x, i) { return (i + 1) + '. ' + x; }).join('\n');
-        }
-      } catch (e) {}
+      if (Array.isArray(memArr) && memArr.length) {
+        memory = '\n\nPERSISTENT USER INSTRUCTIONS — always follow these, they override defaults and never expire:\n' +
+          memArr.map(function(x, i) { return (i + 1) + '. ' + x; }).join('\n');
+      }
       return "You are the user's personal AI system — sophisticated, precise, and authoritative, like J.A.R.V.I.S. " +
         "You have full access to their life-tracking data. Today is " + coachTodayLabel() + ". " +
         "Your replies are delivered via ElevenLabs TTS in voice mode — " +
@@ -893,6 +890,13 @@ body.topbar-modal-open {
     // Protects against applyRemote overwriting localStorage with a stale server
     // snapshot within the 250ms debounce window between a user message and the push.
     let msgArr = null;
+
+    // In-memory authority for persistent coach instructions.
+    // Loaded from localStorage at init; always used as the source of truth
+    // for CHAT_SYS() so applyRemote cannot silently clear instructions mid-session.
+    let memArr = (function() {
+      try { return JSON.parse(localStorage.getItem('coach_memory') || '[]'); } catch (e) { return []; }
+    })();
 
     function todayDateStr() {
       const d = new Date();
@@ -1068,16 +1072,30 @@ body.topbar-modal-open {
       addMsg('user', text);  // persists user message
       input.value = '';
 
-      // Detect explicit user instructions and persist them so they survive
-      // beyond the MAX_CTX conversation window and across sessions.
-      const INSTR_RE = /^(always |never |remember |from now on|going forward|please always|please never|make sure you|stop |don't |do not |i want you to|i need you to)/i;
+      // Detect explicit user instructions and persist them as permanent rules
+      // that survive beyond the MAX_CTX window and across sessions/devices.
+      // Pattern matches any message that contains an instruction directive anywhere.
+      const INSTR_RE = /\b(always|never|remember that|from now on|going forward|make sure you|please always|please never|stop doing|don't |do not |i want you to|i need you to|i'd like you to|you should always|you should never|change your|keep in mind|note that|for future|in the future|every time|each time)\b/i;
       if (INSTR_RE.test(text)) {
         try {
-          const mem = JSON.parse(localStorage.getItem('coach_memory') || '[]');
-          if (!mem.includes(text)) {
-            mem.push(text);
-            if (mem.length > 20) mem.splice(0, mem.length - 20);
-            localStorage.setItem('coach_memory', JSON.stringify(mem));
+          if (!memArr.includes(text)) {
+            memArr.push(text);
+            if (memArr.length > 20) memArr.splice(0, memArr.length - 20);
+            try {
+              localStorage.setItem('coach_memory', JSON.stringify(memArr));
+            } catch (quota) {
+              pruneOldStorage();
+              try { localStorage.setItem('coach_memory', JSON.stringify(memArr)); } catch (e2) {
+                console.warn('[Coach] coach_memory save failed after prune', e2);
+              }
+            }
+            // Immediately push to server so it survives localStorage clears
+            const secret = window.DASH_APP_SECRET || '';
+            fetch('/api/db', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+              body: JSON.stringify({ key: 'coach', data: { 'coach_memory': memArr, 'coach_chat_history': msgArr || [] } })
+            }).catch(function(e) { console.warn('[Coach] memory push failed', e); });
           }
         } catch (e) { console.warn('[Coach] coach_memory save failed', e); }
       }
@@ -1320,8 +1338,38 @@ body.topbar-modal-open {
     if (window.initCloudSync) {
       window.initCloudSync({
         appKey: 'coach',
-        syncedKeys: ['coach_chat_history'],
+        syncedKeys: ['coach_chat_history', 'coach_memory'],
         onApplied: function() {
+          // ── Merge coach_memory: union of server + local, never drop either side ──
+          // applyRemote overwrote coach_memory with whatever the server had, but
+          // the user may have added new instructions locally since the last push.
+          // We union both sets (dedup by text) and write back + push.
+          try {
+            const serverMem = JSON.parse(localStorage.getItem('coach_memory') || '[]');
+            const localMem = memArr || [];
+            if (localMem.length > 0) {
+              const serverSet = new Set(serverMem.map(function(x) { return x; }));
+              const merged = serverMem.slice();
+              localMem.forEach(function(x) { if (!serverSet.has(x)) merged.push(x); });
+              if (merged.length !== serverMem.length) {
+                // Local had entries the server didn't — push the merged set
+                memArr = merged.slice(-20);
+                try { localStorage.setItem('coach_memory', JSON.stringify(memArr)); } catch (_) {}
+                const secret = window.DASH_APP_SECRET || '';
+                fetch('/api/db', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+                  body: JSON.stringify({ key: 'coach', data: { 'coach_memory': memArr, 'coach_chat_history': msgArr || [] } })
+                }).catch(function(e) { console.warn('[Coach] onApplied memory push failed', e); });
+              } else {
+                memArr = serverMem;
+              }
+            } else {
+              memArr = serverMem;
+            }
+          } catch (e) { console.warn('[Coach] onApplied memory merge failed', e); }
+
+          // ── Merge chat history: local wins if ahead ──
           if (msgArr !== null) {
             // applyRemote just overwrote localStorage with the server snapshot.
             // Compare lengths to decide who is ahead.
@@ -1336,7 +1384,7 @@ body.topbar-modal-open {
               fetch('/api/db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
-                body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': msgArr } })
+                body: JSON.stringify({ key: 'coach', data: { 'coach_chat_history': msgArr, 'coach_memory': memArr || [] } })
               }).catch(function(e) { console.warn('[Coach] onApplied restore push failed', e); });
             } else if (serverArr.length > msgArr.length) {
               // Server has more messages (another device added history).
@@ -1355,7 +1403,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-20-v2';
+    const COACH_PROMPT_BUILD = '2026-07-21-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
