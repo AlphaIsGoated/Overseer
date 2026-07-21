@@ -219,7 +219,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   var SYNC_KEY     = 'google_last_sync';
   var GOOGLE_CLIENT_ID = window.DASH_GOOGLE_CLIENT_ID || '';
   var GOOGLE_REDIRECT  = window.location.origin + '/api/google-callback';
-  var SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+  var SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
   var APP_SECRET = window.DASH_APP_SECRET || '';
 
   function loadJSON(k, f) { try { var v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch(e) { return f; } }

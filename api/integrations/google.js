@@ -17,8 +17,12 @@
 // ============================================================
 import { requireAppSecret } from '../_lib/security.js';
 
-async function handleData(req, res) {
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+// Proxy a request (any method) to the Google Calendar / OAuth2 API.
+// Called for GET requests and for POST/PATCH requests that have a `path`
+// query param (e.g. creating a calendar event). Token-refresh POSTs
+// (no `path` param) are handled separately in handleRefresh().
+async function handleData(req, res, method) {
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'missing bearer token' });
 
@@ -30,14 +34,21 @@ async function handleData(req, res) {
     if (k !== 'path') fwd.set(k, String(v));
   }
   const qs = fwd.toString();
-  // /userinfo uses the OAuth2 API, all other paths use the Calendar API
   const baseUrl = path === '/userinfo' ? 'https://www.googleapis.com/oauth2/v3' : 'https://www.googleapis.com/calendar/v3';
   const url = baseUrl + path + (qs ? '?' + qs : '');
 
+  const fetchOpts = {
+    method: method || req.method,
+    headers: { 'Authorization': auth, 'Accept': 'application/json' },
+  };
+  if (method !== 'GET' && req.body) {
+    const bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    fetchOpts.body = bodyStr;
+    fetchOpts.headers['Content-Type'] = 'application/json';
+  }
+
   try {
-    const r = await fetch(url, {
-      headers: { 'Authorization': auth, 'Accept': 'application/json' },
-    });
+    const r = await fetch(url, fetchOpts);
     const text = await r.text();
     res.status(r.status).setHeader('Content-Type', 'application/json');
     return res.send(text);
@@ -83,7 +94,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (!requireAppSecret(req, res)) return;
 
-  if (req.method === 'GET') return handleData(req, res);
+  if (req.method === 'GET') return handleData(req, res, 'GET');
+  // POST with a `path` param = forwarded event write (create/update).
+  // POST without `path` = token refresh.
+  if (req.method === 'POST' && req.query && req.query.path) return handleData(req, res, 'POST');
   if (req.method === 'POST') return handleRefresh(req, res);
+  if (req.method === 'PATCH' && req.query && req.query.path) return handleData(req, res, 'PATCH');
+  if (req.method === 'DELETE' && req.query && req.query.path) return handleData(req, res, 'DELETE');
   return res.status(405).json({ error: 'method not allowed' });
 }

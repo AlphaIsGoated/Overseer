@@ -853,6 +853,7 @@ body.topbar-modal-open {
         "If more information is needed, ask one focused question. " +
         "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
         "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
+        "CALENDAR WRITE: You CAN add events to the user's Google Calendar. When the user asks you to add, book, or schedule something on their calendar, extract the details and append this action block on its own line at the very end of your reply (nothing else between the brackets, valid JSON only): [CALENDAR_ADD:{\"title\":\"...\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}] — use today's date as the base when computing the target date, 24-hour datetime, user timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If any detail (date, time) is unclear, ask before emitting the block. Never emit the block for read-only questions about the calendar." +
         memory +
         "\n\nDashboard data as JSON:\n";
     }
@@ -1101,15 +1102,92 @@ body.topbar-modal-open {
       }
       const loading = addLoading();
       try {
-        const reply = await callAI(DATA_SYS(), text, true);
+        let reply = await callAI(DATA_SYS(), text, true);
         loading.remove();
-        addMsg('coach', reply, false);  // persists coach reply
-        speak(reply);
+        // ── Calendar write action: coach emits [CALENDAR_ADD:{...}] ──
+        const CAL_RE = /\[CALENDAR_ADD:([\s\S]*?)\]/;
+        const calMatch = reply.match(CAL_RE);
+        if (calMatch) {
+          reply = reply.replace(CAL_RE, '').trim();
+          addMsg('coach', reply || 'Adding to your calendar…', false);
+          speak(reply);
+          addGoogleCalendarEvent(JSON.parse(calMatch[1])).then(function(result) {
+            if (result.ok) {
+              addMsg('coach', '📅 Added to your calendar.', false);
+            } else {
+              addMsg('coach', '⚠ Could not add to calendar: ' + result.error, false);
+            }
+          }).catch(function(e) { addMsg('coach', '⚠ Calendar error: ' + (e.message || String(e)), false); });
+        } else {
+          addMsg('coach', reply, false);  // persists coach reply
+          speak(reply);
+        }
       } catch (e) {
         loading.textContent = '⚠ ' + (e.message || 'Could not reach your coach.');
       }
       busy = false;
     }
+
+    // ===== COACH — GOOGLE CALENDAR WRITE =====
+    // Creates a calendar event using stored Google OAuth tokens (google_accounts_v1).
+    // Requires calendar.events scope — if the user only has readonly, this returns
+    // a 403 and tells them to reconnect in calendar.html with the new scope.
+    async function addGoogleCalendarEvent(opts) {
+      try {
+        var accounts = [];
+        try { accounts = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]'); } catch (_) {}
+        if (!accounts.length) return { ok: false, error: 'No Google account connected — go to Calendar and connect your account first.' };
+        var account = accounts[0];
+        var secret = window.DASH_APP_SECRET || '';
+        // Refresh token if expired (expires has <60s left)
+        if (account.expires && Date.now() > account.expires - 60000) {
+          try {
+            var rr = await fetch('/api/integrations/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+              body: JSON.stringify({ refresh_token: account.refresh }),
+            });
+            var jj = await rr.json();
+            if (jj.access_token) {
+              account = Object.assign({}, account, { access: jj.access_token, expires: Date.now() + (jj.expires_in || 3500) * 1000 });
+              accounts[0] = account;
+              try { localStorage.setItem('google_accounts_v1', JSON.stringify(accounts)); } catch (_) {}
+            }
+          } catch (e) { console.warn('[Coach] calendar token refresh failed', e); }
+        }
+        var tz = (typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York';
+        var startDt = opts.datetime; // e.g. "2026-07-25T14:30:00"
+        var durMs = (opts.durationMinutes || 60) * 60000;
+        // Compute end time as local ISO string (same format as start, no Z)
+        var startObj = new Date(startDt);
+        var endObj = new Date(startObj.getTime() + durMs);
+        function pad(n) { return String(n).padStart(2, '0'); }
+        var endDt = endObj.getFullYear() + '-' + pad(endObj.getMonth()+1) + '-' + pad(endObj.getDate())
+          + 'T' + pad(endObj.getHours()) + ':' + pad(endObj.getMinutes()) + ':00';
+        var event = {
+          summary: opts.title,
+          description: opts.description || '',
+          start: { dateTime: startDt, timeZone: opts.timezone || tz },
+          end:   { dateTime: endDt,   timeZone: opts.timezone || tz },
+          reminders: {
+            useDefault: false,
+            overrides: [{ method: 'popup', minutes: opts.notificationMinutes != null ? opts.notificationMinutes : 15 }],
+          },
+        };
+        var r = await fetch('/api/integrations/google?path=/calendars/primary/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + account.access, 'X-App-Secret': secret },
+          body: JSON.stringify(event),
+        });
+        var j = await r.json();
+        if (r.ok) return { ok: true };
+        if (r.status === 403) return { ok: false, error: 'Calendar write permission denied. Go to Calendar → disconnect your Google account → reconnect to grant write access.' };
+        return { ok: false, error: (j && j.error && j.error.message) ? j.error.message : JSON.stringify(j).slice(0, 120) };
+      } catch (e) {
+        return { ok: false, error: e && e.message ? e.message : String(e) };
+      }
+    }
+    window.addGoogleCalendarEvent = addGoogleCalendarEvent;
 
     // ===== COACH — PROACTIVE SCAN (once-per-day briefing) =====
     async function runProactiveScan() {
@@ -1403,7 +1481,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-21-v1';
+    const COACH_PROMPT_BUILD = '2026-07-21-v2';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
