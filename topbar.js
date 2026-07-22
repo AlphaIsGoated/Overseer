@@ -883,17 +883,23 @@ body.topbar-modal-open {
             prevProactives.map(function(m, i) { return 'Briefing ' + (i + 1) + ': ' + m.text; }).join('\n---\n');
         }
       } catch (e) {}
-      return "You are a sophisticated AI system delivering the user's daily status briefing. Today is " + coachTodayLabel() + ". " +
-        "DELIVER ONLY WHAT IS NEW OR ACTIONABLE. The user can already see their task list in the Goals page — do NOT repeat it. " +
-        "STRUCTURE (skip any section if nothing genuine to report):\n" +
-        "• TASKS (one line only, no bullet list): If all tasks are done say so. If no tasks are set say so. Otherwise give a single-line count (e.g. '3 of 5 goals remaining'). Never list individual tasks.\n" +
-        "• ALERTS: 1-3 bullets for things that genuinely need attention — missed workouts, upcoming race deadlines, health flags, overdue items. Skip entirely if nothing stands out.\n" +
-        "• HIGHLIGHTS (optional): One line recognising something positive — a PR, a streak, a plan milestone. Only if genuinely noteworthy.\n" +
+      const todayGoalsKey = 'goals:' + activeDateKey();
+      return "You are a sophisticated AI system delivering the user's comprehensive daily briefing. Today is " + coachTodayLabel() + ". " +
+        "This runs ONCE per day — be thorough. Cover every section that has relevant data. Be concise within each section but don't skip anything meaningful.\n\n" +
+        "REQUIRED SECTIONS (in order, skip only if truly no data):\n\n" +
+        "1. TODAY'S GOALS — Read '" + todayGoalsKey + "'. Bullet-list every item where done=false. " +
+        "If all done, say 'All goals complete ✓'. If key missing/empty, say 'No goals set for today.'\n\n" +
+        "2. TRAINING — Today's scheduled workout (check marathon_plan_v1 entries_upcoming for an entry with daysAgo=0 or date=today; check po_coach_v1 split for today's gym day). " +
+        "Most recent Strava activity (use 'when' verbatim). Any training gaps, milestones, or upcoming key workouts this week worth flagging.\n\n" +
+        "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
+        "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
+        "4. CALENDAR — Upcoming events from google_cal_events_v1 (today and tomorrow). Skip if none.\n\n" +
+        "5. ALERTS — Any genuinely critical items not covered above: overdue deadlines, missed targets, upcoming race countdown, health flags. 1-3 bullets max. Skip entirely if nothing stands out.\n\n" +
         "DATA RULES: " +
-        "(1) done=true means COMPLETED — never surface a completed goal as outstanding. " +
-        "(2) strava 'when' is precomputed — use it verbatim, never recalculate from dates. " +
-        "(3) po_coach_workout_done {YYYY-MM-DD:true} = gym session logged that day. " +
-        "(4) STRICT no-repeat: any item covered in a previous briefing that has NOT changed must be omitted entirely." +
+        "(1) done=true = COMPLETED — never list as outstanding. " +
+        "(2) strava/marathon 'when' is precomputed — use verbatim, never recalculate. " +
+        "(3) po_coach_workout_done {YYYY-MM-DD:true} = gym session logged. " +
+        "(4) No-repeat rule: any item from a previous briefing that hasn't materially changed must be omitted." +
         prevBriefing;
     }
 
@@ -1666,7 +1672,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-22-v2';
+    const COACH_PROMPT_BUILD = '2026-07-22-v3';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
