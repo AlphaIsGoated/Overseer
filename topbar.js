@@ -889,8 +889,11 @@ body.topbar-modal-open {
         "REQUIRED SECTIONS (in order, skip only if truly no data):\n\n" +
         "1. TODAY'S GOALS — Read '" + todayGoalsKey + "'. Bullet-list every item where done=false. " +
         "If all done, say 'All goals complete ✓'. If key missing/empty, say 'No goals set for today.'\n\n" +
-        "2. TRAINING — Today's scheduled workout (check marathon_plan_v1 entries_upcoming for an entry with daysAgo=0 or date=today; check po_coach_v1 split for today's gym day). " +
-        "Most recent Strava activity (use 'when' verbatim). Any training gaps, milestones, or upcoming key workouts this week worth flagging.\n\n" +
+        "2. TRAINING — Today's scheduled workout (check marathon_plan_v1.entries_upcoming for an entry with daysAgo=0; check po_coach_v1 split for today's gym day). " +
+        "LAST RUN: check BOTH (a) marathon_plan_v1.entries_completed — find the most recent entry where completed=true or actualDistanceMi>0, using its precomputed 'when'; " +
+        "AND (b) strava_activities_v1 — most recent entry's 'when'. Use whichever source shows a MORE RECENT date. " +
+        "CRITICAL: never report a long gap (e.g. '42 days') if the marathon log shows a recent run — the marathon log is ground truth for logged runs even if Strava is stale. " +
+        "Any training gaps, milestones, or key workouts this week worth flagging.\n\n" +
         "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
         "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
         "4. CALENDAR — Upcoming events from google_cal_events_v1 (today and tomorrow). Skip if none.\n\n" +
@@ -1418,6 +1421,9 @@ body.topbar-modal-open {
       // sweep the first time they open the coach each day, regardless of
       // how many times they closed and reopened the panel.
       if (!localStorage.getItem(proactiveDayKey())) {
+        // Force-refresh Strava before the daily scan — ignore the 30-min throttle
+        // so the scan always gets today's actual run data, not a cached snapshot.
+        localStorage.removeItem('strava_last_sync');
         primeCoachData().then(function() { runProactiveScan(); });
       } else {
         primeCoachData(); // still refresh data even when no scan needed
@@ -1672,7 +1678,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-22-v3';
+    const COACH_PROMPT_BUILD = '2026-07-22-v4';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
