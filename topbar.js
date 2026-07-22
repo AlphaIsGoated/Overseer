@@ -1276,16 +1276,18 @@ body.topbar-modal-open {
     function openPanel() {
       panelBg.classList.add('show');
       fab.classList.remove('has-insight');
+      // History loading is once-per-session (avoids redundant DOM rebuilds).
       if (!historyLoaded) {
         historyLoaded = true;
         loadChatHistory();
-        // Pull fresh data from all server rows, then run scan so dashboardData()
-        // has current goals/health/etc. even on a device that hasn't visited those pages.
-        if (!localStorage.getItem(proactiveDayKey())) {
-          primeCoachData().then(function() { runProactiveScan(); });
-        } else {
-          primeCoachData(); // still refresh data even when no scan needed
-        }
+      }
+      // Proactive scan runs on every open so the user always gets a fresh
+      // sweep the first time they open the coach each day, regardless of
+      // how many times they closed and reopened the panel.
+      if (!localStorage.getItem(proactiveDayKey())) {
+        primeCoachData().then(function() { runProactiveScan(); });
+      } else {
+        primeCoachData(); // still refresh data even when no scan needed
       }
       setTimeout(() => input.focus(), 80);
     }
