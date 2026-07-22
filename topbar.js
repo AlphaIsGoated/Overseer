@@ -706,7 +706,9 @@ body.topbar-modal-open {
               : daysAgo > 1  ? daysAgo + ' days ago'
               : daysAgo === -1 ? 'tomorrow'
               : Math.abs(daysAgo) + ' days from now';
-            return { when, daysAgo, type:e.type, label:e.label,
+            // date is included for COACH_ACTION write ops only — coach must still
+            // use `when` to describe timing in replies (not re-derive from date).
+            return { when, daysAgo, date:e.date, type:e.type, label:e.label,
               plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
               actualDistanceMi:e.actualDistanceMi };
           };
@@ -853,7 +855,20 @@ body.topbar-modal-open {
         "If more information is needed, ask one focused question. " +
         "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
         "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
-        "CALENDAR WRITE: You CAN add events to the user's Google Calendar. When the user asks you to add, book, or schedule something on their calendar, extract the details and append this action block on its own line at the very end of your reply (nothing else between the brackets, valid JSON only): [CALENDAR_ADD:{\"title\":\"...\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}] — use today's date as the base when computing the target date, 24-hour datetime, user timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If any detail (date, time) is unclear, ask before emitting the block. Never emit the block for read-only questions about the calendar." +
+        "CALENDAR WRITE: You CAN add events to the user's Google Calendar. When asked, append: [CALENDAR_ADD:{\"title\":\"...\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}] — timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If any detail is unclear, ask first." +
+        "\n\nMODULE WRITE ACCESS: You CAN modify the user's data. Append one or more [COACH_ACTION:{...}] blocks (valid JSON, no line breaks inside) at the end of your reply. Multiple blocks are allowed. Always confirm in your text what you changed.\n" +
+        "MARATHON (module:\"marathon\"): entries have a `date` field (YYYY-MM-DD) — use it to target write ops, but describe timing with `when` in your reply.\n" +
+        " • Update entry: {\"module\":\"marathon\",\"op\":\"update_entry\",\"date\":\"YYYY-MM-DD\",\"set\":{\"type\":\"easy|long|speed|tempo|rest|cross|race|other\",\"label\":\"Short label\",\"plannedDistanceMi\":6.0}}\n" +
+        " • Move entry: {\"module\":\"marathon\",\"op\":\"move_entry\",\"fromDate\":\"YYYY-MM-DD\",\"toDate\":\"YYYY-MM-DD\"}\n" +
+        " • Add entry: {\"module\":\"marathon\",\"op\":\"add_entry\",\"date\":\"YYYY-MM-DD\",\"type\":\"easy\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0}\n" +
+        " • Remove entry: {\"module\":\"marathon\",\"op\":\"remove_entry\",\"date\":\"YYYY-MM-DD\"}\n" +
+        " • Set race date: {\"module\":\"marathon\",\"op\":\"set_race\",\"raceDate\":\"YYYY-MM-DD\"}\n" +
+        "GOALS (module:\"goals\"): today's date for goals is " + (function(){ const d=new Date(); if(d.getHours()<6)d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })() + ".\n" +
+        " • Add goal: {\"module\":\"goals\",\"op\":\"add\",\"text\":\"Goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        " • Complete goal: {\"module\":\"goals\",\"op\":\"complete\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        " • Remove goal: {\"module\":\"goals\",\"op\":\"remove\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        " • Update goal: {\"module\":\"goals\",\"op\":\"update\",\"oldText\":\"Old text\",\"newText\":\"New text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        "RULES: Only emit action blocks when the user explicitly asks you to make a change. If date or details are ambiguous, ask first. Never emit action blocks for read-only questions." +
         memory +
         "\n\nDashboard data as JSON:\n";
     }
@@ -1160,20 +1175,36 @@ body.topbar-modal-open {
       try {
         let reply = await callAI(DATA_SYS(), text, true);
         loading.remove();
-        // ── Calendar write action: coach emits [CALENDAR_ADD:{...}] ──
+
+        // ── Calendar write action: [CALENDAR_ADD:{...}] ──
         const CAL_RE = /\[CALENDAR_ADD:([\s\S]*?)\]/;
         const calMatch = reply.match(CAL_RE);
         if (calMatch) {
           reply = reply.replace(CAL_RE, '').trim();
-          addMsg('coach', reply || 'Adding to your calendar…', false);
-          speak(reply);
           addGoogleCalendarEvent(JSON.parse(calMatch[1])).then(function(result) {
-            if (result.ok) {
-              addMsg('coach', '📅 Added to your calendar.', false);
-            } else {
-              addMsg('coach', '⚠ Could not add to calendar: ' + result.error, false);
-            }
+            if (result.ok) addMsg('coach', '📅 Added to your calendar.', false);
+            else addMsg('coach', '⚠ Could not add to calendar: ' + result.error, false);
           }).catch(function(e) { addMsg('coach', '⚠ Calendar error: ' + (e.message || String(e)), false); });
+        }
+
+        // ── Module write actions: one or more [COACH_ACTION:{...}] blocks ──
+        const ACTION_RE = /\[COACH_ACTION:([\s\S]*?)\]/g;
+        const actionMatches = [];
+        let m;
+        while ((m = ACTION_RE.exec(reply)) !== null) actionMatches.push(m);
+        if (actionMatches.length) {
+          reply = reply.replace(/\[COACH_ACTION:[\s\S]*?\]/g, '').trim();
+          addMsg('coach', reply || 'Applying changes…', false);
+          speak(reply);
+          Promise.allSettled(actionMatches.map(function(am) {
+            try { return executeCoachAction(JSON.parse(am[1])); }
+            catch (e) { return Promise.resolve({ ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }); }
+          })).then(function(results) {
+            const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok); })
+              .map(function(r) { return r.reason ? r.reason.message : (r.value && r.value.error) || 'unknown error'; });
+            if (errs.length) addMsg('coach', '⚠ Some changes failed: ' + errs.join('; '), false);
+            else addMsg('coach', '✅ Changes saved. Reload the page to see them reflected.', false);
+          });
         } else {
           addMsg('coach', reply, false);  // persists coach reply
           speak(reply);
@@ -1244,6 +1275,103 @@ body.topbar-modal-open {
       }
     }
     window.addGoogleCalendarEvent = addGoogleCalendarEvent;
+
+    // ===== COACH — MODULE WRITE ACTIONS =====
+    // Executes a single structured action emitted by the coach in a [COACH_ACTION:{...}] block.
+    // Writes directly to localStorage and pushes to the server so changes persist immediately.
+    async function executeCoachAction(act) {
+      const secret = window.DASH_APP_SECRET || '';
+      try {
+        // ── Marathon plan ─────────────────────────────────────────────
+        if (act.module === 'marathon') {
+          let plan = null;
+          try { plan = JSON.parse(localStorage.getItem('marathon_plan_v1')); } catch (_) {}
+          if (!plan || typeof plan !== 'object') plan = { raceDate: null, distanceMi: 26.2188, goalSec: null, paceUnit: 'mi', entries: [] };
+          if (!Array.isArray(plan.entries)) plan.entries = [];
+
+          function mDow(dateStr) {
+            const d = new Date(dateStr + 'T12:00:00');
+            return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+          }
+
+          if (act.op === 'update_entry') {
+            let entry = plan.entries.find(function(e) { return e.date === act.date; });
+            if (!entry) {
+              entry = { id: 'm_' + Date.now(), date: act.date, weekNumber: null,
+                dayOfWeek: mDow(act.date), type: 'other', label: '', plannedDistanceMi: null, completed: false };
+              plan.entries.push(entry);
+              plan.entries.sort(function(a,b) { return a.date.localeCompare(b.date); });
+            }
+            Object.assign(entry, act.set || {});
+
+          } else if (act.op === 'move_entry') {
+            var entry = plan.entries.find(function(e) { return e.date === act.fromDate; });
+            if (!entry) return { ok: false, error: 'No marathon entry on ' + act.fromDate };
+            entry.date = act.toDate; entry.dayOfWeek = mDow(act.toDate);
+            plan.entries.sort(function(a,b) { return a.date.localeCompare(b.date); });
+
+          } else if (act.op === 'add_entry') {
+            plan.entries.push({ id: 'm_' + Date.now(), date: act.date, weekNumber: act.weekNumber || null,
+              dayOfWeek: mDow(act.date), type: act.type || 'other', label: act.label || '',
+              plannedDistanceMi: act.plannedDistanceMi || null, completed: false });
+            plan.entries.sort(function(a,b) { return a.date.localeCompare(b.date); });
+
+          } else if (act.op === 'remove_entry') {
+            plan.entries = plan.entries.filter(function(e) { return e.date !== act.date; });
+
+          } else if (act.op === 'set_race') {
+            if (act.raceDate) plan.raceDate = act.raceDate;
+            if (act.goalSec != null) plan.goalSec = act.goalSec;
+          }
+
+          try { localStorage.setItem('marathon_plan_v1', JSON.stringify(plan)); } catch (e) { console.warn('[Coach] marathon write failed', e); }
+          fetch('/api/db', { method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+            body: JSON.stringify({ key: 'marathon', data: { 'marathon_plan_v1': plan } })
+          }).catch(function(e) { console.warn('[Coach] marathon push failed', e); });
+          return { ok: true };
+        }
+
+        // ── Goals ─────────────────────────────────────────────────────
+        if (act.module === 'goals') {
+          function todayForGoals() {
+            const d = new Date(); if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          }
+          const dateStr = act.date || todayForGoals();
+          const key = 'goals:' + dateStr;
+          let goals = [];
+          try { goals = JSON.parse(localStorage.getItem(key) || '[]'); if (!Array.isArray(goals)) goals = []; } catch (_) {}
+
+          if (act.op === 'add') {
+            goals.push({ id: 'g_' + Date.now(), text: act.text, done: false, createdAt: Date.now() });
+          } else if (act.op === 'complete') {
+            var g = goals.find(function(g) { return g.text === act.text || g.id === act.id; });
+            if (!g) return { ok: false, error: 'Goal "' + act.text + '" not found for ' + dateStr };
+            g.done = true;
+          } else if (act.op === 'remove') {
+            var before = goals.length;
+            goals = goals.filter(function(g) { return g.text !== act.text && g.id !== act.id; });
+            if (goals.length === before) return { ok: false, error: 'Goal "' + act.text + '" not found for ' + dateStr };
+          } else if (act.op === 'update') {
+            var gu = goals.find(function(g) { return g.id === act.id || g.text === act.oldText; });
+            if (!gu) return { ok: false, error: 'Goal not found for ' + dateStr };
+            if (act.newText) gu.text = act.newText; if (act.done !== undefined) gu.done = act.done;
+          }
+
+          try { localStorage.setItem(key, JSON.stringify(goals)); } catch (e) { console.warn('[Coach] goals write failed', e); }
+          fetch('/api/db', { method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+            body: JSON.stringify({ key: 'goals', data: { [key]: goals } })
+          }).catch(function(e) { console.warn('[Coach] goals push failed', e); });
+          return { ok: true };
+        }
+
+        return { ok: false, error: 'Unknown module: ' + act.module };
+      } catch (e) {
+        return { ok: false, error: e && e.message ? e.message : String(e) };
+      }
+    }
 
     // ===== COACH — PROACTIVE SCAN (once-per-day briefing) =====
     async function runProactiveScan() {
@@ -1539,7 +1667,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-21-v2';
+    const COACH_PROMPT_BUILD = '2026-07-22-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
