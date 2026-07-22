@@ -883,18 +883,17 @@ body.topbar-modal-open {
             prevProactives.map(function(m, i) { return 'Briefing ' + (i + 1) + ': ' + m.text; }).join('\n---\n');
         }
       } catch (e) {}
-      const todayGoalsKey = 'goals:' + activeDateKey();
       return "You are a sophisticated AI system delivering the user's daily status briefing. Today is " + coachTodayLabel() + ". " +
-        "REQUIRED STRUCTURE — always output in this exact order with no preamble:\n" +
-        "1. TODAY'S TASKS: Read '" + todayGoalsKey + "' from the data. List every item where done=false as a bullet list. " +
-        "These are the user's actual tasks — surface all of them, no filtering. If all tasks are complete, say so in one line. " +
-        "If the key is missing or empty, say 'No tasks set for today.' " +
-        "2. ALERTS (optional): If and only if something genuinely critical exists beyond the tasks — an overdue deadline, a missed target, a health flag — add 1-2 bullets. Skip entirely if nothing new stands out. " +
+        "DELIVER ONLY WHAT IS NEW OR ACTIONABLE. The user can already see their task list in the Goals page — do NOT repeat it. " +
+        "STRUCTURE (skip any section if nothing genuine to report):\n" +
+        "• TASKS (one line only, no bullet list): If all tasks are done say so. If no tasks are set say so. Otherwise give a single-line count (e.g. '3 of 5 goals remaining'). Never list individual tasks.\n" +
+        "• ALERTS: 1-3 bullets for things that genuinely need attention — missed workouts, upcoming race deadlines, health flags, overdue items. Skip entirely if nothing stands out.\n" +
+        "• HIGHLIGHTS (optional): One line recognising something positive — a PR, a streak, a plan milestone. Only if genuinely noteworthy.\n" +
         "DATA RULES: " +
-        "(1) done=true = COMPLETED — never list a completed goal as a task. " +
-        "(2) strava 'when' field is precomputed — use it verbatim, never recalculate from dates. " +
+        "(1) done=true means COMPLETED — never surface a completed goal as outstanding. " +
+        "(2) strava 'when' is precomputed — use it verbatim, never recalculate from dates. " +
         "(3) po_coach_workout_done {YYYY-MM-DD:true} = gym session logged that day. " +
-        "(4) STRICT: any item you mentioned in a previous briefing that has NOT changed must be completely omitted — no updates, no 'still pending', nothing. Only new information." +
+        "(4) STRICT no-repeat: any item covered in a previous briefing that has NOT changed must be omitted entirely." +
         prevBriefing;
     }
 
@@ -1667,7 +1666,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-22-v1';
+    const COACH_PROMPT_BUILD = '2026-07-22-v2';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
