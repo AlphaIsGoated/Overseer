@@ -1656,6 +1656,9 @@ body.topbar-modal-open {
           } else if (act.op === 'set_race') {
             if (act.raceDate) plan.raceDate = act.raceDate;
             if (act.goalSec != null) plan.goalSec = act.goalSec;
+
+          } else {
+            return { ok: false, error: 'Unknown marathon op: ' + act.op };
           }
 
           // Stamp updatedAt so marathon.html's onApplied can reject a stale server snapshot
@@ -1701,10 +1704,22 @@ body.topbar-modal-open {
             var gu = goals.find(function(g) { return g.id === act.id || g.text === act.oldText; });
             if (!gu) return { ok: false, error: 'Goal not found for ' + dateStr };
             if (act.newText) gu.text = act.newText; if (act.done !== undefined) gu.done = act.done;
+          } else {
+            return { ok: false, error: 'Unknown goals op: ' + act.op };
           }
 
           try { localStorage.setItem(key, JSON.stringify(goals)); } catch (e) { console.warn('[Coach] goals write failed', e); }
-          const goalsPushBody = JSON.stringify({ key: 'goals', data: { [key]: goals } });
+          // Push the COMPLETE goals snapshot so the server row is never partially overwritten.
+          // Sending only { [key]: goals } would replace the entire goals row with one date key,
+          // and the next applyRemote on any page would delete all other goal dates.
+          const allGoalsData = {};
+          for (let gi = 0; gi < localStorage.length; gi++) {
+            const gk = localStorage.key(gi);
+            if (gk && gk.startsWith('goals:')) {
+              try { allGoalsData[gk] = JSON.parse(localStorage.getItem(gk) || '[]'); } catch (_) { allGoalsData[gk] = []; }
+            }
+          }
+          const goalsPushBody = JSON.stringify({ key: 'goals', data: allGoalsData });
           const goalsPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: goalsPushBody };
           try {
             await fetch('/api/db', goalsPushOpts);
