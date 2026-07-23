@@ -1457,24 +1457,29 @@ body.topbar-modal-open {
         while ((m = ACTION_RE.exec(reply)) !== null) actionMatches.push(m);
         if (actionMatches.length) {
           reply = reply.replace(/\[COACH_ACTION:[\s\S]*?\]/g, '').trim();
-          addMsg('coach', reply || 'Applying changes…', false);
-          speak(reply);
-          Promise.allSettled(actionMatches.map(function(am) {
+          // Await all actions before displaying anything — errors appear in the same
+          // message as the AI reply so they can never be separated from "I've done it!" claims.
+          const results = await Promise.allSettled(actionMatches.map(function(am) {
             try { return executeCoachAction(JSON.parse(am[1])); }
             catch (e) { return Promise.resolve({ ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }); }
-          })).then(function(results) {
-            const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok && !r.value.pendingConfirm); })
-              .map(function(r) { return r.reason ? r.reason.message : (r.value && r.value.error) || 'unknown error'; });
-            const hasPending = results.some(function(r) { return r.status === 'fulfilled' && r.value && r.value.pendingConfirm; });
-            if (errs.length) addMsg('coach', '⚠ Some changes failed: ' + errs.join('; '), false);
-            else if (hasPending) addMsg('coach', 'Review the draft above — click Send to confirm, or Cancel to discard.', false);
-            else {
-              // Clear today's proactive key so the next panel open re-runs the sweep
-              // and the user can verify the changes were applied correctly.
-              try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
-              addMsg('coach', '✅ Changes saved. Close and reopen this panel to see a fresh status sweep confirming the update.', false);
-            }
-          });
+          }));
+          const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok && !r.value.pendingConfirm); })
+            .map(function(r) { return r.reason ? r.reason.message : (r.value && r.value.error) || 'unknown error'; });
+          const hasPending = results.some(function(r) { return r.status === 'fulfilled' && r.value && r.value.pendingConfirm; });
+          if (errs.length) {
+            // Prepend error before reply so it can't be missed — AI may have said "I've done it!" above
+            addMsg('coach', '🚫 ' + errs.length + (errs.length === 1 ? ' change' : ' changes') + ' could not be saved:\n• ' + errs.join('\n• ') + (reply ? '\n\n' + reply : ''), false);
+          } else if (hasPending) {
+            addMsg('coach', reply || 'Review the draft below.', false);
+            speak(reply);
+            addMsg('coach', 'Review the draft above — click Send to confirm, or Cancel to discard.', false);
+          } else {
+            // Clear today's proactive key so the next panel open re-runs the sweep
+            // and the user can verify the changes were applied correctly.
+            try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
+            addMsg('coach', (reply || 'Done.') + '\n\n✅ All changes saved.', false);
+            speak(reply);
+          }
         } else {
           addMsg('coach', reply, false);  // persists coach reply
           speak(reply);
@@ -1705,8 +1710,13 @@ body.topbar-modal-open {
                 dayOfWeek: mDow(act.toDate), type: act.type || 'other', label: act.label || '',
                 plannedDistanceMi: act.plannedDistanceMi || null, completed: false });
             } else {
-              return { ok: false, error: 'No marathon entry found on or near ' + act.fromDate
-                + '. Nearby dates: ' + plan.entries.slice(0,5).map(function(e){return e.date;}).join(', ') };
+              // No source entry found — create a placeholder at toDate so the intent
+              // is honored even when the plan doesn't have the exact fromDate yet.
+              // Coach can immediately update it if type/label is missing.
+              plan.entries.push({ id: 'm_' + Date.now(), date: act.toDate, weekNumber: act.weekNumber || null,
+                dayOfWeek: mDow(act.toDate), type: act.type || 'other',
+                label: act.label || (act.type ? act.type.charAt(0).toUpperCase() + act.type.slice(1) + ' run' : 'Run'),
+                plannedDistanceMi: act.plannedDistanceMi || null, completed: false });
             }
             plan.entries.sort(function(a,b) { return a.date.localeCompare(b.date); });
 
@@ -2171,7 +2181,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v7';
+    const COACH_PROMPT_BUILD = '2026-07-23-v8';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
