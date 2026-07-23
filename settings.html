@@ -102,6 +102,18 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 .cl-date { font-size: 10px; color: var(--text-tertiary); margin-left: 8px; font-weight: 400; }
 .cl-list { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
+/* Notification schedule */
+.notif-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.notif-row:last-child { border-bottom: 0; }
+.notif-info { flex: 1; min-width: 0; }
+.notif-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.notif-time { font-size: 11px; color: var(--text-tertiary); }
+.notif-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.test-btn { padding: 5px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text-secondary); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.test-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.test-btn:disabled { opacity: 0.4; cursor: default; }
+#notifStatus { font-size: 11.5px; color: var(--text-tertiary); margin-top: 8px; min-height: 16px; }
+
 @media (max-width: 480px) { body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; } .gm-card { padding: 16px; } }
 </style>
 </head>
@@ -152,6 +164,14 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       </div>
     </div>
     <div class="hint" id="modelNote" style="margin-top:10px">Currently using Opus 4.8.</div>
+  </div>
+
+  <!-- ── NOTIFICATION SCHEDULE ── -->
+  <div class="section-title">Notification schedule</div>
+  <div class="gm-card">
+    <p class="hint" style="margin-bottom:14px">Toggle any notification type off to silence it. Times shown in your local timezone. The "Test" button sends a real push to all your subscribed devices right now.</p>
+    <div id="notifRows"></div>
+    <div id="notifStatus"></div>
   </div>
 
   <!-- ── CONSERVATION MODE ── -->
@@ -428,6 +448,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.120', date: '2026-07-23', items: ['Add Gmail integration: inbox, shipping tracker, send with confirmation', 'Add Mail module (mail.html)', 'Notification schedule in Settings: toggle each type, test buttons', 'Fix web-push DEP0169 deprecation warning'] },
     { ver: '3.119', date: '2026-07-23', items: ['Fix coach module changes not persisting on mobile (race condition)', 'Fix marathon last-run and morning goals notification'] },
 
     { ver: '3.118', date: '2026-07-22', items: ['Fix false \'no recent run\' alert: cross-reference marathon log + force Strava refresh'] },
@@ -678,6 +699,89 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   ).join('');
 
   window.addEventListener('storage', () => { renderSpend(); renderBudget(); });
+
+  // ── NOTIFICATION SCHEDULE ──────────────────────────────────────────
+  // Times are the UTC hour from vercel.json cron schedules, converted to
+  // local time so the user sees them in their own timezone.
+  const NOTIF_TYPES = [
+    { key: 'morning',   label: '☀️ Morning briefing',   utcHour: 12 },
+    { key: 'reminders', label: '✅ Daily reminders',     utcHour: 13 },
+    { key: 'nutrition', label: '🥗 Nutrition check-in', utcHour: 20 },
+    { key: 'training',  label: '🏃 Training reminder',  utcHour: 21 },
+    { key: 'skincare',  label: '🧖 Skincare routine',   utcHour: 2  },
+  ];
+
+  function localTimeStr(utcHour) {
+    const d = new Date(); d.setUTCHours(utcHour, 0, 0, 0);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function loadNotifPrefs() {
+    try { return JSON.parse(localStorage.getItem('notification_prefs')) || {}; } catch (e) { return {}; }
+  }
+
+  function saveNotifPrefs(prefs) {
+    try { localStorage.setItem('notification_prefs', JSON.stringify(prefs)); } catch (e) { console.error('[Settings] localStorage quota:', e); }
+    const secret = window.DASH_APP_SECRET || '';
+    fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+      body: JSON.stringify({ key: 'notification_prefs', data: prefs }),
+    }).catch(function(e) { console.warn('[Settings] notif prefs push failed', e); });
+  }
+
+  function renderNotifRows() {
+    const prefs = loadNotifPrefs();
+    const container = $('notifRows');
+    container.innerHTML = NOTIF_TYPES.map(function(t) {
+      const enabled = prefs[t.key] !== false;
+      return '<div class="notif-row">' +
+        '<div class="notif-info">' +
+          '<div class="notif-name">' + t.label + '</div>' +
+          '<div class="notif-time">Fires at ' + localTimeStr(t.utcHour) + ' · ' + (enabled ? '<span style="color:var(--success)">Enabled</span>' : '<span style="color:var(--text-tertiary)">Disabled</span>') + '</div>' +
+        '</div>' +
+        '<div class="notif-actions">' +
+          '<button class="test-btn" data-test="' + t.key + '">Test</button>' +
+          '<label class="toggle"><input type="checkbox" data-notif="' + t.key + '"' + (enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+
+    container.querySelectorAll('input[data-notif]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        const prefs = loadNotifPrefs();
+        prefs[input.dataset.notif] = input.checked;
+        saveNotifPrefs(prefs);
+        renderNotifRows();
+      });
+    });
+
+    container.querySelectorAll('button[data-test]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const type = btn.dataset.test;
+        const statusEl = $('notifStatus');
+        btn.disabled = true;
+        btn.textContent = '...';
+        statusEl.textContent = 'Sending ' + type + ' notification…';
+        const secret = window.DASH_APP_SECRET || '';
+        fetch('/api/push-send?type=' + type, {
+          headers: { 'X-App-Secret': secret },
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          statusEl.textContent = data.sent > 0 ? '✓ Sent to ' + data.sent + ' device' + (data.sent !== 1 ? 's' : '') + '.' : '⚠ ' + (data.message || 'No subscribed devices.');
+          statusEl.style.color = data.sent > 0 ? 'var(--success)' : 'var(--warning)';
+        }).catch(function(e) {
+          statusEl.textContent = '✗ Send failed — check console.';
+          statusEl.style.color = 'var(--danger)';
+          console.warn('[Settings] test push failed', e);
+        }).finally(function() {
+          btn.disabled = false;
+          btn.textContent = 'Test';
+        });
+      });
+    });
+  }
+  renderNotifRows();
+
 })();
 </script>
 </body>

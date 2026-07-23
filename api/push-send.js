@@ -173,6 +173,20 @@ export default async function handler(req, res) {
   if (!isCron && !requireAppSecret(req, res)) return;
 
   const type = (req.query && req.query.type) || 'morning';
+
+  // Check user notification preferences for scheduled cron calls.
+  // Manual calls (test button in Settings) always fire regardless of prefs.
+  if (isCron) {
+    const notifPrefsRaw = await fetchModuleData(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      'notification_prefs'
+    );
+    if (notifPrefsRaw && notifPrefsRaw[type] === false) {
+      return res.status(200).json({ ok: true, sent: 0, message: 'notification type disabled by user preference' });
+    }
+  }
+
   const vapidPublic = process.env.VAPID_PUBLIC_KEY;
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
   const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@overseer.app';
