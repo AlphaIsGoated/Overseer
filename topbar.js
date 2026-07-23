@@ -278,6 +278,19 @@ body.topbar-modal-open {
     overscroll-behavior: contain;
   }
 }
+/* ── Gmail confirmation card ── */
+.gmail-confirm-card { background: rgba(110,231,183,0.04); border: 1px solid rgba(110,231,183,0.3); border-radius: 10px; padding: 12px; margin-top: 4px; }
+.gmail-confirm-label { font-size: 11px; color: rgba(110,231,183,0.65); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.gmail-confirm-field { font-size: 12.5px; color: #b8e8d0; margin-bottom: 4px; }
+.gmail-confirm-field b { color: rgba(110,231,183,0.55); }
+.gmail-confirm-body { font-size: 12.5px; color: #c9f7e3; background: rgba(0,0,0,0.25); border-radius: 6px; padding: 8px 10px; margin: 8px 0; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
+.gmail-confirm-actions { display: flex; gap: 8px; margin-top: 10px; }
+.gmail-btn { padding: 7px 15px; border-radius: 7px; border: 1px solid; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.15s; }
+.gmail-send { background: rgba(110,231,183,0.15); color: #6EE7B7; border-color: rgba(110,231,183,0.4); }
+.gmail-send:hover:not(:disabled) { background: rgba(110,231,183,0.3); }
+.gmail-cancel { background: rgba(255,255,255,0.04); color: rgba(200,200,200,0.6); border-color: rgba(255,255,255,0.12); }
+.gmail-cancel:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
+.gmail-btn:disabled { opacity: 0.4; cursor: default; }
 `;
 
   // -------- HTML --------
@@ -670,7 +683,7 @@ body.topbar-modal-open {
         'canvas_creds_v1','apiusage:log','data-theme','coach_voice_on','nova_voice_on',
         'settings:budget_alerted','settings:conservation_mode','settings:model',
         'settings:theme','settings:monthly_budget',
-        'google_last_sync','canvas_last_sync','strava_last_sync','whoop_last_sync',
+        'google_last_sync','canvas_last_sync','strava_last_sync','whoop_last_sync','gmail_last_sync',
         'finance_active_tab','po_coach_units_migrated_lb_v1',
         'wish-hero-pct-num','app_secret',
       ]);
@@ -765,6 +778,18 @@ body.topbar-modal-open {
         } else if (k === 'google_cal_events_v1' && Array.isArray(v)) {
           // Already slimmed with precomputed when strings — cap to 30 upcoming events
           out[k] = v.slice(0, 30);
+        } else if (k === 'gmail_summary_v1' && v && typeof v === 'object') {
+          // Slim gmail data: pass unread count, top 10 threads (subject/from/when/snippet),
+          // and up to 5 shipping threads. Drop full email bodies and raw dates.
+          out[k] = {
+            unreadCount: v.unreadCount || 0,
+            threads: (v.threads || []).slice(0, 10).map(function(t) {
+              return { subject: t.subject, from: t.from, when: t.when, snippet: (t.snippet || '').slice(0, 120), isUnread: t.isUnread, isImportant: t.isImportant, id: t.id };
+            }),
+            shipping: (v.shipping || []).slice(0, 5).map(function(t) {
+              return { subject: t.subject, from: t.from, when: t.when, snippet: (t.snippet || '').slice(0, 160) };
+            }),
+          };
         } else if (k === 'po_coach_weights' && Array.isArray(v)) {
           out[k] = v.slice(-20);
         } else if ((k === 'po_coach_photos' || k === 'po_coach_inbody') && v) {
@@ -876,6 +901,9 @@ body.topbar-modal-open {
         " • Complete goal: {\"module\":\"goals\",\"op\":\"complete\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Remove goal: {\"module\":\"goals\",\"op\":\"remove\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Update goal: {\"module\":\"goals\",\"op\":\"update\",\"oldText\":\"Old text\",\"newText\":\"New text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        "GMAIL (module:\"gmail\"): Read access via gmail_summary_v1 in dashboard data. To draft/send an email, emit a [COACH_ACTION] with op:\"send\" — a confirmation card appears and the email is NOT sent until the user clicks Send.\n" +
+        " • Draft/send: {\"module\":\"gmail\",\"op\":\"send\",\"to\":\"name@domain.com\",\"subject\":\"Subject line\",\"body\":\"Full email body text\",\"cc\":\"optional\",\"threadId\":\"optional thread id for replies\"}\n" +
+        "GMAIL RULES: Always write the full email body — do not truncate or summarize. If recipient, subject, or key content is unclear, ask before emitting. Do not mention the confirmation step in your reply text — it appears automatically.\n" +
         "RULES: Only emit action blocks when the user explicitly asks you to make a change. If date or details are ambiguous, ask first. Never emit action blocks for read-only questions." +
         memory +
         "\n\nDashboard data as JSON:\n";
@@ -905,7 +933,8 @@ body.topbar-modal-open {
         "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
         "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
         "4. CALENDAR — Upcoming events from google_cal_events_v1 (today and tomorrow). Skip if none.\n\n" +
-        "5. ALERTS — Any genuinely critical items not covered above: overdue deadlines, missed targets, upcoming race countdown, health flags. 1-3 bullets max. Skip entirely if nothing stands out.\n\n" +
+        "5. EMAIL — From gmail_summary_v1: unread count, any important/starred threads needing action, and any shipping emails (packages in transit or arriving soon). Skip entirely if inbox is clear or no gmail data.\n\n" +
+        "6. ALERTS — Any genuinely critical items not covered above: overdue deadlines, missed targets, upcoming race countdown, health flags. 1-3 bullets max. Skip entirely if nothing stands out.\n\n" +
         "DATA RULES: " +
         "(1) done=true = COMPLETED — never list as outstanding. " +
         "(2) strava/marathon 'when' is precomputed — use verbatim, never recalculate. " +
@@ -1103,6 +1132,14 @@ body.topbar-modal-open {
       if (Date.now() - stravaLastSync > 30 * 60 * 1000) {
         await primeStravaActivities(secret);
       }
+
+      // ── Refresh Gmail summary (throttled: once per 15 min) ──
+      // gmail_summary_v1 is local-only. Refreshed here so coach always has
+      // current inbox/shipping data without requiring a visit to mail.html.
+      const gmailLastSync = parseInt(localStorage.getItem('gmail_last_sync') || '0', 10);
+      if (Date.now() - gmailLastSync > 15 * 60 * 1000) {
+        await loadGmailSummary(secret);
+      }
     }
 
     async function primeStravaActivities(secret) {
@@ -1151,6 +1188,105 @@ body.topbar-modal-open {
         localStorage.setItem('strava_last_sync', String(Date.now()));
       } catch (e) { console.warn('[Coach] primeStravaActivities failed', e); }
     }
+
+    // ===== COACH — GMAIL SUMMARY LOADER =====
+    // Fetches recent inbox threads (excluding promotions/social) and identifies shipping
+    // emails. Stores result in gmail_summary_v1 for coach and mail.html.
+    // Requires google_accounts_v1 token with gmail.readonly scope.
+    async function loadGmailSummary(secret) {
+      try {
+        let accounts;
+        try { accounts = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]'); } catch (_) {}
+        if (!accounts || !accounts.length) return;
+        let account = accounts[0];
+        // Only proceed if the token has gmail scope (granted after user reconnects in calendar.html)
+        if (!account.scope || !account.scope.includes('gmail.readonly')) return;
+
+        // Refresh token if expiring soon
+        if (account.expires && Date.now() > account.expires - 60000) {
+          try {
+            const rr = await fetch('/api/integrations/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+              body: JSON.stringify({ refresh_token: account.refresh }),
+            });
+            const jj = await rr.json();
+            if (jj.access_token) {
+              account = Object.assign({}, account, { access: jj.access_token, expires: Date.now() + (jj.expires_in || 3500) * 1000 });
+              accounts[0] = account;
+              try { localStorage.setItem('google_accounts_v1', JSON.stringify(accounts)); } catch (_) {}
+            }
+          } catch (e) { console.warn('[Gmail] token refresh failed', e); }
+        }
+
+        const gHdr = { 'Authorization': 'Bearer ' + account.access, 'X-App-Secret': secret };
+
+        // Fetch up to 20 primary inbox messages (no promotions/social/updates)
+        const listParams = new URLSearchParams({ path: '/users/me/messages', maxResults: '20', q: 'in:inbox -category:promotions -category:social -category:updates' });
+        const listR = await fetch('/api/integrations/google?' + listParams, { headers: gHdr });
+        if (!listR.ok) { console.warn('[Gmail] messages list failed:', listR.status); return; }
+        const listData = await listR.json();
+        const msgIds = ((listData.messages) || []).slice(0, 14).map(function(m) { return m.id; });
+        if (!msgIds.length) {
+          try { localStorage.setItem('gmail_summary_v1', JSON.stringify({ fetchedAt: Date.now(), threads: [], shipping: [], unreadCount: 0 })); } catch(_) {}
+          localStorage.setItem('gmail_last_sync', String(Date.now()));
+          return;
+        }
+
+        const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+        function whenFromDate(d) {
+          if (!d || isNaN(d)) return 'unknown';
+          const days = Math.round((todayMid - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+          return days === 0 ? 'today' : days === 1 ? 'yesterday' : days > 1 ? days + ' days ago' : 'today';
+        }
+        function parseName(raw) {
+          raw = (raw || '').trim();
+          const m = raw.match(/^"?([^"<]+?)"?\s*<[^>]+>$/);
+          return m ? m[1].trim() : raw.replace(/<[^>]+>/, '').trim() || raw.split('@')[0];
+        }
+        function parseEmail(raw) { const m = (raw || '').match(/<([^>]+)>/); return m ? m[1] : (raw || '').trim(); }
+
+        // Batch-fetch message metadata in parallel
+        const metaResults = await Promise.allSettled(msgIds.map(async function(id) {
+          const p = new URLSearchParams({ path: '/users/me/messages/' + id, format: 'metadata' });
+          p.append('metadataHeaders', 'Subject');
+          p.append('metadataHeaders', 'From');
+          p.append('metadataHeaders', 'Date');
+          const r = await fetch('/api/integrations/google?' + p, { headers: gHdr });
+          if (!r.ok) return null;
+          const msg = await r.json();
+          const hdrs = {};
+          ((msg.payload && msg.payload.headers) || []).forEach(function(h) { hdrs[h.name] = h.value; });
+          const fromRaw = hdrs['From'] || '';
+          const subject = (hdrs['Subject'] || '(no subject)').slice(0, 120);
+          const snippet = (msg.snippet || '').slice(0, 200);
+          const dateObj = hdrs['Date'] ? new Date(hdrs['Date']) : null;
+          const isUnread = ((msg.labelIds) || []).includes('UNREAD');
+          const isImportant = ((msg.labelIds) || []).includes('IMPORTANT');
+          const isShipping = /shipped|tracking number|your order|out for delivery|package|dispatched|estimated delivery/i.test(subject + ' ' + snippet);
+          return {
+            id: msg.id,
+            threadId: msg.threadId || msg.id,
+            subject,
+            from: parseName(fromRaw),
+            fromEmail: parseEmail(fromRaw),
+            when: whenFromDate(dateObj),
+            snippet,
+            isUnread,
+            isImportant,
+            isShipping,
+          };
+        }));
+
+        const threads = metaResults.map(function(r) { return r.status === 'fulfilled' ? r.value : null; }).filter(Boolean);
+        const shipping = threads.filter(function(t) { return t.isShipping; });
+        const summary = { fetchedAt: Date.now(), threads, shipping, unreadCount: threads.filter(function(t) { return t.isUnread; }).length };
+        try { localStorage.setItem('gmail_summary_v1', JSON.stringify(summary)); } catch(e) { console.warn('[Gmail] write failed', e); }
+        localStorage.setItem('gmail_last_sync', String(Date.now()));
+        return summary;
+      } catch (e) { console.warn('[Gmail] loadGmailSummary failed', e); }
+    }
+    window.loadGmailSummary = loadGmailSummary;
 
     let busy = false;
     async function ask(text) {
@@ -1216,9 +1352,11 @@ body.topbar-modal-open {
             try { return executeCoachAction(JSON.parse(am[1])); }
             catch (e) { return Promise.resolve({ ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }); }
           })).then(function(results) {
-            const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok); })
+            const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok && !r.value.pendingConfirm); })
               .map(function(r) { return r.reason ? r.reason.message : (r.value && r.value.error) || 'unknown error'; });
+            const hasPending = results.some(function(r) { return r.status === 'fulfilled' && r.value && r.value.pendingConfirm; });
             if (errs.length) addMsg('coach', '⚠ Some changes failed: ' + errs.join('; '), false);
+            else if (hasPending) addMsg('coach', 'Review the draft above — click Send to confirm, or Cancel to discard.', false);
             else addMsg('coach', '✅ Changes saved. Reload the page to see them reflected.', false);
           });
         } else {
@@ -1291,6 +1429,111 @@ body.topbar-modal-open {
       }
     }
     window.addGoogleCalendarEvent = addGoogleCalendarEvent;
+
+    // ===== COACH — GMAIL SEND WITH CONFIRMATION =====
+    // Coach emits [COACH_ACTION:{module:'gmail',op:'send',...}].
+    // executeCoachAction calls showGmailConfirmation() instead of sending immediately.
+    // User must click "Send" to confirm — prevents accidental sends.
+
+    function buildRawEmail(to, subject, body, replyToMsgId) {
+      const lines = [
+        'To: ' + to,
+        'Subject: ' + subject,
+        'Content-Type: text/plain; charset=UTF-8',
+        'MIME-Version: 1.0',
+        ...(replyToMsgId ? ['In-Reply-To: ' + replyToMsgId, 'References: ' + replyToMsgId] : []),
+        '',
+        body,
+      ];
+      const raw = lines.join('\r\n');
+      // Base64url encode (RFC 4648 §5: + → -, / → _, no padding)
+      const b64 = typeof btoa !== 'undefined'
+        ? btoa(unescape(encodeURIComponent(raw)))
+        : Buffer.from(raw).toString('base64');
+      return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function sendGmailNow(draft, secret) {
+      let accounts;
+      try { accounts = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]'); } catch (_) {}
+      if (!accounts || !accounts.length) return { ok: false, error: 'No Google account connected.' };
+      let account = accounts[0];
+      if (!account.scope || !account.scope.includes('gmail.send')) {
+        return { ok: false, error: 'No gmail.send permission. Go to Calendar → reconnect your Google account.' };
+      }
+      // Refresh if expiring
+      if (account.expires && Date.now() > account.expires - 60000) {
+        try {
+          const rr = await fetch('/api/integrations/google', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+            body: JSON.stringify({ refresh_token: account.refresh }),
+          });
+          const jj = await rr.json();
+          if (jj.access_token) {
+            account = Object.assign({}, account, { access: jj.access_token, expires: Date.now() + (jj.expires_in || 3500) * 1000 });
+            accounts[0] = account;
+            try { localStorage.setItem('google_accounts_v1', JSON.stringify(accounts)); } catch (_) {}
+          }
+        } catch (e) { console.warn('[Gmail] send token refresh failed', e); }
+      }
+      try {
+        const rawB64 = buildRawEmail(draft.to, draft.subject, draft.body, draft.replyToMsgId || null);
+        const sendPath = '/users/me/messages/send' + (draft.threadId ? '?threadId=' + draft.threadId : '');
+        const r = await fetch('/api/integrations/google?path=' + encodeURIComponent('/users/me/messages/send'), {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + account.access, 'Content-Type': 'application/json', 'X-App-Secret': secret },
+          body: JSON.stringify({ raw: rawB64, ...(draft.threadId ? { threadId: draft.threadId } : {}) }),
+        });
+        const j = await r.json().catch(function() { return {}; });
+        if (r.ok) return { ok: true };
+        if (r.status === 403) return { ok: false, error: 'Gmail send permission denied — reconnect Google account in Calendar.' };
+        return { ok: false, error: (j && j.error && j.error.message) || ('Gmail API error ' + r.status) };
+      } catch (e) { return { ok: false, error: e && e.message ? e.message : String(e) }; }
+    }
+
+    function showGmailConfirmation(draft) {
+      function escH(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+      const secret = window.DASH_APP_SECRET || '';
+      const card = document.createElement('div');
+      card.className = 'coach-msg coach';
+      card.innerHTML =
+        '<div class="gmail-confirm-card">' +
+        '<div class="gmail-confirm-label">✉ Email draft — confirm before sending</div>' +
+        '<div class="gmail-confirm-field"><b>To:</b> ' + escH(draft.to) + '</div>' +
+        (draft.cc ? '<div class="gmail-confirm-field"><b>CC:</b> ' + escH(draft.cc) + '</div>' : '') +
+        '<div class="gmail-confirm-field"><b>Subject:</b> ' + escH(draft.subject) + '</div>' +
+        '<div class="gmail-confirm-body">' + escH(draft.body) + '</div>' +
+        '<div class="gmail-confirm-actions">' +
+        '<button class="gmail-btn gmail-send">📤 Send</button>' +
+        '<button class="gmail-btn gmail-cancel">✕ Cancel</button>' +
+        '</div></div>';
+      feed.appendChild(card);
+      feed.scrollTop = feed.scrollHeight;
+
+      card.querySelector('.gmail-send').addEventListener('click', async function() {
+        const btns = card.querySelectorAll('.gmail-btn');
+        btns.forEach(function(b) { b.disabled = true; });
+        this.textContent = '⟳ Sending…';
+        const result = await sendGmailNow(draft, secret);
+        if (result.ok) {
+          card.querySelector('.gmail-confirm-card').innerHTML = '<div style="color:#6EE7B7;font-size:13px">📤 Email sent to ' + escH(draft.to) + '</div>';
+          // Invalidate Gmail cache so next open shows the sent thread
+          localStorage.removeItem('gmail_last_sync');
+        } else {
+          btns.forEach(function(b) { b.disabled = false; });
+          card.querySelector('.gmail-send').textContent = '📤 Send';
+          const errEl = document.createElement('div');
+          errEl.style.cssText = 'color:#f87171;font-size:12px;margin-top:6px';
+          errEl.textContent = '⚠ ' + result.error;
+          card.querySelector('.gmail-confirm-actions').after(errEl);
+        }
+      });
+
+      card.querySelector('.gmail-cancel').addEventListener('click', function() {
+        card.querySelector('.gmail-confirm-card').innerHTML = '<div style="color:rgba(200,200,200,0.4);font-size:12px">Cancelled.</div>';
+      });
+    }
+    window.showGmailConfirmation = showGmailConfirmation;
 
     // ===== COACH — MODULE WRITE ACTIONS =====
     // Executes a single structured action emitted by the coach in a [COACH_ACTION:{...}] block.
@@ -1396,6 +1639,17 @@ body.topbar-modal-open {
             catch (e2) { console.warn('[Coach] goals push retry failed', e2); }
           }
           return { ok: true };
+        }
+
+        // ── Gmail ────────────────────────────────────────────────
+        if (act.module === 'gmail') {
+          if (act.op === 'send') {
+            if (!act.to || !act.subject || !act.body) return { ok: false, error: 'Gmail send requires: to, subject, body' };
+            // Show confirmation card — do NOT send yet. User must click "Send".
+            showGmailConfirmation({ to: act.to, subject: act.subject, body: act.body, cc: act.cc || null, threadId: act.threadId || null });
+            return { ok: true, pendingConfirm: true };
+          }
+          return { ok: false, error: 'Unknown gmail op: ' + act.op };
         }
 
         return { ok: false, error: 'Unknown module: ' + act.module };
@@ -1701,7 +1955,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v1';
+    const COACH_PROMPT_BUILD = '2026-07-23-v2';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
