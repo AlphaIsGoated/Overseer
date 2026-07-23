@@ -9,5 +9,11 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "scripts": {
+    "postinstall": "patch-package"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }
