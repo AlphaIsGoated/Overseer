@@ -1340,11 +1340,21 @@ body.topbar-modal-open {
             if (act.goalSec != null) plan.goalSec = act.goalSec;
           }
 
+          // Stamp updatedAt so marathon.html's onApplied can reject a stale server snapshot
+          plan.updatedAt = Date.now();
           try { localStorage.setItem('marathon_plan_v1', JSON.stringify(plan)); } catch (e) { console.warn('[Coach] marathon write failed', e); }
-          fetch('/api/db', { method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
-            body: JSON.stringify({ key: 'marathon', data: { 'marathon_plan_v1': plan } })
-          }).catch(function(e) { console.warn('[Coach] marathon push failed', e); });
+          // Await the push — don't return until the server has the new data.
+          // On mobile the user may navigate to marathon.html immediately; if the push
+          // is fire-and-forget, applyRemote can overwrite localStorage with old server data.
+          const marathonPushBody = JSON.stringify({ key: 'marathon', data: { 'marathon_plan_v1': plan } });
+          const marathonPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: marathonPushBody };
+          try {
+            await fetch('/api/db', marathonPushOpts);
+          } catch (e) {
+            console.warn('[Coach] marathon push failed, retrying', e);
+            try { await new Promise(function(r) { setTimeout(r, 1500); }); await fetch('/api/db', marathonPushOpts); }
+            catch (e2) { console.warn('[Coach] marathon push retry failed', e2); }
+          }
           return { ok: true };
         }
 
@@ -1376,10 +1386,15 @@ body.topbar-modal-open {
           }
 
           try { localStorage.setItem(key, JSON.stringify(goals)); } catch (e) { console.warn('[Coach] goals write failed', e); }
-          fetch('/api/db', { method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
-            body: JSON.stringify({ key: 'goals', data: { [key]: goals } })
-          }).catch(function(e) { console.warn('[Coach] goals push failed', e); });
+          const goalsPushBody = JSON.stringify({ key: 'goals', data: { [key]: goals } });
+          const goalsPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: goalsPushBody };
+          try {
+            await fetch('/api/db', goalsPushOpts);
+          } catch (e) {
+            console.warn('[Coach] goals push failed, retrying', e);
+            try { await new Promise(function(r) { setTimeout(r, 1500); }); await fetch('/api/db', goalsPushOpts); }
+            catch (e2) { console.warn('[Coach] goals push retry failed', e2); }
+          }
           return { ok: true };
         }
 

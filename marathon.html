@@ -568,6 +568,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   if (!Array.isArray(plan.entries)) plan.entries = [];
 
   function savePlan() {
+    plan.updatedAt = Date.now(); // timestamp so onApplied can reject stale server snapshots
     saveJSON(PLAN_KEY, plan);
     fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': window.DASH_APP_SECRET || '' },
       body: JSON.stringify({ key: 'marathon', data: { [PLAN_KEY]: plan } }) }).catch(function(e) { console.warn('[marathon] push failed:', e); });
@@ -1606,7 +1607,20 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
       appKey: 'marathon',
       syncedKeys: [PLAN_KEY],
       onApplied: function () {
-        plan = loadJSON(PLAN_KEY, defaultPlan());
+        // Reject stale server snapshots. If the coach (or this page) wrote a newer
+        // plan to localStorage and pushed it to the server, applyRemote may briefly
+        // bring back an older snapshot before the push propagates. Comparing updatedAt
+        // prevents that race from discarding in-flight coach changes.
+        const incoming = loadJSON(PLAN_KEY, null);
+        if (!incoming) return;
+        const incomingTs = incoming.updatedAt || 0;
+        const currentTs = plan && plan.updatedAt ? plan.updatedAt : 0;
+        if (incomingTs < currentTs) {
+          // Server snapshot is older than current in-memory plan — server hasn't
+          // received the latest push yet. Keep in-memory state; don't re-render.
+          return;
+        }
+        plan = incoming;
         if (!Array.isArray(plan.entries)) plan.entries = [];
         renderCountdown(); renderPaceGrid(); renderProgress();
         renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderSchedule();
