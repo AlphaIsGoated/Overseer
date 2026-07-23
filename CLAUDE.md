@@ -116,6 +116,13 @@ If `applyRemote` fires while a note (or any record) editor is open, it can wipe 
 
 Never use a bare `catch(e) {}` or `.catch(function() {})` with no body.
 
+### 13. updatedAt timestamps for optimistic concurrency
+When a page has a large object that the coach can also write (e.g. `marathon_plan_v1`), `applyRemote` can overwrite a coach-written value with a stale server snapshot if the push is still in-flight. Fix: stamp `updatedAt = Date.now()` on every write (both user-saves and coach-writes); in `onApplied`, compare `incoming.updatedAt` vs `plan.updatedAt` — if incoming is older, skip the apply.
+
+**Rule:** Any page where the coach writes to the same localStorage key that `applyRemote` also writes must maintain an `updatedAt` timestamp and guard `onApplied` with `if (incomingTs < currentTs) return`.
+
+**Affected file:** `marathon.html`. Fixed in session 2026-07-23.
+
 ---
 
 ## Project Map
@@ -132,8 +139,12 @@ Never use a bare `catch(e) {}` or `.catch(function() {})` with no body.
 | `health.html` | **Supplements** | Daily supplement stack tracker. |
 | `marathon.html` | **Marathon** | Marathon training plan, long-run tracking. |
 | `brain.html` | **Notes / Brain** | Obsidian-connected notes and observations. |
+| `mail.html` | **Mail** | Gmail inbox viewer, shipping tracker, compose. Reads `gmail_summary_v1` from localStorage (populated by `topbar.js`). Compose calls `window.sendGmailNow()`. |
+| `calendar.html` | **Calendar** | Google Calendar viewer + OAuth flow. Holds the Google `SCOPE` constant — must be updated here when new OAuth scopes are needed. Users must reconnect after any scope change. |
 | `api/db.js` | **DB Proxy** | Server-side Supabase proxy. All sync reads/writes go through `/api/db`. |
 | `api/ai/ai-chat.js` | **AI Chat Proxy** | Server-side proxy to Anthropic API. Used by coach and link auto-categorize. |
+| `api/integrations/google.js` | **Google Proxy** | Handles OAuth token refresh and forwards API calls. Routing: `/userinfo` → Google OAuth2; `/users/*` → Gmail API; all others → Google Calendar API. POST with `?path=` param → API write; POST without → token refresh. |
+| `api/push-send.js` | **Push Notification Cron** | Vercel cron handler. `morning` (8 AM), `reminders` (9 AM) cases. Reads goals and marathon plan from Supabase; falls back to `goals:yesterday` when `goals:today` is absent. |
 | `middleware.js` | **Auth** | Vercel edge middleware. Checks `x-app-secret` header on all `/api/*` routes. |
 
 **localStorage key namespaces** (important for sync scoping):
@@ -147,6 +158,8 @@ Never use a bare `catch(e) {}` or `.catch(function() {})` with no body.
 | `coach_prompt_build` | Coach | No | — |
 | `apiusage:log` | Usage | Yes (exact key) | `apiusage` |
 | `strava_activities_v1` | Strava | No (pulled fresh by integration) | — |
+| `gmail_summary_v1` | Mail / Coach | **No** — local-only cache, refreshed on demand | — |
+| `gmail_last_sync` | Mail / Coach | No — ephemeral throttle timestamp | — |
 | `po_coach_v1` | Workout Coach | No | — |
 | `po_coach_workout_done` | Workout | No | — |
 | `savedlinks:items` | Saved Links | Yes (exact key) | `savedlinks` |
@@ -174,6 +187,7 @@ Never use a bare `catch(e) {}` or `.catch(function() {})` with no body.
 | `personalcare` | `personal-care.html` | store key |
 | `skincare` | `skincare.html` | store key |
 | `chores` | `chores.html` | store key |
+| *(none)* | `mail.html` | No sync — reads `gmail_summary_v1` populated by topbar.js; sends via `window.sendGmailNow()` |
 
 ---
 
@@ -187,6 +201,11 @@ Entries are newest-first within each section. Add a new entry at the **top** of 
 
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added Gmail integration. `loadGmailSummary(secret)` fetches up to 14 primary inbox threads (excluding promotions/social/updates), extracts metadata (subject, from, when, snippet, isUnread, isImportant, isShipping), stores as `gmail_summary_v1`. Called from `primeCoachData()` with 15-min throttle; throttle bypassed (same as Strava) on daily scan. `buildRawEmail()` + `sendGmailNow()` construct RFC 2822 base64url message and POST to Gmail API. `showGmailConfirmation(draft)` renders inline confirmation card — **actual send only fires when user clicks Send** (option B explicit confirmation). `executeCoachAction()` gmail handler: `op:'send'` → shows confirmation card → returns `{pendingConfirm:true}`. `ask()` detects `pendingConfirm` and shows "Review the draft" instead of "Changes saved". `dashboardData()` slim handler for `gmail_summary_v1` (10 threads, 5 shipping, unreadCount). `CHAT_SYS()` updated with Gmail write schema. `PROACTIVE_SYS()` section 5 covers email; section 6 covers alerts. Gmail CSS styles added to coach CSS block. `COACH_PROMPT_BUILD` bumped to `'2026-07-23-v2'`. New module: `mail.html` (inbox, shipping tracker, stats, compose). Added mail tile to `index.html` bento grid (·23). `api/integrations/google.js` routes `/users/*` paths to Gmail API. `calendar.html` scope updated to include `gmail.readonly` + `gmail.send`. | User must reconnect Google account in `calendar.html` for Gmail scopes to apply — old tokens only have calendar scope. If Strava throttle isn't cleared before daily scan, Gmail (15-min throttle) may also use stale cache; forced cleared same as Strava in `openPanel()`. Coach send confirmation card is rendered inline — if the coach feed resets mid-session, any pending confirmation card is lost (user must re-ask). `gmail_summary_v1` is local-only (not synced to Supabase). |
+| 2026-07-23 | *(this session)* | Fixed `executeCoachAction()` marathon/goals push race on mobile: push is now awaited with one automatic retry (1.5s delay). Added `plan.updatedAt = Date.now()` stamp on every coach write; `marathon.html` `onApplied` rejects server snapshots older than current in-memory plan (stale `applyRemote` during in-flight push no longer overwrites coach changes). `savePlan()` also stamps `updatedAt`. | `onApplied` rejecting stale snapshots means a legitimate rollback from another device won't apply if the local plan is newer. This is acceptable — the push is awaited, so the server should always be at least as current as local state. |
+| 2026-07-23 | *(this session)* | Fixed DEP0169 `url.parse()` deprecation warning from `web-push` showing as Vercel function errors. Installed `patch-package`; patch replaces both `url.parse()` calls in `web-push/src/web-push-lib.js` with WHATWG `new URL()` — `.path` (pathname+search combined) replaced with `.pathname + .search`. Patch re-applies on every `npm install` via `postinstall` script. | If `web-push` is upgraded, the patch will need to be regenerated (`npx patch-package web-push`). The `.pathname + .search` replacement is semantically equivalent to the old `.path`. |
+| 2026-07-23 | *(this session)* | Fixed morning push notification not showing goals (said "nothing to do" even with goals set). Root cause: `goals:today` only created in browser after user opens `main.html`; at 9 AM the cron fires before the app is opened. Fix: `reminders` and `morning` cron cases now fall back to `goals:yesterday` when `goals:today` is empty — rollover copies pending goals, so yesterday's uncompleted goals are identical to today's. `morning` notification now includes pending goal count and today's run in the body. | If the user has genuinely completed all goals by morning and today's key doesn't exist yet (e.g., cleared cache), the fallback to yesterday's goals may show already-done items (done=true items are filtered out, so this is safe). |
+| 2026-07-23 | *(this session)* | Fixed marathon data not reaching coach (false "43-day gap" alert). `dashboardData()` now precomputes `marathon_plan_v1.last_logged_run` — the most recent past entry where `completed=true` or `actualDistanceMi>0` and `type!='rest'`, with precomputed `when`. `entries_completed` replaced by `entries_recent_history` (last 30 past entries newest-first). `PROACTIVE_SYS()` updated to use `last_logged_run` as primary run source; falls back to `strava_activities_v1` only if null; forbidden from reporting a long Strava gap if marathon plan shows scheduled activity. `COACH_PROMPT_BUILD` bumped. | `last_logged_run` is null if no marathon entries have `completed=true` and no `actualDistanceMi>0` — coach then uses Strava fallback. If user runs without logging in either system, no source shows recent runs. |
 | 2026-07-22 | *(this session)* | Added coach write access to marathon and goals modules. Coach can now emit `[COACH_ACTION:{...}]` blocks (one or more per reply) that `ask()` intercepts and executes via `executeCoachAction()`. Marathon: update_entry, move_entry, add_entry, remove_entry, set_race — writes to `marathon_plan_v1` in localStorage and pushes to server. Goals: add, complete, remove, update — writes to `goals:YYYY-MM-DD` key and pushes to server. `dashboardData()` now includes `date` field on marathon entries so coach has the ISO date for targeting write ops (still uses `when` for display per Invariant §5). Multiple action blocks in one reply execute in parallel via `Promise.allSettled`. `CHAT_SYS()` updated with full write-access schema and rules. COACH_PROMPT_BUILD bumped to `'2026-07-22-v1'`. | Coach writes directly to localStorage — if the marathon/goals page is open in another tab at the same time, its in-memory state won't see the change until it re-reads localStorage (reload or next applyRemote poll). The "✅ Changes saved. Reload the page." confirmation message reminds the user. |
 | 2026-07-21 | *(this session)* | Fixed stale Strava data causing false coach alerts. `strava_activities_v1` was only refreshed when `marathon.html` was open; if the user hadn't visited in days, coach saw old runs and fired false "no recent activity" alerts. Fix: added `primeStravaActivities()` to `topbar.js`, called inside `primeCoachData()` with a 30-minute throttle (`strava_last_sync` guard). Reads `strava_tokens_v1`, auto-refreshes expired tokens via `/api/integrations/strava`, fetches last 60 activities, filters to runs, and writes fresh data to `strava_activities_v1`. | Adds one extra Strava API call when coach panel opens (if >30 min since last sync). Token is stored under `strava_tokens_v1` by marathon.html — if key name ever changes there, this breaks silently. If user is not connected to Strava, function exits immediately. |
 | 2026-07-21 | *(this session)* | Added Google Calendar write access for coach. (1) `/api/integrations/google.js` now forwards POST/PATCH/DELETE requests to the Google Calendar API (previously GET-only); distinguished from token-refresh POSTs by presence of `path` query param. (2) `calendar.html` SCOPE upgraded from `calendar.readonly` to `calendar.events calendar.readonly` — user must reconnect account to grant write permission. (3) `addGoogleCalendarEvent(opts)` added to `topbar.js`, exposed as `window.addGoogleCalendarEvent`. Reads `google_accounts_v1` from localStorage, refreshes token if expired, POSTs event to `/calendars/primary/events`. (4) Coach reply parser in `ask()` scans for `[CALENDAR_ADD:{...}]` block; if found, strips it from displayed text, calls `addGoogleCalendarEvent`, shows 📅 confirmation or error inline. (5) `CHAT_SYS()` updated with CALENDAR WRITE instructions including user's live IANA timezone. Bumped COACH_PROMPT_BUILD to `'2026-07-21-v2'`. | Existing google_accounts_v1 tokens only have `calendar.readonly` scope — write will return 403 until user reconnects in calendar.html. If coach emits malformed JSON in the CALENDAR_ADD block, `JSON.parse` will throw and the catch shows a calendar error message. |
@@ -306,6 +325,20 @@ Each `initCloudSync` call must use an appKey from the registry in the Project Ma
 ### "Create/add/log in any module doesn't persist after page interaction"
 The `save()` function only called `localStorage.setItem`, relying on sync.js's 250ms debounce. If a 30s poll `applyRemote` fired within that window, the local change was wiped. See Invariant §9. Fix: every `save()` must fire an immediate fetch to `/api/db`.
 
+### "Coach edit to marathon plan disappears on mobile after tab switch"
+Mobile tab eviction causes the page to reload from scratch, which triggers `onApplied` before the push completed. Fix: `executeCoachAction()` awaits the push with retry; `marathon.html` guards `onApplied` with `updatedAt` check (Invariant §13). If the plan still reverts, check that `plan.updatedAt` is being set in the coach write path AND in `savePlan()`.
+
+### "Gmail inbox empty / Mail module shows connection prompt"
+1. Check that `google_accounts_v1` is set in localStorage (user must connect Google in `calendar.html`).
+2. Check that `google_accounts_v1[0].scope` contains `gmail.readonly` — if it only has `calendar.*` scopes, user connected before the scope was upgraded. They must reconnect in `calendar.html`.
+3. Check `gmail_summary_v1` in localStorage — if it has `threads: []` with no error, the Gmail API returned no results (possibly all mail is in filtered-out categories: promotions/social/updates).
+4. If the coach shows stale Gmail data, check `gmail_last_sync` timestamp — clear it to force a refresh.
+
+### "Coach tried to send email but nothing happened"
+1. Check that `google_accounts_v1[0].scope` contains `gmail.send` — requires scope upgrade and reconnect.
+2. The confirmation card only fires when `executeCoachAction` runs, which only runs when coach emits a `[COACH_ACTION:...]` block. Check that the coach actually emitted one.
+3. If the confirmation card appeared but Send didn't work, check browser console for `sendGmailNow` error — likely a 403 (scope missing) or 401 (token expired; usually auto-refreshed).
+
 ---
 
 ### `health.html` — Supplements
@@ -320,6 +353,7 @@ The `save()` function only called `localStorage.setItem`, relying on sync.js's 2
 
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added tile ·23 (Mail, `mail.html`, accent #7DD3FC) to the bento grid. | Tile count is now 23. If adding more tiles, continue the numbering sequence. |
 | 2026-07-14 | *(this session)* | Changed sync from `appKey: 'health'` to `appKey: 'profile'` for po_water_v1. Prevents profile saves from overwriting the supplement stack on the server. | — |
 
 ---
@@ -340,7 +374,15 @@ The `save()` function only called `localStorage.setItem`, relying on sync.js's 2
 
 ---
 
-### `chores.html`, `personal-care.html`, `shopping.html`, `skincare.html`, `nutrition.html`, `caffeine.html`, `marathon.html`
+### `marathon.html` — Marathon Training
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added `updatedAt` timestamps for optimistic concurrency (Invariant §13). `savePlan()` stamps `plan.updatedAt = Date.now()` before every write. `onApplied` now compares `incoming.updatedAt` vs `plan.updatedAt`; if incoming is older, skips the apply to prevent a stale server snapshot from overwriting coach edits mid-push. Fixes coach-edited plan reverting on mobile after tab switch. | If two devices save the plan simultaneously, the later-timestamped write always wins regardless of content. Legitimate rollbacks from another device won't apply if local is newer — acceptable since push is awaited before returning. |
+
+---
+
+### `chores.html`, `personal-care.html`, `shopping.html`, `skincare.html`, `nutrition.html`, `caffeine.html`
 
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
@@ -362,3 +404,37 @@ The `save()` function only called `localStorage.setItem`, relying on sync.js's 2
 |------|--------|--------|-----------------|
 | 2026-07-16 | *(this session)* | Full silent-catch audit: `saveState`, `saveDoneDays`, `wtSave`, `syncProfileWeight`, `migrateKgToLb` writes, `pcRerender`, and migration flag writes all now `console.warn` on failure. Previously these all swallowed errors silently, hiding data-loss bugs. | — |
 | 2026-07-16 | *(prev session)* | Added `po_coach_strength_goals` to `PC_SYNCED_KEYS` and added its merge handler in `pcApplyRemoteState` (object spread, local wins). Strength goals were being written to localStorage but never pushed to the cloud — lost on cross-device or cross-session. | merge is `{...remote,...local}` per lift key; if two devices set conflicting goals simultaneously, local device always wins. |
+
+---
+
+### `api/push-send.js` — Push Notification Cron
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Fixed morning notification always saying "nothing to do": added `goals:yesterday` fallback when `goals:today` is absent in Supabase. At 9 AM cron time, the user hasn't opened the app yet so `goals:today` doesn't exist (rollover only runs in-browser). Since rollover copies uncompleted goals forward, yesterday's pending goals === today's pending goals. `morning` notification now includes pending goal count + today's marathon run in the body. `reminders` case received the same fallback. | If the user completes all goals the night before AND opens the app AND the cron fires before the new day's key is written — yesterday's key shows 0 pending, so fallback returns nothing. Acceptable edge case; notification body falls back to "Open coach for your full briefing." |
+
+---
+
+### `api/integrations/google.js` — Google API Proxy
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added Gmail API routing. `handleData()` now routes by path prefix: `/userinfo` → Google OAuth2, `/users/*` → `https://gmail.googleapis.com/gmail/v1`, all others → Google Calendar API. Previously all paths except `/userinfo` went to Calendar. Also passes through POST/PATCH/DELETE for Gmail sends. | If a new Google API path starts with `/users/` but is NOT a Gmail path, it will be misrouted to Gmail. Unlikely but possible if future APIs are added — use explicit routing in that case. |
+| 2026-07-21 | *(this session)* | Added POST/PATCH/DELETE forwarding for Google Calendar API. Previously GET-only. Token-refresh POSTs distinguished from API-write POSTs by presence of `?path=` query param. | — |
+
+---
+
+### `calendar.html` — Google Calendar
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added `gmail.readonly` and `gmail.send` to OAuth SCOPE. Users who connected before this deploy only have calendar scopes — they must disconnect and reconnect in `calendar.html` to grant Gmail permissions. | If user doesn't reconnect, `gmail_summary_v1` will remain empty (coach silently skips if scope missing), and coach send attempts will show 403 error in the confirmation card. |
+| 2026-07-21 | *(this session)* | Upgraded SCOPE from `calendar.readonly` to `calendar.events calendar.readonly` for calendar write access. | Existing tokens lack write scope until user reconnects. |
+
+---
+
+### `mail.html` — Mail Module (new)
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | New file. Gmail inbox viewer, shipping tracker, compose form. Reads `gmail_summary_v1` from localStorage (no direct API calls — all Gmail fetching done by `topbar.js`). Stats row: unread count, shipping packages, thread count. Tabs: Inbox / Shipping / Compose. Refresh button clears `gmail_last_sync` and calls `window.loadGmailSummary()`. Compose calls `window.sendGmailNow()`. Shows connection prompt if `google_accounts_v1[0].scope` lacks `gmail.readonly`. Auto-refreshes on load if cache >15 min old. Dark theme, sky blue accent (#7DD3FC). | `mail.html` depends on `window.loadGmailSummary` and `window.sendGmailNow` being set by `topbar.js`. If topbar.js fails to load, these are undefined and the refresh/send buttons will throw. Since `topbar.js` is loaded on every page, this is only a risk if the script itself errors during parse. |
