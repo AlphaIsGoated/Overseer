@@ -34,7 +34,15 @@ async function handleData(req, res, method) {
     if (k !== 'path') fwd.set(k, String(v));
   }
   const qs = fwd.toString();
-  const baseUrl = path === '/userinfo' ? 'https://www.googleapis.com/oauth2/v3' : 'https://www.googleapis.com/calendar/v3';
+  // Route by path prefix:
+  //   /userinfo          → OAuth2 userinfo endpoint
+  //   /users/...         → Gmail API (gmail.googleapis.com/gmail/v1)
+  //   everything else    → Google Calendar API
+  const baseUrl = path === '/userinfo'
+    ? 'https://www.googleapis.com/oauth2/v3'
+    : path.startsWith('/users/')
+      ? 'https://gmail.googleapis.com/gmail/v1'
+      : 'https://www.googleapis.com/calendar/v3';
   const url = baseUrl + path + (qs ? '?' + qs : '');
 
   const fetchOpts = {
