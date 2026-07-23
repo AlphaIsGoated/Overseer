@@ -152,6 +152,7 @@ When a page has a large object that the coach can also write (e.g. `marathon_pla
 | `marathon.html` | **Marathon** | Marathon training plan, long-run tracking. |
 | `brain.html` | **Notes / Brain** | Obsidian-connected notes and observations. |
 | `mail.html` | **Mail** | Gmail inbox viewer, shipping tracker, compose. Reads `gmail_summary_v1` from localStorage (populated by `topbar.js`). Compose calls `window.sendGmailNow()`. |
+| `internship.html` | **Internships / Research** | AI opportunity search, manual opportunity list, email template, AI email personalization, Gmail send modal. Stores data under `appKey: 'internships'`. |
 | `calendar.html` | **Calendar** | Google Calendar viewer + OAuth flow. Holds the Google `SCOPE` constant — must be updated here when new OAuth scopes are needed. Users must reconnect after any scope change. |
 | `api/db.js` | **DB Proxy** | Server-side Supabase proxy. All sync reads/writes go through `/api/db`. |
 | `api/ai/ai-chat.js` | **AI Chat Proxy** | Server-side proxy to Anthropic API. Used by coach and link auto-categorize. |
@@ -199,6 +200,7 @@ When a page has a large object that the coach can also write (e.g. `marathon_pla
 | `personalcare` | `personal-care.html` | store key |
 | `skincare` | `skincare.html` | store key |
 | `chores` | `chores.html` | store key |
+| `internships` | `internship.html` | `internship:resume_ctx`, `internship:opportunities`, `internship:applied`, `internship:email_template`, `internship:sent_log` |
 | *(none)* | `mail.html` | No sync — reads `gmail_summary_v1` populated by topbar.js; sends via `window.sendGmailNow()` |
 
 ---
@@ -467,3 +469,11 @@ Mobile tab eviction causes the page to reload from scratch, which triggers `onAp
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
 | 2026-07-23 | *(this session)* | New file. Gmail inbox viewer, shipping tracker, compose form. Reads `gmail_summary_v1` from localStorage (no direct API calls — all Gmail fetching done by `topbar.js`). Stats row: unread count, shipping packages, thread count. Tabs: Inbox / Shipping / Compose. Refresh button clears `gmail_last_sync` and calls `window.loadGmailSummary()`. Compose calls `window.sendGmailNow()`. Shows connection prompt if `google_accounts_v1[0].scope` lacks `gmail.readonly`. Auto-refreshes on load if cache >15 min old. Dark theme, sky blue accent (#7DD3FC). | `mail.html` depends on `window.loadGmailSummary` and `window.sendGmailNow` being set by `topbar.js`. If topbar.js fails to load, these are undefined and the refresh/send buttons will throw. Since `topbar.js` is loaded on every page, this is only a risk if the script itself errors during parse. |
+
+---
+
+### `internship.html` — Internships / Research
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Full rewrite. Added email template section (`internship:email_template`) — user pastes base template; AI fills in role/company/resume highlights per opportunity. Added bottom-sheet send modal with editable To/Subject/Body; actual Gmail send only fires when user clicks "Send email" (calls `window.sendGmailNow()`). `generateEmail(opp)` uses template + `EMAIL_GEN_SYS` prompt (returns JSON `{subject,body}`); falls back to `DRAFT_FALLBACK_SYS` (SUBJECT:/BODY: format) if no template saved. Draft & Send button on both manual opportunity rows and AI search result cards. Sent status tracked per-opportunity in `internship:sent_log` (`{sentAt, subject, to}`); sent rows get teal border and "✓ Sent [date]" badge. Added `initCloudSync`-style server load on page open (direct `fetch('/api/db?key=internships')`) — restores opportunities, sent log, template, and resume context across devices. Added `pushInternshipData()` after every write (opportunities, applied, sent log). PDF upload calls `/api/extract-resume-text` (if endpoint exists) or falls back to plain-text FileReader. Gmail connection notice shown if `google_accounts_v1[0].scope` lacks `gmail.send`. Added `internships` to appKey registry in this file. | `sendGmailNow` is set by `topbar.js` on load — if topbar.js errors, it is undefined and the send button shows an error. `/api/extract-resume-text` endpoint does not exist yet; PDF upload will 404 until implemented (text files work immediately via FileReader). The server load reads all internship keys at once from one Supabase row — if the `internships` row doesn't exist yet, the load silently no-ops and local state is used. |
