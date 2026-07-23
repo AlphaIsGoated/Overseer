@@ -448,6 +448,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.132', date: '2026-07-23', items: ['Fix coach writes not persisting: check res.ok, guard primeCoachData'] },
+
     { ver: '3.131', date: '2026-07-23', items: ['Revert scan to once-per-day; bump build to clear today\'s key now'] },
 
     { ver: '3.130', date: '2026-07-23', items: ['Fix proactive scan: per-page-load trigger, timestamp key, ↻ button'] },
