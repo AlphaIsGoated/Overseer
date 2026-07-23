@@ -725,10 +725,13 @@ body.topbar-modal-open {
               plannedDistanceMi:e.plannedDistanceMi, completed:e.completed,
               actualDistanceMi:e.actualDistanceMi };
           };
-          const past = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() <= now).map(slim);
-          const future = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() > now).map(slim);
+          // Use todayMidnight (not Date.now()) so today's entry lands in upcoming,
+          // not past — otherwise coach can't find today's scheduled run in entries_upcoming.
+          const tmMs = todayMidnight.getTime();
+          const past = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() < tmMs).map(slim);
+          const future = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() >= tmMs).map(slim);
           // Precompute last_logged_run so the coach doesn't have to sort a long list.
-          // A "logged run" is any past entry with completed=true OR actualDistanceMi>0,
+          // A "logged run" is any past entry (before today) with completed=true OR actualDistanceMi>0,
           // that is not a rest day. Sorted newest-first, take the top hit.
           const lastLoggedRun = past
             .filter(e => e.type !== 'rest' && (e.completed === true || (e.actualDistanceMi && e.actualDistanceMi > 0)))
@@ -776,7 +779,32 @@ body.topbar-modal-open {
               if (arr.length) slimLogs[exId] = arr.slice(-10).map(l => ({ date: l.date.slice(0, 10), sets: l.sets, weight: l.weight, reps: l.reps }));
             });
           }
-          out[k] = { exercises: v.exercises, days: v.days, gyms: v.gyms, logs: slimLogs };
+          // Compute today's gym split from splitRotation + splitAnchor so coach
+          // doesn't have to figure out day-of-week arithmetic itself.
+          let todayGymSplit = null;
+          try {
+            const rot = v.splitRotation;
+            const anch = v.splitAnchor;
+            if (rot && rot.length && anch && anch.date) {
+              const [ay, am, ad] = anch.date.split('-').map(Number);
+              const anchorDay = new Date(ay, am - 1, ad);
+              const todayDay = new Date(); todayDay.setHours(0, 0, 0, 0);
+              const diffDays = Math.round((todayDay - anchorDay) / 86400000);
+              const idx = ((anch.index + diffDays) % rot.length + rot.length) % rot.length;
+              const splitName = rot[idx];
+              const matchDay = Array.isArray(v.days) && v.days.find(function(d) {
+                return d.name && d.name.toLowerCase() === splitName.toLowerCase();
+              });
+              const exercises = matchDay && Array.isArray(matchDay.exercises)
+                ? matchDay.exercises.map(function(exId) {
+                    const ex = Array.isArray(v.exercises) && v.exercises.find(function(e) { return e.id === exId; });
+                    return ex ? ex.name : exId;
+                  })
+                : [];
+              todayGymSplit = { split: splitName, isRest: /^rest\b/i.test(splitName), exercises };
+            }
+          } catch (e) { /* leave null */ }
+          out[k] = { exercises: v.exercises, days: v.days, gyms: v.gyms, logs: slimLogs, today_gym_split: todayGymSplit };
         } else if (k === 'google_cal_events_v1' && Array.isArray(v)) {
           // Already slimmed with precomputed when strings — cap to 30 upcoming events
           out[k] = v.slice(0, 30);
@@ -889,7 +917,11 @@ body.topbar-modal-open {
         "Be formal and professional. Build naturally on conversation history. " +
         "If more information is needed, ask one focused question. " +
         "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
-        "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
+        "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. " +
+        "po_coach_v1.today_gym_split = {split:'Push',isRest:false,exercises:['Bench Press',...]} — precomputed for today, use it directly. " +
+        "strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
+        "marathon_plan_v1.entries_upcoming includes today (daysAgo=0) and future entries. entries_recent_history has past entries newest-first. " +
+        "For actual run distance/pace, Strava is GPS-accurate and takes precedence over manually entered marathon plan values. " +
         "CALENDAR WRITE: You CAN add events to the user's Google Calendar. When asked, append: [CALENDAR_ADD:{\"title\":\"...\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}] — timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If any detail is unclear, ask first." +
         "\n\nMODULE WRITE ACCESS: You CAN modify the user's data. Append one or more [COACH_ACTION:{...}] blocks (valid JSON, no line breaks inside) at the end of your reply. Multiple blocks are allowed. Always confirm in your text what you changed.\n" +
         "MARATHON (module:\"marathon\"): entries have a `date` field (YYYY-MM-DD) — use it to target write ops, but describe timing with `when` in your reply.\n" +
@@ -906,7 +938,9 @@ body.topbar-modal-open {
         "GMAIL (module:\"gmail\"): Read access via gmail_summary_v1 in dashboard data. To draft/send an email, emit a [COACH_ACTION] with op:\"send\" — a confirmation card appears and the email is NOT sent until the user clicks Send.\n" +
         " • Draft/send: {\"module\":\"gmail\",\"op\":\"send\",\"to\":\"name@domain.com\",\"subject\":\"Subject line\",\"body\":\"Full email body text\",\"cc\":\"optional\",\"threadId\":\"optional thread id for replies\"}\n" +
         "GMAIL RULES: Always write the full email body — do not truncate or summarize. If recipient, subject, or key content is unclear, ask before emitting. Do not mention the confirmation step in your reply text — it appears automatically.\n" +
-        "RULES: Only emit action blocks when the user explicitly asks you to make a change. If date or details are ambiguous, ask first. Never emit action blocks for read-only questions." +
+        "CRITICAL WRITE RULE: Whenever the user asks you to change, update, add, remove, move, reschedule, edit, or modify ANYTHING in their data — you MUST emit a [COACH_ACTION:{...}] block in the same reply. " +
+        "Do NOT just say 'I've noted that' or 'I'll remember that' — that does nothing. The change is NOT saved unless you emit the block. " +
+        "If the details are ambiguous, ask ONE clarifying question before emitting. Never emit for read-only questions (show me, what is, tell me about)." +
         memory +
         "\n\nDashboard data as JSON:\n";
     }
@@ -927,10 +961,13 @@ body.topbar-modal-open {
         "REQUIRED SECTIONS (in order, skip only if truly no data):\n\n" +
         "1. TODAY'S GOALS — Read '" + todayGoalsKey + "'. Bullet-list every item where done=false. " +
         "If all done, say 'All goals complete ✓'. If key missing/empty, say 'No goals set for today.'\n\n" +
-        "2. TRAINING — Today's scheduled workout: check marathon_plan_v1.entries_upcoming for daysAgo=0; check po_coach_v1 split for today's gym day. " +
-        "LAST RUN — use marathon_plan_v1.last_logged_run as the primary source (it is precomputed, already filtered to runs with completed=true or actualDistanceMi>0). " +
-        "Use its 'when' field verbatim. If last_logged_run is null, fall back to the most recent entry in strava_activities_v1. " +
-        "NEVER derive a days-long gap from strava_activities_v1 alone if the marathon plan shows recent scheduled activity or a last_logged_run exists — Strava may be incomplete. " +
+        "2. TRAINING — " +
+        "TODAY'S MARATHON: check marathon_plan_v1.entries_upcoming for the entry with daysAgo=0 (today). If present and type!='rest', state the workout. " +
+        "TODAY'S GYM: check po_coach_v1.today_gym_split — if isRest=false, state the split name and exercises. " +
+        "LAST RUN: use marathon_plan_v1.last_logged_run for the date/context. " +
+        "For actual distance and pace, cross-reference strava_activities_v1 — Strava is GPS-accurate; the plan may have manually entered values. Prefer Strava numbers when both exist for the same date. " +
+        "Use the precomputed 'when' field verbatim. If last_logged_run is null, fall back to the most recent strava_activities_v1 entry. " +
+        "NEVER report a multi-week running gap if marathon plan entries_upcoming has a run today/recently or last_logged_run exists. " +
         "Note upcoming key workouts (long runs, tempo, race) from entries_upcoming this week.\n\n" +
         "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
         "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
@@ -1958,7 +1995,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v3';
+    const COACH_PROMPT_BUILD = '2026-07-23-v4';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
