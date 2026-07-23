@@ -448,6 +448,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.134', date: '2026-07-23', items: ['chore: update CLAUDE.md changelog for coach action error fix (73daca8)', 'Fix coach action errors being silently buried after success messages'] },
+
     { ver: '3.133', date: '2026-07-23', items: ['Fix move_entry failing when exact date not in plan'] },
 
     { ver: '3.132', date: '2026-07-23', items: ['Fix coach writes not persisting: check res.ok, guard primeCoachData'] },
