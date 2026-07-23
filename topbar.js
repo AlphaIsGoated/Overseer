@@ -1164,9 +1164,26 @@ body.topbar-modal-open {
           if (!r.ok) return;
           const json = await r.json();
           if (!json || !json.data) return;
+          const PROTECT_MS = 5 * 60 * 1000; // 5 minutes
           Object.entries(json.data).forEach(function([k, v]) {
             if (k.startsWith('coach_')) return; // never overwrite coach state from other rows
-            if (onGoalsPage && k.startsWith('goals:')) return; // managed by initCloudSync on main.html
+            // Skip goals on main.html (initCloudSync owns them) OR if coach wrote goals
+            // recently this session (guards against primeCoachData restoring stale server
+            // data after a push that completed but hasn't propagated, or after a push failure).
+            if (k.startsWith('goals:') && (onGoalsPage || (_coachLastGoalsWrite > 0 && Date.now() - _coachLastGoalsWrite < PROTECT_MS))) return;
+            if (k === 'marathon_plan_v1') {
+              // Skip if the local plan has a newer updatedAt than the server snapshot.
+              // This prevents a stale applyRemote/primeCoachData from overwriting a
+              // coach-edited plan whose push is still in-flight or just failed.
+              try {
+                const localPlan = JSON.parse(localStorage.getItem('marathon_plan_v1') || 'null');
+                const serverPlan = typeof v === 'object' ? v : JSON.parse(v);
+                if (localPlan && serverPlan && localPlan.updatedAt && serverPlan.updatedAt
+                    && localPlan.updatedAt > serverPlan.updatedAt) {
+                  return; // local is newer — don't overwrite
+                }
+              } catch (_) {}
+            }
             if (k === 'po_water_v1') {
               // Merge water logs instead of overwriting — take max per date key so that
               // bottles logged on this device this session are not replaced by a stale
@@ -1359,6 +1376,10 @@ body.topbar-modal-open {
     window.loadGmailSummary = loadGmailSummary;
 
     let busy = false;
+    // Timestamps of last successful coach writes this session.
+    // primeCoachData() uses these to avoid overwriting local changes with stale server data.
+    let _coachLastGoalsWrite = 0;
+    let _coachLastMarathonWrite = 0;
     async function ask(text) {
       text = (text || '').trim();
       if (!text || busy) return;
@@ -1690,13 +1711,18 @@ body.topbar-modal-open {
           // is fire-and-forget, applyRemote can overwrite localStorage with old server data.
           const marathonPushBody = JSON.stringify({ key: 'marathon', data: { 'marathon_plan_v1': plan } });
           const marathonPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: marathonPushBody };
+          let mRes;
           try {
-            await fetch('/api/db', marathonPushOpts);
+            mRes = await fetch('/api/db', marathonPushOpts);
           } catch (e) {
             console.warn('[Coach] marathon push failed, retrying', e);
-            try { await new Promise(function(r) { setTimeout(r, 1500); }); await fetch('/api/db', marathonPushOpts); }
-            catch (e2) { console.warn('[Coach] marathon push retry failed', e2); }
+            try { await new Promise(function(r) { setTimeout(r, 1500); }); mRes = await fetch('/api/db', marathonPushOpts); }
+            catch (e2) { return { ok: false, error: 'Network error — plan updated locally but did not reach the server. Try again.' }; }
           }
+          if (!mRes || !mRes.ok) {
+            return { ok: false, error: 'Server error (' + (mRes ? mRes.status : '?') + ') saving marathon plan. Changes are local only — try again.' };
+          }
+          _coachLastMarathonWrite = Date.now();
           return { ok: true };
         }
 
@@ -1742,13 +1768,18 @@ body.topbar-modal-open {
           }
           const goalsPushBody = JSON.stringify({ key: 'goals', data: allGoalsData });
           const goalsPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: goalsPushBody };
+          let gRes;
           try {
-            await fetch('/api/db', goalsPushOpts);
+            gRes = await fetch('/api/db', goalsPushOpts);
           } catch (e) {
             console.warn('[Coach] goals push failed, retrying', e);
-            try { await new Promise(function(r) { setTimeout(r, 1500); }); await fetch('/api/db', goalsPushOpts); }
-            catch (e2) { console.warn('[Coach] goals push retry failed', e2); }
+            try { await new Promise(function(r) { setTimeout(r, 1500); }); gRes = await fetch('/api/db', goalsPushOpts); }
+            catch (e2) { return { ok: false, error: 'Network error — goal updated locally but did not reach the server. Try again.' }; }
           }
+          if (!gRes || !gRes.ok) {
+            return { ok: false, error: 'Server error (' + (gRes ? gRes.status : '?') + ') saving goals. Changes are local only — try again.' };
+          }
+          _coachLastGoalsWrite = Date.now();
           return { ok: true };
         }
 
