@@ -339,6 +339,7 @@ body.topbar-modal-open {
         <div class="coach-sub" id="coachSub">SYSTEMS NOMINAL</div>
       </div>
       <div class="coach-head-spacer"></div>
+      <button class="coach-voice-toggle" id="coachRescan" type="button" title="Redo status sweep" aria-label="Redo status sweep">↻</button>
       <button class="coach-voice-toggle" id="coachVoiceToggle" type="button" title="Read replies aloud" aria-label="Toggle spoken replies">🔊</button>
       <button class="coach-close" id="coachClose" type="button" aria-label="Close">✕</button>
     </div>
@@ -1371,6 +1372,7 @@ body.topbar-modal-open {
         addMsg('user', text);
         input.value = '';
         try {
+          lastScanTs = 0;
           try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
           localStorage.removeItem('strava_last_sync');
           await primeCoachData();
@@ -1449,6 +1451,7 @@ body.topbar-modal-open {
             else {
               // Clear today's proactive key so the next panel open re-runs the sweep
               // and the user can verify the changes were applied correctly.
+              lastScanTs = 0;
               try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
               addMsg('coach', '✅ Changes saved. Close and reopen this panel to see a fresh status sweep confirming the update.', false);
             }
@@ -1818,7 +1821,8 @@ body.topbar-modal-open {
         const text = await callAI(PROACTIVE_SYS() + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
         loading.remove();
         addMsg('coach', text, true);  // persists to chat history
-        localStorage.setItem(proactiveDayKey(), '1');
+        lastScanTs = Date.now();
+        localStorage.setItem(proactiveDayKey(), String(lastScanTs));
         // Prune old day keys to avoid localStorage bloat
         try {
           const todayKey = proactiveDayKey();
@@ -1835,6 +1839,16 @@ body.topbar-modal-open {
     }
 
     let historyLoaded = false;
+    // lastScanTs: in-memory timestamp of the last completed proactive scan.
+    // Seeded from localStorage on init so page reloads respect recent scans.
+    const _storedScanTs = parseInt(localStorage.getItem(proactiveDayKey()) || '0', 10);
+    let lastScanTs = (_storedScanTs > 1) ? _storedScanTs : 0; // '1' was old boolean value
+
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    function needsProactiveScan() {
+      return !lastScanTs || (Date.now() - lastScanTs) > ONE_HOUR_MS;
+    }
+
     function openPanel() {
       panelBg.classList.add('show');
       fab.classList.remove('has-insight');
@@ -1843,12 +1857,9 @@ body.topbar-modal-open {
         historyLoaded = true;
         loadChatHistory();
       }
-      // Proactive scan runs on every open so the user always gets a fresh
-      // sweep the first time they open the coach each day, regardless of
-      // how many times they closed and reopened the panel.
-      if (!localStorage.getItem(proactiveDayKey())) {
-        // Force-refresh Strava before the daily scan — ignore the 30-min throttle
-        // so the scan always gets today's actual run data, not a cached snapshot.
+      // Scan fires on every page load (lastScanTs resets) or whenever > 1 hr since last scan.
+      if (needsProactiveScan()) {
+        // Force-refresh Strava so the scan always gets today's actual run data.
         localStorage.removeItem('strava_last_sync');
         primeCoachData().then(function() { runProactiveScan(); });
       } else {
@@ -1866,8 +1877,8 @@ body.topbar-modal-open {
     document.getElementById('coachClose').addEventListener('click', closePanel);
     panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
 
-    // Show the insight dot if today's briefing hasn't run yet
-    if (!localStorage.getItem(proactiveDayKey())) fab.classList.add('has-insight');
+    // Show the insight dot if no scan has run in the last hour
+    if (needsProactiveScan()) fab.classList.add('has-insight');
 
     // ===== COACH — VOICE =====
     // Pre-unlock an HTMLAudioElement during a user gesture so it can be reused
@@ -1884,6 +1895,20 @@ body.topbar-modal-open {
         _voiceEl.play().then(() => { _voiceEl.pause(); _voiceEl.volume = 1; }).catch(() => {});
       } catch (_) {}
     }
+
+    document.getElementById('coachRescan').addEventListener('click', async function() {
+      if (busy) return;
+      busy = true;
+      try {
+        lastScanTs = 0;
+        try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
+        localStorage.removeItem('strava_last_sync');
+        await primeCoachData();
+        await runProactiveScan();
+      } finally {
+        busy = false;
+      }
+    });
 
     let voiceOn = false;
     const voiceToggle = document.getElementById('coachVoiceToggle');
