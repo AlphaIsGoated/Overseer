@@ -730,12 +730,29 @@ body.topbar-modal-open {
           const tmMs = todayMidnight.getTime();
           const past = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() < tmMs).map(slim);
           const future = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() >= tmMs).map(slim);
-          // Precompute last_logged_run so the coach doesn't have to sort a long list.
-          // A "logged run" is any past entry (before today) with completed=true OR actualDistanceMi>0,
-          // that is not a rest day. Sorted newest-first, take the top hit.
-          const lastLoggedRun = past
+          // Precompute last_logged_run: most recent past non-rest entry with completion evidence.
+          // Enrich with Strava GPS data for the same date so the coach gets accurate
+          // distance/pace instead of manually-entered plan values.
+          const stravaRaw = (function() {
+            try { return JSON.parse(localStorage.getItem('strava_activities_v1') || '[]'); } catch (_) { return []; }
+          })();
+          const lastLoggedBase = past
             .filter(e => e.type !== 'rest' && (e.completed === true || (e.actualDistanceMi && e.actualDistanceMi > 0)))
             .sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+          let lastLoggedRun = lastLoggedBase;
+          if (lastLoggedBase) {
+            const stravaMatch = stravaRaw.find(function(a) { return a.date === lastLoggedBase.date; });
+            if (stravaMatch) {
+              const totalSec = stravaMatch.paceSecPerMi ? Math.round(stravaMatch.paceSecPerMi) : null;
+              const pace = totalSec ? Math.floor(totalSec / 60) + ':' + String(totalSec % 60).padStart(2, '0') + '/mi' : null;
+              lastLoggedRun = Object.assign({}, lastLoggedBase, {
+                strava_distanceMi: stravaMatch.distanceMi,
+                strava_pace: pace,
+                strava_name: stravaMatch.name,
+                strava_durationMin: stravaMatch.movingSec ? Math.round(stravaMatch.movingSec / 60) : null,
+              });
+            }
+          }
           // entries_recent_history: last 30 past entries newest-first (trimmed for AI context)
           const recentPast = past.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
           out[k] = { ...v, entries_recent_history: recentPast, entries_upcoming: future.slice(0, 30), last_logged_run: lastLoggedRun };
@@ -753,10 +770,17 @@ body.topbar-modal-open {
             const actDay = a.date ? new Date(a.date.slice(0,10) + 'T00:00:00') : null;
             const daysAgo = actDay ? Math.round((todayMidnight - actDay) / 86400000) : null;
             const when = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : daysAgo != null ? daysAgo + ' days ago' : 'unknown';
-            return { name:a.name, type:a.type, when,
-              distanceMi:a.distanceMi,
-              durationMin:a.movingSec ? Math.round(a.movingSec/60) : null,
-              paceMinPerMi:a.paceSecPerMi ? (a.paceSecPerMi/60).toFixed(2) : null };
+            // Format pace as MM:SS/mi to match what Strava displays — decimal minutes
+            // (e.g. 9.08) don't match the app (9:05) and confuse the coach.
+            let pace = null;
+            if (a.paceSecPerMi) {
+              const totalSec = Math.round(a.paceSecPerMi);
+              pace = Math.floor(totalSec / 60) + ':' + String(totalSec % 60).padStart(2, '0') + '/mi';
+            }
+            return { name: a.name, type: a.type, when, date: a.date,
+              distanceMi: a.distanceMi,
+              durationMin: a.movingSec ? Math.round(a.movingSec / 60) : null,
+              pace };
           });
         } else if (k === 'google_calendars_v3' && v && typeof v === 'object') {
           // keep calendar list but drop the cached events array to avoid huge dumps
@@ -919,9 +943,9 @@ body.topbar-modal-open {
         "KEY DATA NOTES: goals:YYYY-MM-DD is [{text,done}] — done=true means ALREADY COMPLETED, never treat completed goals as outstanding. " +
         "po_coach_workout_done={YYYY-MM-DD:true} tracks logged gym sessions. " +
         "po_coach_v1.today_gym_split = {split:'Push',isRest:false,exercises:['Bench Press',...]} — precomputed for today, use it directly. " +
-        "strava_activities_v1 entries have a precomputed 'when' string (e.g. 'today', 'yesterday', '2 days ago') — use it verbatim to describe timing, never recompute from a date. " +
+        "strava_activities_v1 entries have 'when' (precomputed, use verbatim) and 'pace' formatted as MM:SS/mi (matches Strava display exactly). " +
         "marathon_plan_v1.entries_upcoming includes today (daysAgo=0) and future entries. entries_recent_history has past entries newest-first. " +
-        "For actual run distance/pace, Strava is GPS-accurate and takes precedence over manually entered marathon plan values. " +
+        "last_logged_run may have strava_distanceMi and strava_pace (GPS-accurate, MM:SS/mi) — always prefer these over plan values when present. " +
         "CALENDAR WRITE: You CAN add events to the user's Google Calendar. When asked, append: [CALENDAR_ADD:{\"title\":\"...\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}] — timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If any detail is unclear, ask first." +
         "\n\nMODULE WRITE ACCESS: You CAN modify the user's data. Append one or more [COACH_ACTION:{...}] blocks (valid JSON, no line breaks inside) at the end of your reply. Multiple blocks are allowed. Always confirm in your text what you changed.\n" +
         "MARATHON (module:\"marathon\"): entries have a `date` field (YYYY-MM-DD) — use it to target write ops, but describe timing with `when` in your reply.\n" +
@@ -964,9 +988,9 @@ body.topbar-modal-open {
         "2. TRAINING — " +
         "TODAY'S MARATHON: check marathon_plan_v1.entries_upcoming for the entry with daysAgo=0 (today). If present and type!='rest', state the workout. " +
         "TODAY'S GYM: check po_coach_v1.today_gym_split — if isRest=false, state the split name and exercises. " +
-        "LAST RUN: use marathon_plan_v1.last_logged_run for the date/context. " +
-        "For actual distance and pace, cross-reference strava_activities_v1 — Strava is GPS-accurate; the plan may have manually entered values. Prefer Strava numbers when both exist for the same date. " +
-        "Use the precomputed 'when' field verbatim. If last_logged_run is null, fall back to the most recent strava_activities_v1 entry. " +
+        "LAST RUN: use marathon_plan_v1.last_logged_run. If it has strava_distanceMi/strava_pace fields, use those — they are GPS-accurate Strava values. " +
+        "Fall back to actualDistanceMi/plannedDistanceMi only if no strava fields. Use 'when' verbatim. " +
+        "If last_logged_run is null, use the most recent strava_activities_v1 entry (pace is already MM:SS/mi format). " +
         "NEVER report a multi-week running gap if marathon plan entries_upcoming has a run today/recently or last_logged_run exists. " +
         "Note upcoming key workouts (long runs, tempo, race) from entries_upcoming this week.\n\n" +
         "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
@@ -1995,7 +2019,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v4';
+    const COACH_PROMPT_BUILD = '2026-07-23-v5';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
