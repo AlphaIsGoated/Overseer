@@ -714,7 +714,15 @@ body.topbar-modal-open {
           };
           const past = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() <= now).map(slim);
           const future = v.entries.filter(e => new Date(e.date + 'T00:00').getTime() > now).map(slim);
-          out[k] = { ...v, entries_completed: past, entries_upcoming: future.slice(0, 30) };
+          // Precompute last_logged_run so the coach doesn't have to sort a long list.
+          // A "logged run" is any past entry with completed=true OR actualDistanceMi>0,
+          // that is not a rest day. Sorted newest-first, take the top hit.
+          const lastLoggedRun = past
+            .filter(e => e.type !== 'rest' && (e.completed === true || (e.actualDistanceMi && e.actualDistanceMi > 0)))
+            .sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+          // entries_recent_history: last 30 past entries newest-first (trimmed for AI context)
+          const recentPast = past.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+          out[k] = { ...v, entries_recent_history: recentPast, entries_upcoming: future.slice(0, 30), last_logged_run: lastLoggedRun };
           delete out[k].entries; // replaced by split arrays above
         } else if (k === 'notes:items' && Array.isArray(v)) {
           out[k] = v.slice(0, 25).map(n => ({ title:n.title, category:n.category,
@@ -889,11 +897,11 @@ body.topbar-modal-open {
         "REQUIRED SECTIONS (in order, skip only if truly no data):\n\n" +
         "1. TODAY'S GOALS — Read '" + todayGoalsKey + "'. Bullet-list every item where done=false. " +
         "If all done, say 'All goals complete ✓'. If key missing/empty, say 'No goals set for today.'\n\n" +
-        "2. TRAINING — Today's scheduled workout (check marathon_plan_v1.entries_upcoming for an entry with daysAgo=0; check po_coach_v1 split for today's gym day). " +
-        "LAST RUN: check BOTH (a) marathon_plan_v1.entries_completed — find the most recent entry where completed=true or actualDistanceMi>0, using its precomputed 'when'; " +
-        "AND (b) strava_activities_v1 — most recent entry's 'when'. Use whichever source shows a MORE RECENT date. " +
-        "CRITICAL: never report a long gap (e.g. '42 days') if the marathon log shows a recent run — the marathon log is ground truth for logged runs even if Strava is stale. " +
-        "Any training gaps, milestones, or key workouts this week worth flagging.\n\n" +
+        "2. TRAINING — Today's scheduled workout: check marathon_plan_v1.entries_upcoming for daysAgo=0; check po_coach_v1 split for today's gym day. " +
+        "LAST RUN — use marathon_plan_v1.last_logged_run as the primary source (it is precomputed, already filtered to runs with completed=true or actualDistanceMi>0). " +
+        "Use its 'when' field verbatim. If last_logged_run is null, fall back to the most recent entry in strava_activities_v1. " +
+        "NEVER derive a days-long gap from strava_activities_v1 alone if the marathon plan shows recent scheduled activity or a last_logged_run exists — Strava may be incomplete. " +
+        "Note upcoming key workouts (long runs, tempo, race) from entries_upcoming this week.\n\n" +
         "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
         "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
         "4. CALENDAR — Upcoming events from google_cal_events_v1 (today and tomorrow). Skip if none.\n\n" +
@@ -1678,7 +1686,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-22-v4';
+    const COACH_PROMPT_BUILD = '2026-07-23-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }

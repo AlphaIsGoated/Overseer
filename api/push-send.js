@@ -76,15 +76,22 @@ async function buildPayload(type, supaUrl, supaKey) {
 
     case 'reminders': {
       const thisWeek = isoWeekKey(new Date());
+      const yesterday = dateKey(new Date(Date.now() - 86400000));
       const [goalsData, choresData, pcData] = await Promise.all([
         fetchModuleData(supaUrl, supaKey, 'goals'),
         fetchModuleData(supaUrl, supaKey, 'chores'),
         fetchModuleData(supaUrl, supaKey, 'personalcare'),
       ]);
 
-      // Main goals (main.html) — primary source for this notification
+      // Main goals (main.html) — primary source for this notification.
+      // goals:today is only created in the browser after the user opens main.html.
+      // If the notification fires before the app is opened (9 AM), fall back to
+      // goals:yesterday — rollover copies uncompleted goals to today, so yesterday's
+      // pending goals are the same tasks the user needs to do today.
       const todayGoals = (goalsData && goalsData['goals:' + today]) || [];
-      const goalsPending = todayGoals.filter(g => g && !g.done).map(g => g.text).filter(Boolean);
+      const yesterdayGoals = (goalsData && goalsData['goals:' + yesterday]) || [];
+      const goalsSource = todayGoals.length > 0 ? todayGoals : yesterdayGoals;
+      const goalsPending = goalsSource.filter(g => g && !g.done).map(g => g.text).filter(Boolean);
 
       if (goalsPending.length > 0) {
         let body;
@@ -122,13 +129,29 @@ async function buildPayload(type, supaUrl, supaKey) {
 
     case 'morning':
     default: {
-      const plan = readMarathonPlan(await fetchModuleData(supaUrl, supaKey, 'marathon'));
+      const yesterday = dateKey(new Date(Date.now() - 86400000));
+      const [plan, goalsData] = await Promise.all([
+        fetchModuleData(supaUrl, supaKey, 'marathon').then(readMarathonPlan),
+        fetchModuleData(supaUrl, supaKey, 'goals'),
+      ]);
       const todayRun = ((plan && plan.entries) || []).find(e => e.date === today && e.type !== 'rest');
+      // goals:today may not exist yet if app hasn't been opened — fall back to yesterday's
+      const todayGoals = (goalsData && goalsData['goals:' + today]) || [];
+      const yGoals = (goalsData && goalsData['goals:' + yesterday]) || [];
+      const goalsSource = todayGoals.length > 0 ? todayGoals : yGoals;
+      const pendingCount = goalsSource.filter(g => g && !g.done).length;
+
+      const parts = [];
       if (todayRun) {
-        const dist = todayRun.plannedDistanceMi ? ` — ${todayRun.plannedDistanceMi} mi` : '';
-        return { tag: 'morning', title: "Shrey's Dashboard · Good morning", body: `Today: ${todayRun.label || todayRun.type}${dist}. Check your coach for the full overview.`, url: '/index.html' };
+        const dist = todayRun.plannedDistanceMi ? ` (${todayRun.plannedDistanceMi} mi)` : '';
+        parts.push(`Run: ${todayRun.label || todayRun.type}${dist}`);
       }
-      return { tag: 'morning', title: "Shrey's Dashboard · Good morning", body: 'Your daily check-in is ready. Open the app to see your coach insights.', url: '/index.html' };
+      if (pendingCount > 0) parts.push(`${pendingCount} goal${pendingCount === 1 ? '' : 's'} to do`);
+
+      const body = parts.length > 0
+        ? parts.join(' · ') + '. Open coach for full briefing.'
+        : 'Your daily check-in is ready. Open coach for your full briefing.';
+      return { tag: 'morning', title: "Shrey's Dashboard · Good morning", body, url: '/index.html' };
     }
   }
 }
