@@ -954,7 +954,7 @@ body.topbar-modal-open {
         " • Add event: {\"module\":\"calendar\",\"op\":\"add_event\",\"title\":\"Event name\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}\n" +
         "MARATHON (module:\"marathon\"): entries have a `date` field (YYYY-MM-DD) — use it to target write ops, but describe timing with `when` in your reply.\n" +
         " • Update entry: {\"module\":\"marathon\",\"op\":\"update_entry\",\"date\":\"YYYY-MM-DD\",\"set\":{\"type\":\"easy|long|speed|tempo|rest|cross|race|other\",\"label\":\"Short label\",\"plannedDistanceMi\":6.0}}\n" +
-        " • Move entry: {\"module\":\"marathon\",\"op\":\"move_entry\",\"fromDate\":\"YYYY-MM-DD\",\"toDate\":\"YYYY-MM-DD\"}\n" +
+        " • Move entry: {\"module\":\"marathon\",\"op\":\"move_entry\",\"fromDate\":\"YYYY-MM-DD\",\"toDate\":\"YYYY-MM-DD\",\"type\":\"easy\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0} — always include type/label/distance as fallback if fromDate entry is missing\n" +
         " • Add entry: {\"module\":\"marathon\",\"op\":\"add_entry\",\"date\":\"YYYY-MM-DD\",\"type\":\"easy\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0}\n" +
         " • Remove entry: {\"module\":\"marathon\",\"op\":\"remove_entry\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Set race date: {\"module\":\"marathon\",\"op\":\"set_race\",\"raceDate\":\"YYYY-MM-DD\"}\n" +
@@ -1681,9 +1681,33 @@ body.topbar-modal-open {
             Object.assign(entry, act.set || {});
 
           } else if (act.op === 'move_entry') {
+            // Exact match first; then ±1 day fuzzy (handles timezone off-by-one issues where
+            // the coach picks a date from dashboardData that's shifted by a day).
             var entry = plan.entries.find(function(e) { return e.date === act.fromDate; });
-            if (!entry) return { ok: false, error: 'No marathon entry on ' + act.fromDate };
-            entry.date = act.toDate; entry.dayOfWeek = mDow(act.toDate);
+            if (!entry) {
+              var fromTs = new Date(act.fromDate + 'T12:00:00').getTime();
+              entry = plan.entries.find(function(e) {
+                return Math.abs(new Date(e.date + 'T12:00:00').getTime() - fromTs) <= 86400000;
+              });
+            }
+            if (entry) {
+              // Remove from old date position, place at toDate
+              plan.entries = plan.entries.filter(function(e) { return e !== entry; });
+              entry.date = act.toDate; entry.dayOfWeek = mDow(act.toDate);
+              // Carry over any override fields the coach supplied (type, label, distance)
+              if (act.type) entry.type = act.type;
+              if (act.label) entry.label = act.label;
+              if (act.plannedDistanceMi != null) entry.plannedDistanceMi = act.plannedDistanceMi;
+              plan.entries.push(entry);
+            } else if (act.type || act.label) {
+              // No source entry found but coach supplied enough info to create one at toDate
+              plan.entries.push({ id: 'm_' + Date.now(), date: act.toDate, weekNumber: act.weekNumber || null,
+                dayOfWeek: mDow(act.toDate), type: act.type || 'other', label: act.label || '',
+                plannedDistanceMi: act.plannedDistanceMi || null, completed: false });
+            } else {
+              return { ok: false, error: 'No marathon entry found on or near ' + act.fromDate
+                + '. Nearby dates: ' + plan.entries.slice(0,5).map(function(e){return e.date;}).join(', ') };
+            }
             plan.entries.sort(function(a,b) { return a.date.localeCompare(b.date); });
 
           } else if (act.op === 'add_entry') {
