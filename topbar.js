@@ -1372,7 +1372,6 @@ body.topbar-modal-open {
         addMsg('user', text);
         input.value = '';
         try {
-          lastScanTs = 0;
           try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
           localStorage.removeItem('strava_last_sync');
           await primeCoachData();
@@ -1451,7 +1450,6 @@ body.topbar-modal-open {
             else {
               // Clear today's proactive key so the next panel open re-runs the sweep
               // and the user can verify the changes were applied correctly.
-              lastScanTs = 0;
               try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
               addMsg('coach', '✅ Changes saved. Close and reopen this panel to see a fresh status sweep confirming the update.', false);
             }
@@ -1821,8 +1819,7 @@ body.topbar-modal-open {
         const text = await callAI(PROACTIVE_SYS() + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
         loading.remove();
         addMsg('coach', text, true);  // persists to chat history
-        lastScanTs = Date.now();
-        localStorage.setItem(proactiveDayKey(), String(lastScanTs));
+        localStorage.setItem(proactiveDayKey(), '1');
         // Prune old day keys to avoid localStorage bloat
         try {
           const todayKey = proactiveDayKey();
@@ -1839,15 +1836,6 @@ body.topbar-modal-open {
     }
 
     let historyLoaded = false;
-    // lastScanTs: in-memory timestamp of the last completed proactive scan.
-    // Seeded from localStorage on init so page reloads respect recent scans.
-    const _storedScanTs = parseInt(localStorage.getItem(proactiveDayKey()) || '0', 10);
-    let lastScanTs = (_storedScanTs > 1) ? _storedScanTs : 0; // '1' was old boolean value
-
-    const ONE_HOUR_MS = 60 * 60 * 1000;
-    function needsProactiveScan() {
-      return !lastScanTs || (Date.now() - lastScanTs) > ONE_HOUR_MS;
-    }
 
     function openPanel() {
       panelBg.classList.add('show');
@@ -1857,9 +1845,9 @@ body.topbar-modal-open {
         historyLoaded = true;
         loadChatHistory();
       }
-      // Scan fires on every page load (lastScanTs resets) or whenever > 1 hr since last scan.
-      if (needsProactiveScan()) {
-        // Force-refresh Strava so the scan always gets today's actual run data.
+      // Proactive scan runs once per day — on the first panel open after the key is absent.
+      if (!localStorage.getItem(proactiveDayKey())) {
+        // Force-refresh Strava before the daily scan so it always has today's run data.
         localStorage.removeItem('strava_last_sync');
         primeCoachData().then(function() { runProactiveScan(); });
       } else {
@@ -1877,8 +1865,8 @@ body.topbar-modal-open {
     document.getElementById('coachClose').addEventListener('click', closePanel);
     panelBg.addEventListener('click', (e) => { if (e.target === panelBg) closePanel(); });
 
-    // Show the insight dot if no scan has run in the last hour
-    if (needsProactiveScan()) fab.classList.add('has-insight');
+    // Show the insight dot if today's scan hasn't run yet
+    if (!localStorage.getItem(proactiveDayKey())) fab.classList.add('has-insight');
 
     // ===== COACH — VOICE =====
     // Pre-unlock an HTMLAudioElement during a user gesture so it can be reused
@@ -1900,7 +1888,6 @@ body.topbar-modal-open {
       if (busy) return;
       busy = true;
       try {
-        lastScanTs = 0;
         try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
         localStorage.removeItem('strava_last_sync');
         await primeCoachData();
@@ -2129,7 +2116,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v6';
+    const COACH_PROMPT_BUILD = '2026-07-23-v7';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
