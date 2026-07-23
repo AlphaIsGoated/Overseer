@@ -1534,6 +1534,7 @@ body.topbar-modal-open {
       });
     }
     window.showGmailConfirmation = showGmailConfirmation;
+    window.sendGmailNow = sendGmailNow;
 
     // ===== COACH — MODULE WRITE ACTIONS =====
     // Executes a single structured action emitted by the coach in a [COACH_ACTION:{...}] block.

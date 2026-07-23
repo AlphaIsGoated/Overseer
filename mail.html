@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Mail · Dashboard</title>
+
+<script src="/api/config"></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B; --accent: #7DD3FC;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 80px; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 78% 18%, rgba(125,211,252,0.12), transparent 45%), radial-gradient(circle at 18% 88%, rgba(107,227,164,0.07), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
+body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-20px,12px,0)} }
+
+.page { max-width: 720px; margin: 0 auto; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.page-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #B8D8F0 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.page-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 20px; }
+@media (max-width: 480px) { .page-title { font-size: 22px; } }
+
+.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 22px 0 12px; }
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.5; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+
+/* Stats row */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.stat-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 14px 16px; text-align: center; }
+.stat-num { font-size: 26px; font-weight: 700; color: var(--text-primary); line-height: 1; }
+.stat-num.accent { color: var(--accent); }
+.stat-num.warn { color: var(--warning); }
+.stat-label { font-size: 10px; color: var(--text-tertiary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; background: rgba(255,255,255,0.03); border-radius: 10px; padding: 4px; }
+.tab { flex: 1; text-align: center; padding: 7px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--text-tertiary); font-family: inherit; transition: all 0.15s; }
+.tab.active { background: rgba(125,211,252,0.15); color: var(--accent); border: 1px solid rgba(125,211,252,0.3); }
+.tab:hover:not(.active) { color: var(--text-secondary); }
+
+/* Thread list */
+.thread-list { display: flex; flex-direction: column; gap: 6px; }
+.thread-row { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; cursor: pointer; transition: background 0.15s; }
+.thread-row:hover { background: rgba(255,255,255,0.06); }
+.thread-row.unread { border-left: 3px solid var(--accent); background: rgba(125,211,252,0.04); }
+.thread-row.shipping { border-left: 3px solid var(--warning); background: rgba(242,192,99,0.04); }
+.thread-avatar { width: 34px; height: 34px; border-radius: 50%; background: rgba(125,211,252,0.15); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--accent); flex-shrink: 0; text-transform: uppercase; }
+.thread-avatar.shipping-av { background: rgba(242,192,99,0.15); color: var(--warning); }
+.thread-body { flex: 1; min-width: 0; }
+.thread-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.thread-from { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.thread-when { font-size: 11px; color: var(--text-tertiary); margin-left: auto; flex-shrink: 0; }
+.thread-subject { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.thread-snippet { font-size: 11.5px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-unread-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 3px; }
+.empty-state { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 28px 0; font-style: italic; }
+
+/* Connection prompt */
+.connect-card { background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2); border-radius: 14px; padding: 24px; text-align: center; }
+.connect-icon { font-size: 40px; margin-bottom: 10px; }
+.connect-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.connect-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+.connect-btn { display: inline-block; padding: 10px 22px; background: rgba(125,211,252,0.18); border: 1px solid rgba(125,211,252,0.4); border-radius: 10px; color: var(--accent); font-weight: 700; font-size: 13px; text-decoration: none; cursor: pointer; font-family: inherit; }
+.connect-btn:hover { background: rgba(125,211,252,0.28); }
+
+/* Compose */
+.compose-form { display: flex; flex-direction: column; gap: 10px; }
+.compose-field { display: flex; flex-direction: column; gap: 4px; }
+.compose-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); }
+.compose-input { padding: 10px 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 13.5px; outline: none; }
+.compose-input:focus { border-color: rgba(125,211,252,0.4); }
+.compose-textarea { min-height: 140px; resize: vertical; }
+.compose-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.btn-primary { padding: 9px 20px; border: none; border-radius: 9px; background: rgba(125,211,252,0.2); border: 1px solid rgba(125,211,252,0.4); color: var(--accent); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-primary:hover { background: rgba(125,211,252,0.32); }
+.btn-secondary { padding: 9px 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 9px; background: transparent; color: var(--text-tertiary); font-family: inherit; font-size: 13px; cursor: pointer; }
+.btn-secondary:hover { background: rgba(255,255,255,0.06); }
+.compose-status { font-size: 12px; color: var(--text-tertiary); text-align: center; padding: 6px 0; }
+
+/* Refresh button */
+.refresh-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.refresh-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-tertiary); font-size: 12px; font-family: inherit; cursor: pointer; }
+.refresh-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+.last-sync { font-size: 11px; color: var(--text-tertiary); }
+.spinning { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Shipping badge */
+.shipping-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(242,192,99,0.2); color: var(--warning); border: 1px solid rgba(242,192,99,0.3); margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <a href="/" class="back-btn">← Back</a>
+  <h1 class="page-title">✉ Mail</h1>
+  <p class="page-sub" id="mailSub">Loading inbox…</p>
+
+  <div id="connectPrompt" style="display:none">
+    <div class="connect-card">
+      <div class="connect-icon">📧</div>
+      <div class="connect-title">Connect Gmail</div>
+      <div class="connect-desc">Connect your Google account with Gmail permissions to see your inbox, shipping tracking, and let your coach send emails for you.</div>
+      <a href="/calendar.html" class="connect-btn">Connect in Calendar →</a>
+    </div>
+  </div>
+
+  <div id="mailContent" style="display:none">
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num accent" id="statUnread">—</div>
+        <div class="stat-label">Unread</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num warn" id="statShipping">—</div>
+        <div class="stat-label">Packages</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="statTotal">—</div>
+        <div class="stat-label">Fetched</div>
+      </div>
+    </div>
+
+    <!-- Refresh row -->
+    <div class="refresh-row">
+      <span class="last-sync" id="lastSyncLabel"></span>
+      <button class="refresh-btn" id="refreshBtn">⟳ Refresh</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="inbox">Inbox</button>
+      <button class="tab" data-tab="shipping">📦 Shipping</button>
+      <button class="tab" data-tab="compose">✉ Compose</button>
+    </div>
+
+    <!-- Inbox tab -->
+    <div id="tabInbox">
+      <div class="thread-list" id="threadList">
+        <div class="empty-state">No inbox data yet — click Refresh.</div>
+      </div>
+    </div>
+
+    <!-- Shipping tab -->
+    <div id="tabShipping" style="display:none">
+      <div class="thread-list" id="shippingList">
+        <div class="empty-state">No shipping emails detected.</div>
+      </div>
+    </div>
+
+    <!-- Compose tab -->
+    <div id="tabCompose" style="display:none">
+      <div class="gm-card">
+        <div class="compose-form">
+          <div class="compose-field">
+            <label class="compose-label">To</label>
+            <input class="compose-input" id="composeTo" type="email" placeholder="recipient@email.com">
+          </div>
+          <div class="compose-field">
+            <label class="compose-label">Subject</label>
+            <input class="compose-input" id="composeSubject" type="text" placeholder="Subject">
+          </div>
+          <div class="compose-field">
+            <label class="compose-label">Message</label>
+            <textarea class="compose-input compose-textarea" id="composeBody" placeholder="Write your message…"></textarea>
+          </div>
+          <div class="compose-actions">
+            <button class="btn-secondary" id="composeClear">Clear</button>
+            <button class="btn-primary" id="composeSend">📤 Send</button>
+          </div>
+          <div class="compose-status" id="composeStatus"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SUMMARY_KEY = 'gmail_summary_v1';
+  var LAST_SYNC_KEY = 'gmail_last_sync';
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function relTime(ts) {
+    if (!ts) return 'never';
+    var diff = (Date.now() - ts) / 60000;
+    if (diff < 1) return 'just now';
+    if (diff < 60) return Math.round(diff) + 'm ago';
+    if (diff < 1440) return Math.round(diff / 60) + 'h ago';
+    return Math.round(diff / 1440) + 'd ago';
+  }
+
+  function initials(name) {
+    var parts = (name || '?').trim().split(/\s+/);
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+
+  // ── Tab switching ──
+  document.querySelectorAll('.tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      ['tabInbox','tabShipping','tabCompose'].forEach(function (id) {
+        document.getElementById(id).style.display = 'none';
+      });
+      var target = btn.dataset.tab;
+      if (target === 'inbox') document.getElementById('tabInbox').style.display = '';
+      if (target === 'shipping') document.getElementById('tabShipping').style.display = '';
+      if (target === 'compose') document.getElementById('tabCompose').style.display = '';
+    });
+  });
+
+  // ── Render summary from localStorage ──
+  function renderSummary(summary) {
+    if (!summary) return;
+    document.getElementById('statUnread').textContent = summary.unreadCount || 0;
+    document.getElementById('statShipping').textContent = (summary.shipping || []).length;
+    document.getElementById('statTotal').textContent = (summary.threads || []).length;
+
+    var lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    document.getElementById('lastSyncLabel').textContent = lastSync ? ('Updated ' + relTime(lastSync)) : '';
+
+    // Inbox threads
+    var threadList = document.getElementById('threadList');
+    var threads = summary.threads || [];
+    if (!threads.length) {
+      threadList.innerHTML = '<div class="empty-state">Inbox is empty or no data yet.</div>';
+    } else {
+      threadList.innerHTML = threads.map(function (t) {
+        var cls = 'thread-row' + (t.isUnread ? ' unread' : '') + (t.isShipping ? ' shipping' : '');
+        var avCls = 'thread-avatar' + (t.isShipping ? ' shipping-av' : '');
+        var shipBadge = t.isShipping ? '<span class="shipping-badge">📦</span>' : '';
+        return '<div class="' + cls + '">' +
+          '<div class="' + avCls + '">' + esc(initials(t.from)) + '</div>' +
+          '<div class="thread-body">' +
+          '<div class="thread-meta">' +
+          '<span class="thread-from">' + esc(t.from) + '</span>' +
+          shipBadge +
+          '<span class="thread-when">' + esc(t.when) + '</span>' +
+          '</div>' +
+          '<div class="thread-subject">' + esc(t.subject) + '</div>' +
+          '<div class="thread-snippet">' + esc(t.snippet) + '</div>' +
+          '</div>' +
+          (t.isUnread ? '<div class="thread-unread-dot"></div>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    // Shipping threads
+    var shippingList = document.getElementById('shippingList');
+    var shipping = summary.shipping || [];
+    if (!shipping.length) {
+      shippingList.innerHTML = '<div class="empty-state">No shipping emails in your recent inbox.</div>';
+    } else {
+      shippingList.innerHTML = shipping.map(function (t) {
+        return '<div class="thread-row shipping">' +
+          '<div class="thread-avatar shipping-av">📦</div>' +
+          '<div class="thread-body">' +
+          '<div class="thread-meta"><span class="thread-from">' + esc(t.from) + '</span><span class="thread-when">' + esc(t.when) + '</span></div>' +
+          '<div class="thread-subject">' + esc(t.subject) + '</div>' +
+          '<div class="thread-snippet">' + esc(t.snippet) + '</div>' +
+          '</div></div>';
+      }).join('');
+    }
+
+    document.getElementById('mailSub').textContent = threads.length + ' thread' + (threads.length === 1 ? '' : 's') + ' · ' + (summary.unreadCount || 0) + ' unread';
+  }
+
+  // ── Check if Gmail scope is granted ──
+  function hasGmailScope() {
+    try {
+      var accs = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]');
+      return accs && accs.length > 0 && accs[0].scope && accs[0].scope.includes('gmail.readonly');
+    } catch (_) { return false; }
+  }
+
+  // ── Refresh: call loadGmailSummary from topbar.js (exposed as window.loadGmailSummary) ──
+  async function doRefresh() {
+    var btn = document.getElementById('refreshBtn');
+    var icon = btn.querySelector('span') || btn;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinning">⟳</span> Refreshing…';
+
+    // Clear throttle so loadGmailSummary actually fetches
+    localStorage.removeItem(LAST_SYNC_KEY);
+
+    if (typeof window.loadGmailSummary === 'function') {
+      var secret = window.DASH_APP_SECRET || '';
+      await window.loadGmailSummary(secret);
+    } else {
+      // topbar.js not loaded yet — wait briefly and try once more
+      await new Promise(function(r) { setTimeout(r, 800); });
+      if (typeof window.loadGmailSummary === 'function') {
+        await window.loadGmailSummary(window.DASH_APP_SECRET || '');
+      }
+    }
+
+    try {
+      var summary = JSON.parse(localStorage.getItem(SUMMARY_KEY));
+      renderSummary(summary);
+    } catch (_) {}
+
+    btn.disabled = false;
+    btn.textContent = '⟳ Refresh';
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', doRefresh);
+
+  // ── Compose send ──
+  document.getElementById('composeSend').addEventListener('click', async function () {
+    var to = document.getElementById('composeTo').value.trim();
+    var subject = document.getElementById('composeSubject').value.trim();
+    var body = document.getElementById('composeBody').value.trim();
+    var status = document.getElementById('composeStatus');
+    if (!to || !subject || !body) { status.textContent = 'Fill in To, Subject, and Message.'; status.style.color = '#f87171'; return; }
+
+    this.disabled = true; this.textContent = '⟳ Sending…';
+    status.textContent = ''; status.style.color = '';
+
+    // Use sendGmailNow exposed from topbar.js
+    if (typeof window.sendGmailNow !== 'function') {
+      // Build and send directly via proxy if not available from topbar
+      status.textContent = 'Coach not ready yet — open the coach panel first, then retry.';
+      status.style.color = '#f87171';
+      this.disabled = false; this.textContent = '📤 Send';
+      return;
+    }
+
+    var result = await window.sendGmailNow({ to, subject, body }, window.DASH_APP_SECRET || '');
+    if (result.ok) {
+      status.textContent = '📤 Sent to ' + to;
+      status.style.color = '#6EE7B7';
+      document.getElementById('composeTo').value = '';
+      document.getElementById('composeSubject').value = '';
+      document.getElementById('composeBody').value = '';
+      localStorage.removeItem(LAST_SYNC_KEY); // invalidate cache
+    } else {
+      status.textContent = '⚠ ' + result.error;
+      status.style.color = '#f87171';
+    }
+    this.disabled = false; this.textContent = '📤 Send';
+  });
+
+  document.getElementById('composeClear').addEventListener('click', function () {
+    document.getElementById('composeTo').value = '';
+    document.getElementById('composeSubject').value = '';
+    document.getElementById('composeBody').value = '';
+    document.getElementById('composeStatus').textContent = '';
+  });
+
+  // ── Expose sendGmailNow to compose (topbar.js loads after this script) ──
+  // We expose it on window in topbar.js, so compose can call it directly.
+
+  // ── Boot ──
+  function init() {
+    if (!hasGmailScope()) {
+      document.getElementById('connectPrompt').style.display = '';
+      document.getElementById('mailContent').style.display = 'none';
+      document.getElementById('mailSub').textContent = 'Gmail not connected';
+      return;
+    }
+
+    document.getElementById('connectPrompt').style.display = 'none';
+    document.getElementById('mailContent').style.display = '';
+
+    // Try cached summary first for instant render
+    try {
+      var cached = JSON.parse(localStorage.getItem(SUMMARY_KEY));
+      if (cached) { renderSummary(cached); }
+    } catch (_) {}
+
+    // Auto-refresh if stale (>15 min) or no cache
+    var lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    if (Date.now() - lastSync > 15 * 60 * 1000) {
+      doRefresh();
+    }
+  }
+
+  // topbar.js loads deferred — wait for it before calling sendGmailNow in compose
+  window.addEventListener('load', init);
+  // Also expose sendGmailNow from topbar — it's set on window after topbar loads
+})();
+</script>
+</body>
+</html>
