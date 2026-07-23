@@ -448,6 +448,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.123', date: '2026-07-23', items: ['Fix coach missing today\'s training and not saving changes'] },
+
     { ver: '3.122', date: '2026-07-23', items: ['Fix Strava coach reading oldest runs instead of newest (slice direction bug)'] },
 
     { ver: '3.121', date: '2026-07-23', items: ['Update CLAUDE.md: notification settings + push-send prefs gate entries', 'Add notification schedule settings: toggle per type, test buttons', 'Update CLAUDE.md: add §13 invariant, session changelogs, Gmail debugging', 'Add Mail module: Gmail inbox, shipping tracker, compose', 'Add Gmail integration to coach: loadGmailSummary, send with confirmation', 'Fix DEP0169: replace url.parse() in web-push with WHATWG URL API', 'Add gmail scopes to Google OAuth + route Gmail API in integrations proxy'] },
