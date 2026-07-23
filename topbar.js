@@ -1361,6 +1361,22 @@ body.topbar-modal-open {
     async function ask(text) {
       text = (text || '').trim();
       if (!text || busy) return;
+
+      // Shortcut: "redo [daily] [status] sweep/scan/briefing" re-runs the proactive scan
+      // without sending to the AI. Bypasses the once-per-day guard.
+      const RESCAN_RE = /\b(redo|rerun|re-run|refresh|reset|run again|restart)\b.{0,30}\b(status\s+sweep|daily\s+sweep|sweep|scan|briefing|daily\s+brief)/i;
+      if (RESCAN_RE.test(text)) {
+        busy = true;
+        addMsg('user', text);
+        input.value = '';
+        try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
+        localStorage.removeItem('strava_last_sync');
+        await primeCoachData();
+        await runProactiveScan();
+        busy = false;
+        return;
+      }
+
       busy = true;
       addMsg('user', text);  // persists user message
       input.value = '';
