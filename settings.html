@@ -448,6 +448,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.124', date: '2026-07-23', items: ['Fix Strava pace format and enrich last_logged_run with GPS data'] },
+
     { ver: '3.123', date: '2026-07-23', items: ['Fix coach missing today\'s training and not saving changes'] },
 
     { ver: '3.122', date: '2026-07-23', items: ['Fix Strava coach reading oldest runs instead of newest (slice direction bug)'] },
