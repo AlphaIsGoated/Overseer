@@ -946,8 +946,11 @@ body.topbar-modal-open {
         "strava_activities_v1 entries have 'when' (precomputed, use verbatim) and 'pace' formatted as MM:SS/mi (matches Strava display exactly). " +
         "marathon_plan_v1.entries_upcoming includes today (daysAgo=0) and future entries. entries_recent_history has past entries newest-first. " +
         "last_logged_run may have strava_distanceMi and strava_pace (GPS-accurate, MM:SS/mi) — always prefer these over plan values when present. " +
-        "CALENDAR WRITE: You CAN add events to the user's Google Calendar. When asked, append: [CALENDAR_ADD:{\"title\":\"...\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}] — timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If any detail is unclear, ask first." +
-        "\n\nMODULE WRITE ACCESS: You CAN modify the user's data. Append one or more [COACH_ACTION:{...}] blocks (valid JSON, no line breaks inside) at the end of your reply. Multiple blocks are allowed. Always confirm in your text what you changed.\n" +
+        "\n\nMODULE WRITE ACCESS — YOU ARE NOT READ-ONLY: You have FULL write access to the user's goals, marathon plan, Google Calendar, water/hydration, and Gmail. " +
+        "NEVER tell the user you 'can only read' any of these systems. Always emit the appropriate block. " +
+        "Append one or more [COACH_ACTION:{...}] blocks (valid JSON, no line breaks inside) at the END of your reply. Multiple blocks allowed. Always confirm in text what you changed.\n" +
+        "CALENDAR (module:\"calendar\"): You CAN add events to the user's Google Calendar. Timezone: " + ((typeof Intl !== 'undefined') ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/New_York') + ". If time/date is unclear, ask first.\n" +
+        " • Add event: {\"module\":\"calendar\",\"op\":\"add_event\",\"title\":\"Event name\",\"datetime\":\"YYYY-MM-DDTHH:MM:00\",\"durationMinutes\":60,\"notificationMinutes\":15}\n" +
         "MARATHON (module:\"marathon\"): entries have a `date` field (YYYY-MM-DD) — use it to target write ops, but describe timing with `when` in your reply.\n" +
         " • Update entry: {\"module\":\"marathon\",\"op\":\"update_entry\",\"date\":\"YYYY-MM-DD\",\"set\":{\"type\":\"easy|long|speed|tempo|rest|cross|race|other\",\"label\":\"Short label\",\"plannedDistanceMi\":6.0}}\n" +
         " • Move entry: {\"module\":\"marathon\",\"op\":\"move_entry\",\"fromDate\":\"YYYY-MM-DD\",\"toDate\":\"YYYY-MM-DD\"}\n" +
@@ -959,11 +962,14 @@ body.topbar-modal-open {
         " • Complete goal: {\"module\":\"goals\",\"op\":\"complete\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Remove goal: {\"module\":\"goals\",\"op\":\"remove\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Update goal: {\"module\":\"goals\",\"op\":\"update\",\"oldText\":\"Old text\",\"newText\":\"New text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        "WATER (module:\"water\"): You CAN update the user's hydration log (po_water_v1). Today's date for water is " + (function(){ const d=new Date(); if(d.getHours()<6)d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })() + ".\n" +
+        " • Set bottles for a date: {\"module\":\"water\",\"op\":\"set\",\"date\":\"YYYY-MM-DD\",\"bottles\":8}\n" +
+        " • Add bottles to a date: {\"module\":\"water\",\"op\":\"add\",\"date\":\"YYYY-MM-DD\",\"bottles\":2}\n" +
         "GMAIL (module:\"gmail\"): Read access via gmail_summary_v1 in dashboard data. To draft/send an email, emit a [COACH_ACTION] with op:\"send\" — a confirmation card appears and the email is NOT sent until the user clicks Send.\n" +
         " • Draft/send: {\"module\":\"gmail\",\"op\":\"send\",\"to\":\"name@domain.com\",\"subject\":\"Subject line\",\"body\":\"Full email body text\",\"cc\":\"optional\",\"threadId\":\"optional thread id for replies\"}\n" +
         "GMAIL RULES: Always write the full email body — do not truncate or summarize. If recipient, subject, or key content is unclear, ask before emitting. Do not mention the confirmation step in your reply text — it appears automatically.\n" +
-        "CRITICAL WRITE RULE: Whenever the user asks you to change, update, add, remove, move, reschedule, edit, or modify ANYTHING in their data — you MUST emit a [COACH_ACTION:{...}] block in the same reply. " +
-        "Do NOT just say 'I've noted that' or 'I'll remember that' — that does nothing. The change is NOT saved unless you emit the block. " +
+        "CRITICAL WRITE RULE: Whenever the user asks you to change, update, add, remove, move, reschedule, edit, modify, suppress, delete, or log ANYTHING — you MUST emit a [COACH_ACTION:{...}] block in the same reply. " +
+        "Do NOT say 'I've noted that', 'I'll remember that', or 'those live in systems I can only read' — those statements are WRONG. The change is NOT saved unless you emit the block. " +
         "If the details are ambiguous, ask ONE clarifying question before emitting. Never emit for read-only questions (show me, what is, tell me about)." +
         memory +
         "\n\nDashboard data as JSON:\n";
@@ -1420,7 +1426,12 @@ body.topbar-modal-open {
             const hasPending = results.some(function(r) { return r.status === 'fulfilled' && r.value && r.value.pendingConfirm; });
             if (errs.length) addMsg('coach', '⚠ Some changes failed: ' + errs.join('; '), false);
             else if (hasPending) addMsg('coach', 'Review the draft above — click Send to confirm, or Cancel to discard.', false);
-            else addMsg('coach', '✅ Changes saved. Reload the page to see them reflected.', false);
+            else {
+              // Clear today's proactive key so the next panel open re-runs the sweep
+              // and the user can verify the changes were applied correctly.
+              try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
+              addMsg('coach', '✅ Changes saved. Close and reopen this panel to see a fresh status sweep confirming the update.', false);
+            }
           });
         } else {
           addMsg('coach', reply, false);  // persists coach reply
@@ -1702,6 +1713,45 @@ body.topbar-modal-open {
             try { await new Promise(function(r) { setTimeout(r, 1500); }); await fetch('/api/db', goalsPushOpts); }
             catch (e2) { console.warn('[Coach] goals push retry failed', e2); }
           }
+          return { ok: true };
+        }
+
+        // ── Calendar ──────────────────────────────────────────────
+        if (act.module === 'calendar') {
+          if (act.op === 'add_event') {
+            return addGoogleCalendarEvent({
+              title: act.title,
+              datetime: act.datetime,
+              durationMinutes: act.durationMinutes || 60,
+              notificationMinutes: act.notificationMinutes !== undefined ? act.notificationMinutes : 15,
+            });
+          }
+          return { ok: false, error: 'Unknown calendar op: ' + act.op };
+        }
+
+        // ── Water / hydration ─────────────────────────────────────
+        if (act.module === 'water') {
+          function todayWater() {
+            const d = new Date(); if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          }
+          let water = {};
+          try { water = JSON.parse(localStorage.getItem('po_water_v1') || '{}'); } catch (_) {}
+          if (!water.logs) water.logs = {};
+          const waterDate = act.date || todayWater();
+          if (act.op === 'set') {
+            water.logs[waterDate] = Math.max(0, Number(act.bottles) || 0);
+          } else if (act.op === 'add') {
+            water.logs[waterDate] = (water.logs[waterDate] || 0) + (Number(act.bottles) || 1);
+          } else {
+            return { ok: false, error: 'Unknown water op: ' + act.op };
+          }
+          try { localStorage.setItem('po_water_v1', JSON.stringify(water)); } catch (e) { console.warn('[Coach] water write failed', e); }
+          fetch('/api/db', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+            body: JSON.stringify({ key: 'profile', data: { po_water_v1: water } }),
+          }).catch(function(e) { console.warn('[Coach] water push failed', e); });
           return { ok: true };
         }
 
@@ -2019,7 +2069,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v5';
+    const COACH_PROMPT_BUILD = '2026-07-23-v6';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
