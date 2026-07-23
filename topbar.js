@@ -744,7 +744,9 @@ body.topbar-modal-open {
           out[k] = v.slice(0, 12).map(n => ({ path:n.path, body:(n.body||'').slice(0,80) }));
         } else if (k === 'strava_activities_v1' && Array.isArray(v)) {
           const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
-          out[k] = v.slice(-30).map(a => {
+          // Strava API returns newest-first; slice(0,30) = 30 most recent.
+          // slice(-30) was a bug: it gave the 30 oldest, hiding recent runs.
+          out[k] = v.slice(0, 30).map(a => {
             const actDay = a.date ? new Date(a.date.slice(0,10) + 'T00:00:00') : null;
             const daysAgo = actDay ? Math.round((todayMidnight - actDay) / 86400000) : null;
             const when = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : daysAgo != null ? daysAgo + ' days ago' : 'unknown';
@@ -1956,7 +1958,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v2';
+    const COACH_PROMPT_BUILD = '2026-07-23-v3';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
