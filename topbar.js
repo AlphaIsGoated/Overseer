@@ -1362,18 +1362,22 @@ body.topbar-modal-open {
       text = (text || '').trim();
       if (!text || busy) return;
 
-      // Shortcut: "redo [daily] [status] sweep/scan/briefing" re-runs the proactive scan
-      // without sending to the AI. Bypasses the once-per-day guard.
-      const RESCAN_RE = /\b(redo|rerun|re-run|refresh|reset|run again|restart)\b.{0,30}\b(status\s+sweep|daily\s+sweep|sweep|scan|briefing|daily\s+brief)/i;
-      if (RESCAN_RE.test(text)) {
+      // Shortcut: any message with a redo-intent word AND a scan-target word re-runs the
+      // proactive scan without sending to the AI. Bypasses the once-per-day guard.
+      const RESCAN_INTENT = /\b(redo|rerun|re-?run|refresh|reset|restart|run again|again|recheck|rescan|re-?scan)\b/i;
+      const RESCAN_TARGET = /\b(scan|sweep|brief(ing)?|status|proactive|morning|daily|check.?in)\b/i;
+      if (RESCAN_INTENT.test(text) && RESCAN_TARGET.test(text)) {
         busy = true;
         addMsg('user', text);
         input.value = '';
-        try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
-        localStorage.removeItem('strava_last_sync');
-        await primeCoachData();
-        await runProactiveScan();
-        busy = false;
+        try {
+          try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
+          localStorage.removeItem('strava_last_sync');
+          await primeCoachData();
+          await runProactiveScan();
+        } finally {
+          busy = false;
+        }
         return;
       }
 
