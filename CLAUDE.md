@@ -358,6 +358,14 @@ Mobile tab eviction causes the page to reload from scratch, which triggers `onAp
 
 ---
 
+### `settings.html` — Settings
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added **Notification Schedule** section. Shows all 5 notification types (morning, reminders, nutrition, training, skincare) with local-time display (computed from UTC cron schedule via `Date.toLocaleTimeString`), enable/disable toggle per type, and Test button (fires real push to all subscribed devices immediately via `GET /api/push-send?type=X` + X-App-Secret). Prefs saved to `localStorage('notification_prefs')` + immediate push to Supabase under key `notification_prefs`. Disabling a type gates the cron send in `push-send.js`. Test buttons always fire regardless of enabled/disabled state. | `notification_prefs` is stored as its own Supabase row (key='notification_prefs') — NOT inside any appKey sync. If another page calls `initCloudSync({appKey:'profile'})` it will not overwrite this key. If push subscriptions expire, test button returns 0 devices; user needs to re-enable push notifications via the subscription UI. |
+
+---
+
 ### `po-water.html` — Water Tracker
 
 | Date | Commit | Change | What could break |
@@ -411,6 +419,7 @@ Mobile tab eviction causes the page to reload from scratch, which triggers `onAp
 
 | Date | Commit | Change | What could break |
 |------|--------|--------|-----------------|
+| 2026-07-23 | *(this session)* | Added per-type notification preferences gate. On cron calls, reads `notification_prefs` key from Supabase. If `notifPrefs[type] === false`, returns `{sent:0}` immediately without sending. Manual test calls (from settings.html test buttons) always fire regardless of prefs. Default is enabled for all types (only explicitly `false` skips). | If Supabase is unreachable when fetching prefs, `fetchModuleData` returns null and the gate is bypassed (notification fires anyway). This is safe — if anything, it over-sends rather than silently drops. |
 | 2026-07-23 | *(this session)* | Fixed morning notification always saying "nothing to do": added `goals:yesterday` fallback when `goals:today` is absent in Supabase. At 9 AM cron time, the user hasn't opened the app yet so `goals:today` doesn't exist (rollover only runs in-browser). Since rollover copies uncompleted goals forward, yesterday's pending goals === today's pending goals. `morning` notification now includes pending goal count + today's marathon run in the body. `reminders` case received the same fallback. | If the user completes all goals the night before AND opens the app AND the cron fires before the new day's key is written — yesterday's key shows 0 pending, so fallback returns nothing. Acceptable edge case; notification body falls back to "Open coach for your full briefing." |
 
 ---
