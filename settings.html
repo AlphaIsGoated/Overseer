@@ -448,6 +448,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.140', date: '2026-07-27', items: ['Add append_entries op + enforce 20-entry batch limit for large plans'] },
+
     { ver: '3.139', date: '2026-07-27', items: ['Fix COACH_ACTION JSON truncation on payloads with nested brackets'] },
 
     { ver: '3.138', date: '2026-07-27', items: ['Add replace_plan op + fix status sweep re-running on every open'] },
