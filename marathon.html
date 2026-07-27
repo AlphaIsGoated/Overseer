@@ -233,6 +233,20 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 .mt-glossary-row:last-child { border-bottom: none; }
 .mt-glossary-term { font-size: 12.5px; font-weight: 700; color: var(--accent); }
 .mt-glossary-def { font-size: 12px; color: var(--text-2); line-height: 1.45; }
+
+/* Training paces card */
+.mt-paces-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+.mt-pace-cell { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 10px; padding: 10px 8px; text-align: center; cursor: default; }
+.mt-pace-cell-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-bottom: 5px; }
+.mt-pace-cell-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: var(--font-mono); display: block; line-height: 1.2; }
+.mt-pace-cell-rep { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
+.mt-pace-cell-name { font-size: 9px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-3); margin-top: 4px; font-weight: 600; }
+.mt-paces-edit-row { display: grid; grid-template-columns: 1fr 84px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.mt-paces-edit-row:last-of-type { border-bottom: none; }
+.mt-paces-edit-name { font-size: 12.5px; font-weight: 600; }
+.mt-paces-edit-desc { font-size: 10.5px; color: var(--text-3); line-height: 1.4; margin-top: 2px; }
+.mt-paces-edit-input { padding: 7px 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text-1); font-family: var(--font-mono); font-size: 13px; text-align: center; outline: none; width: 100%; }
+.mt-paces-edit-input:focus { border-color: rgba(255,138,138,0.4); }
 </style>
 </head>
 <body>
@@ -279,6 +293,20 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     <button class="mt-btn primary full" id="mtSaveGoal" type="button">Save goal</button>
     <div class="mt-status" id="mtGoalStatus"></div>
     <div class="mt-pace-grid" id="mtPaceGrid"></div>
+  </div>
+
+  <!-- ===== TRAINING PACES ===== -->
+  <div class="card">
+    <div class="card-h">
+      <span class="card-title">Training paces</span>
+      <button class="mt-btn" id="mtPacesEditToggle" type="button" style="padding:5px 10px;font-size:11px;height:auto">Edit</button>
+    </div>
+    <div id="mtPacesGrid"></div>
+    <div id="mtPacesEditForm" class="hidden" style="margin-top:12px">
+      <div id="mtPacesEditRows"></div>
+      <button class="mt-btn primary full" id="mtPacesSave" type="button" style="margin-top:12px">Save paces</button>
+    </div>
+    <div class="mt-status" id="mtPacesStatus"></div>
   </div>
 
   <!-- ===== STRAVA ===== -->
@@ -503,6 +531,51 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   }
 
   /* ============================================================
+     TRAINING PACE DEFINITIONS — one record per pace zone. Stored in
+     plan.trainingPaces (sec/mi per key). Used by zonePace(), the
+     Pace card, glossary tooltips, and Routine & fueling panel.
+     ============================================================ */
+  const TRAINING_PACE_DEFS = [
+    { key: 'easy',      label: 'Easy',        zone: 'easy',  color: '#6ee7b7', repMeters: null,
+      desc: 'Mon easy days + WU/CD. Fully conversational, HR Zone 2 — if you can\'t hold a sentence, slow down.' },
+    { key: 'long',      label: 'Long',        zone: 'long',  color: '#7DD3FC', repMeters: null,
+      desc: 'Sat long runs. Steady and easy. Peak weeks: final 2–4 miles may shift to marathon pace (MP).' },
+    { key: 'mp',        label: 'Race / MP',   zone: 'gmp',   color: '#F2C063', repMeters: null,
+      desc: 'Marathon goal pace — must average this for sub-4:00. Should feel controlled, not easy but not hard.' },
+    { key: 'tempo',     label: 'Tempo',       zone: 'tempo', color: '#F2C063', repMeters: null,
+      desc: 'Tue/Thu hard sessions. Comfortably hard, sustained 20–48 min. Only 2–3 words possible; nose-breathing barely holds.' },
+    { key: 'speed1mi',  label: '1mi rep',     zone: 'speed', color: '#FF8A8A', repMeters: 1609,
+      desc: 'VO2max effort — hard, breathing labored but controlled. 2 min jog rest between reps.' },
+    { key: 'speed1200', label: '1200m rep',   zone: 'speed', color: '#FF8A8A', repMeters: 1200,
+      desc: 'Aerobic interval. 90s jog rest. Rep 3 must match rep 1 in split — resist going out fast.' },
+    { key: 'speed800',  label: '800m rep',    zone: 'speed', color: '#FF8A8A', repMeters: 800,
+      desc: 'Controlled speed. 90s standing rest. From Jul 23 Strava session — hard but sustainable across all reps.' },
+    { key: 'speed400',  label: '400m rep',    zone: 'speed', color: '#FF8A8A', repMeters: 400,
+      desc: 'Short & sharp. 90s standing rest. Pace discipline: do NOT go faster on early reps.' },
+    { key: 'strides',   label: 'Strides',     zone: null,    color: '#C9B8FF', repMeters: null,  isFeelPace: true,
+      desc: '20s relaxed accelerations to near top-speed. Full 90s walk-back recovery between each. Not timed precisely.' },
+  ];
+
+  // Calibrated from Strava history: mile PR 6:02 · 5×800 session avg 7:24/mi · long runs 9:50–9:58/mi
+  const DEFAULT_TRAINING_PACES = {
+    easy:       585,   // 9:45/mi
+    long:       585,   // 9:45/mi
+    mp:         547,   // 9:07/mi
+    tempo:      485,   // 8:05/mi
+    speed1mi:   430,   // 7:10/mi
+    speed1200:  429,   // 7:09/mi → 5:21/rep
+    speed800:   420,   // 7:00/mi → 3:30/rep
+    speed400:   408,   // 6:48/mi → 1:42/rep
+    strides:    375,   // ~6:15/mi feel
+  };
+
+  function repTimeSec(key, meters) {
+    const pace = ((plan && plan.trainingPaces) || {})[key] || DEFAULT_TRAINING_PACES[key];
+    if (!pace || !meters) return null;
+    return pace * (meters / 1609.344);
+  }
+
+  /* ============================================================
      GLOSSARY — common marathon-training abbreviations/phrases. Shown
      as a reference card at the bottom of the page, AND auto-highlighted
      (with the same hover tooltip) wherever they appear inside an
@@ -540,7 +613,25 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   function glossaryLookup(term) {
     const lower = term.toLowerCase();
     const key = Object.keys(GLOSSARY).find(k => k.toLowerCase() === lower);
-    return key ? GLOSSARY[key] : null;
+    const base = key ? GLOSSARY[key] : null;
+    if (!base) return null;
+    const tp = (plan && plan.trainingPaces) || DEFAULT_TRAINING_PACES;
+    const r800 = repTimeSec('speed800', 800), r400 = repTimeSec('speed400', 400);
+    const extras = {
+      'wu':        tp.easy      ? ' Your easy pace: ' + paceStr(tp.easy) + '.'   : '',
+      'cd':        tp.easy      ? ' Your easy pace: ' + paceStr(tp.easy) + '.'   : '',
+      'gmp':       tp.mp        ? ' Your GMP: '       + paceStr(tp.mp)   + '.'   : '',
+      'e':         tp.easy      ? ' Your pace: '      + paceStr(tp.easy) + '.'   : '',
+      'l':         tp.long      ? ' Your pace: '      + paceStr(tp.long) + '.'   : '',
+      't':         tp.tempo     ? ' Your pace: '      + paceStr(tp.tempo)+ '.'   : '',
+      'easy':      tp.easy      ? ' Your pace: '      + paceStr(tp.easy) + '.'   : '',
+      'tempo':     tp.tempo     ? ' Your pace: '      + paceStr(tp.tempo)+ '.'   : '',
+      'threshold': tp.tempo     ? ' Your threshold: ' + paceStr(tp.tempo)+ '.'   : '',
+      'interval':  r800         ? ' Your 800m rep: '  + fmtSec(r800)   + '/rep (' + paceStr(tp.speed800) + ').' : '',
+      'intervals': (r800&&r400) ? ' 800m: '+fmtSec(r800)+'/rep · 400m: '+fmtSec(r400)+'/rep · 1mi: '+paceStr(tp.speed1mi)+'.' : '',
+      'strides':   tp.strides   ? ' ~' + paceStr(tp.strides) + ' feel.' : '',
+    };
+    return base + (extras[lower] || '');
   }
   // Wraps any glossary term found in an ALREADY-HTML-ESCAPED string with a
   // hoverable span. Must run after escapeHtml, never before (it doesn't
@@ -557,8 +648,57 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     const wrap = $('mtGlossaryList');
     if (!wrap) return;
     wrap.innerHTML = Object.keys(GLOSSARY).map(term =>
-      '<div class="mt-glossary-row"><span class="mt-glossary-term">' + escapeHtml(term) + '</span><span class="mt-glossary-def">' + escapeHtml(GLOSSARY[term]) + '</span></div>'
+      '<div class="mt-glossary-row"><span class="mt-glossary-term">' + escapeHtml(term) + '</span><span class="mt-glossary-def">' + escapeHtml(glossaryLookup(term) || GLOSSARY[term]) + '</span></div>'
     ).join('');
+  }
+
+  /* ============================================================
+     TRAINING PACES CARD — display + edit stored training paces
+     ============================================================ */
+  function renderPaceCard() {
+    const grid = $('mtPacesGrid');
+    if (!grid) return;
+    const tp = (plan && plan.trainingPaces) || DEFAULT_TRAINING_PACES;
+    grid.innerHTML = TRAINING_PACE_DEFS.map(def => {
+      const pace = tp[def.key] || DEFAULT_TRAINING_PACES[def.key];
+      const paceDisplay = def.isFeelPace ? '~' + paceStr(pace) : paceStr(pace);
+      const repSec = def.repMeters ? repTimeSec(def.key, def.repMeters) : null;
+      const repDisplay = repSec ? fmtSec(repSec) + '/rep' : null;
+      const tip = attrTip(def.label + '\\n' + def.desc + (repDisplay ? '\\n' + repDisplay + ' per rep' : ''));
+      return '<div class="mt-pace-cell" data-tip="' + tip + '" style="border-color:' + def.color + '33">'
+        + '<div><span class="mt-pace-cell-dot" style="background:' + def.color + '"></span></div>'
+        + '<span class="mt-pace-cell-val" style="color:' + def.color + '">' + paceDisplay + '</span>'
+        + (repDisplay ? '<div class="mt-pace-cell-rep">' + repDisplay + '</div>' : '')
+        + '<div class="mt-pace-cell-name">' + escapeHtml(def.label) + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  function renderPaceEditForm() {
+    const rows = $('mtPacesEditRows');
+    if (!rows) return;
+    const tp = (plan && plan.trainingPaces) || DEFAULT_TRAINING_PACES;
+    rows.innerHTML = TRAINING_PACE_DEFS.map(def => {
+      const pace = tp[def.key] || DEFAULT_TRAINING_PACES[def.key];
+      const repSec = def.repMeters ? repTimeSec(def.key, def.repMeters) : null;
+      const displayVal = paceStr(pace).replace(' /' + paceUnit, '');
+      return '<div class="mt-paces-edit-row">'
+        + '<div><div class="mt-paces-edit-name" style="color:' + def.color + '">' + escapeHtml(def.label) + (repSec ? ' <span style="color:var(--text-3);font-size:11px;font-family:var(--font-mono);font-weight:400">(' + fmtSec(repSec) + '/rep)</span>' : '') + '</div>'
+        + '<div class="mt-paces-edit-desc">' + escapeHtml(def.desc) + '</div></div>'
+        + '<input class="mt-paces-edit-input" type="text" data-key="' + def.key + '" value="' + (def.isFeelPace ? '~' : '') + escapeHtml(displayVal) + '" placeholder="m:ss">'
+        + '</div>';
+    }).join('');
+  }
+  function parsePaceInput(str) {
+    const s = String(str || '').replace(/^[~\s]+/, '').replace(/[^\d:]/g, '');
+    const parts = s.split(':').map(Number);
+    if (!parts.length || parts.some(isNaN)) return null;
+    let totalSec;
+    if (parts.length === 1) totalSec = parts[0];
+    else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+    else totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (!(totalSec > 0)) return null;
+    // Input is in the current display unit (/mi or /km) — normalise to /mi
+    return paceUnit === 'km' ? Math.round(totalSec * MI_TO_KM) : totalSec;
   }
 
   function defaultPlan() {
@@ -566,6 +706,9 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   }
   let plan = loadJSON(PLAN_KEY, defaultPlan());
   if (!Array.isArray(plan.entries)) plan.entries = [];
+  if (!plan.trainingPaces || !Object.keys(plan.trainingPaces).length) {
+    plan.trainingPaces = Object.assign({}, DEFAULT_TRAINING_PACES);
+  }
 
   function savePlan() {
     plan.updatedAt = Date.now(); // timestamp so onApplied can reject stale server snapshots
@@ -634,7 +777,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     renderCountdown(); renderPaceGrid();
   }
   $('mtDistSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => setDistSeg(parseFloat(b.dataset.d))));
-  $('mtPaceUnitSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { setPaceUnitSeg(b.dataset.u); plan.paceUnit = b.dataset.u; savePlan(); renderPaceGrid(); renderProgress(); renderPaceTrendChart(); }));
+  $('mtPaceUnitSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { setPaceUnitSeg(b.dataset.u); plan.paceUnit = b.dataset.u; savePlan(); renderPaceGrid(); renderPaceCard(); renderProgress(); renderPaceTrendChart(); }));
   $('mtSaveGoal').addEventListener('click', () => {
     plan.raceDate = $('mtRaceDate').value || null;
     plan.distanceMi = distanceMi;
@@ -1168,6 +1311,14 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     return null;
   }
   function zonePace(zone) {
+    if (zone) {
+      const tp = (plan && plan.trainingPaces) || DEFAULT_TRAINING_PACES;
+      const ZONE_TO_KEY = { easy: 'easy', wu: 'easy', cd: 'easy', jog: 'easy', rec: 'easy', long: 'long', gmp: 'mp', race: 'mp', tempo: 'tempo', speed: 'speed800' };
+      const k = ZONE_TO_KEY[zone];
+      const stored = k && (tp[k] || DEFAULT_TRAINING_PACES[k]);
+      if (stored) return stored;
+    }
+    // Fallback: goal-pace offset (original behavior for zones without a stored pace)
     const gp = goalPaceSecPerMi();
     if (!gp || !zone || ZONE_OFFSET_SEC[zone] == null) return null;
     return gp + ZONE_OFFSET_SEC[zone];
@@ -1610,6 +1761,34 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   $('mtFromMdBtn').addEventListener('click', () => $('mtFileMd').click());
   $('mtFileMd').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImportMdFile(f); e.target.value = ''; });
   $('mtReviewSave').addEventListener('click', saveImportedPlan);
+  $('mtPacesEditToggle').addEventListener('click', () => {
+    const form = $('mtPacesEditForm');
+    const isOpen = !form.classList.contains('hidden');
+    if (!isOpen) renderPaceEditForm();
+    form.classList.toggle('hidden', isOpen);
+    $('mtPacesEditToggle').textContent = isOpen ? 'Edit' : 'Done';
+  });
+  $('mtPacesSave').addEventListener('click', () => {
+    const inputs = $('mtPacesEditRows').querySelectorAll('.mt-paces-edit-input');
+    const newPaces = Object.assign({}, DEFAULT_TRAINING_PACES, plan.trainingPaces || {});
+    let anyErr = false;
+    inputs.forEach(inp => {
+      inp.style.borderColor = '';
+      const parsed = parsePaceInput(inp.value);
+      if (parsed) { newPaces[inp.dataset.key] = parsed; }
+      else { inp.style.borderColor = 'var(--bad)'; anyErr = true; }
+    });
+    if (anyErr) { $('mtPacesStatus').textContent = 'Fix invalid paces (use mm:ss format).'; $('mtPacesStatus').style.color = 'var(--bad)'; return; }
+    plan.trainingPaces = newPaces;
+    savePlan();
+    renderPaceCard();
+    renderGlossaryCard();
+    $('mtPacesStatus').textContent = 'Paces saved ✓';
+    $('mtPacesStatus').style.color = 'var(--good)';
+    $('mtPacesEditForm').classList.add('hidden');
+    $('mtPacesEditToggle').textContent = 'Edit';
+    setTimeout(() => { $('mtPacesStatus').textContent = ''; }, 2000);
+  });
   $('mtWeekWindow').addEventListener('input', () => {
     weekWindowStart = parseInt($('mtWeekWindow').value, 10) || 0;
     renderMileageChart();
@@ -1620,6 +1799,7 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
      BOOT
      ============================================================ */
   populateGoalForm();
+  renderPaceCard();
   renderStrava();
   renderSchedule();
   renderMileageChart();
@@ -1654,7 +1834,8 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
     if (freshTs >= currentTs) {
       plan = fresh;
       if (!Array.isArray(plan.entries)) plan.entries = [];
-      renderCountdown(); renderPaceGrid(); renderProgress();
+      if (!plan.trainingPaces || !Object.keys(plan.trainingPaces).length) plan.trainingPaces = Object.assign({}, DEFAULT_TRAINING_PACES);
+      renderCountdown(); renderPaceGrid(); renderPaceCard(); renderGlossaryCard(); renderProgress();
       renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderSchedule();
     }
   });
@@ -1682,7 +1863,8 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         }
         plan = incoming;
         if (!Array.isArray(plan.entries)) plan.entries = [];
-        renderCountdown(); renderPaceGrid(); renderProgress();
+        if (!plan.trainingPaces || !Object.keys(plan.trainingPaces).length) plan.trainingPaces = Object.assign({}, DEFAULT_TRAINING_PACES);
+        renderCountdown(); renderPaceGrid(); renderPaceCard(); renderGlossaryCard(); renderProgress();
         renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderSchedule();
       }
     });
