@@ -1501,6 +1501,15 @@ body.topbar-modal-open {
     let _coachLastGoalsWrite = 0;
     let _coachLastMarathonWrite = 0;
 
+    // In-memory marathon plan buffer for multi-action sequences.
+    // When the coach sends replace_plan + append_entries in one reply, they execute
+    // sequentially. Between calls, sync.js's 30-second applyRemote poll can overwrite
+    // localStorage with a stale server snapshot (before the push propagates), causing
+    // action 2 to read the wrong base. _pendingMarathonPlan holds the accumulated
+    // plan in memory across all actions in one ask() invocation. It is set to null
+    // after the sequential loop in ask() completes so each reply starts fresh.
+    let _pendingMarathonPlan = null;
+
     // ── Attachment state ──────────────────────────────────────────────────────
     // pendingAttachment: { type:'image'|'text', mediaType?:string, data:string, name:string }
     let pendingAttachment = null;
@@ -1642,12 +1651,14 @@ body.topbar-modal-open {
           // This is especially critical for replace_plan + append_entries batches where
           // action 2 must see action 1's entries in localStorage before it appends.
           const results = [];
+          _pendingMarathonPlan = null; // start each reply with a clean buffer
           for (const json of actionJsons) {
             let res;
             try { res = await executeCoachAction(JSON.parse(json)); }
             catch (e) { res = { ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }; }
             results.push({ status: 'fulfilled', value: res });
           }
+          _pendingMarathonPlan = null; // release memory; next ask() starts fresh
           const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok && !r.value.pendingConfirm); })
             .map(function(r) { return r.reason ? r.reason.message : (r.value && r.value.error) || 'unknown error'; });
           const hasPending = results.some(function(r) { return r.status === 'fulfilled' && r.value && r.value.pendingConfirm; });
@@ -1847,8 +1858,13 @@ body.topbar-modal-open {
       try {
         // ── Marathon plan ─────────────────────────────────────────────
         if (act.module === 'marathon') {
-          let plan = null;
-          try { plan = JSON.parse(localStorage.getItem('marathon_plan_v1')); } catch (_) {}
+          // Use the in-memory buffer if available (set by a previous action in this ask() call).
+          // This prevents sync.js's applyRemote from corrupting the accumulated plan between
+          // sequential actions — action 2 reads what action 1 wrote, not stale localStorage.
+          let plan = _pendingMarathonPlan;
+          if (!plan) {
+            try { plan = JSON.parse(localStorage.getItem('marathon_plan_v1')); } catch (_) {}
+          }
           if (!plan || typeof plan !== 'object') plan = { raceDate: null, distanceMi: 26.2188, goalSec: null, paceUnit: 'mi', entries: [] };
           if (!Array.isArray(plan.entries)) plan.entries = [];
 
@@ -1947,6 +1963,9 @@ body.topbar-modal-open {
           // Stamp updatedAt so marathon.html's onApplied can reject a stale server snapshot
           plan.updatedAt = Date.now();
           try { localStorage.setItem('marathon_plan_v1', JSON.stringify(plan)); } catch (e) { console.warn('[Coach] marathon write failed', e); }
+          // Keep the in-memory buffer in sync so subsequent actions in this ask() call
+          // read the accumulated plan (not stale localStorage from an applyRemote poll).
+          _pendingMarathonPlan = plan;
           // Set session guard immediately after localStorage write — BEFORE the push await.
           // primeCoachData() may return concurrent server data while the push is in-flight;
           // setting this now ensures the guard is active for any concurrent primeCoachData forEach.
@@ -1964,6 +1983,9 @@ body.topbar-modal-open {
           if (!mRes || !mRes.ok) {
             return { ok: false, error: 'Server error (' + (mRes ? mRes.status : '?') + ') saving marathon plan. Changes are local only — try again.' };
           }
+          // Notify marathon.html (if open in same window) to re-render immediately
+          // rather than waiting for the next 30-second sync poll.
+          try { window.dispatchEvent(new CustomEvent('coach:marathon:updated', { detail: { updatedAt: plan.updatedAt } })); } catch (_) {}
           return { ok: true };
         }
 

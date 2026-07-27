@@ -1640,6 +1640,21 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   // If already connected, sync quietly on load so the page opens with fresh data.
   if (loadJSON(STRAVA_KEY, null)) syncStrava();
 
+  // When the coach writes a new plan from topbar.js, re-render immediately instead of
+  // waiting up to 30 seconds for the next sync.js applyRemote poll.
+  window.addEventListener('coach:marathon:updated', function(e) {
+    const fresh = loadJSON(PLAN_KEY, null);
+    if (!fresh) return;
+    const freshTs = fresh.updatedAt || 0;
+    const currentTs = plan && plan.updatedAt ? plan.updatedAt : 0;
+    if (freshTs >= currentTs) {
+      plan = fresh;
+      if (!Array.isArray(plan.entries)) plan.entries = [];
+      renderCountdown(); renderPaceGrid(); renderProgress();
+      renderMileageChart(); renderCompletionChart(); renderPaceTrendChart(); renderSchedule();
+    }
+  });
+
   if (window.initCloudSync) {
     window.initCloudSync({
       appKey: 'marathon',
