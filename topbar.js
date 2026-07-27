@@ -1668,8 +1668,27 @@ body.topbar-modal-open {
           _pendingMarathonPlan = null; // start each reply with a clean buffer
           for (const json of actionJsons) {
             let res;
-            try { res = await executeCoachAction(JSON.parse(json)); }
-            catch (e) { res = { ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }; }
+            try {
+              const trimmed = json.trim();
+              let parsed;
+              try {
+                parsed = JSON.parse(trimmed);
+              } catch (parseErr) {
+                // Log raw JSON so we can diagnose AI formatting issues (unquoted keys, double-braces, etc.)
+                console.warn('[Coach] COACH_ACTION parse error. Raw (first 400 chars):', JSON.stringify(trimmed.slice(0, 400)));
+                // Repair attempt: AI sometimes emits JS-style objects with unquoted property names
+                // e.g. {module:"marathon"} instead of {"module":"marathon"}
+                const fixed = trimmed.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+                try {
+                  parsed = JSON.parse(fixed);
+                  console.warn('[Coach] COACH_ACTION repaired by quoting unquoted property names');
+                } catch (_) {
+                  throw new Error('Invalid action JSON: ' + (parseErr.message || String(parseErr)));
+                }
+              }
+              res = await executeCoachAction(parsed);
+            }
+            catch (e) { res = { ok: false, error: e.message || String(e) }; }
             results.push({ status: 'fulfilled', value: res });
           }
           _pendingMarathonPlan = null; // release memory; next ask() starts fresh
