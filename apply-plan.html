@@ -6,40 +6,56 @@
 <title>Apply Marathon Plan</title>
 <script src="/api/config"></script>
 <style>
-  body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; padding: 32px; max-width: 700px; margin: 0 auto; }
+  body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; padding: 32px; max-width: 780px; margin: 0 auto; }
   h2 { color: #7DD3FC; margin-bottom: 4px; }
-  .sub { color: #888; font-size: 13px; margin-bottom: 24px; }
-  .log { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.7; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 8px; line-height: 1.7; }
+  .paces { background: #111; border: 1px solid #2a2a2a; border-radius: 6px; padding: 12px 16px; font-size: 12px; margin-bottom: 20px; color: #aaa; line-height: 1.8; }
+  .paces span { color: #7DD3FC; }
+  .log { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.8; max-height: 540px; overflow-y: auto; }
   .ok  { color: #6BE3A4; }
   .err { color: #FF8A8A; }
   .inf { color: #7DD3FC; }
   .warn { color: #F2C063; }
+  .dim  { color: #444; }
   #status { margin-top: 20px; font-size: 15px; font-weight: bold; }
   a { color: #7DD3FC; }
 </style>
 </head>
 <body>
-<h2>Toledo Marathon Plan — Direct Apply</h2>
-<div class="sub">Jul 27 (Mon) → Sep 20 (Sun), 2026 · Sub-4:00 goal · 55 days · 8 weeks</div>
-<div class="log" id="log">Starting…</div>
+<h2>Toledo Marathon — Calibrated 4-Day Plan · Sub-4:00 (9:07/mi)</h2>
+<div class="sub">
+  Mon (easy) · Tue (hard) · Wed rest · Thu (hard) · Fri rest · Sat (long) · Sun rest<br>
+  Jul 27 → Sep 20, 2026 · 8 weeks · paces derived from your actual Strava history
+</div>
+<div class="paces">
+  <b>Paces from your data</b> — Mile PR 6:02 · 5k ~21:49 est · 5×800 session avg 7:24/mi · Long run 9:50–9:58/mi<br>
+  <span>Easy</span> 9:45/mi &nbsp;·&nbsp;
+  <span>Long</span> 9:45/mi &nbsp;·&nbsp;
+  <span>MP (race)</span> 9:07/mi &nbsp;·&nbsp;
+  <span>Tempo</span> 8:05/mi &nbsp;·&nbsp;
+  <span>800m rep</span> 3:30 (7:00/mi) &nbsp;·&nbsp;
+  <span>400m rep</span> 1:42 (6:48/mi) &nbsp;·&nbsp;
+  <span>1mi rep</span> 7:10/mi &nbsp;·&nbsp;
+  <span>1200m rep</span> 5:21 (7:09/mi)
+</div>
+<div class="log" id="log">Building plan…</div>
 <div id="status"></div>
 
 <script>
 (function() {
   var logEl = document.getElementById('log');
   var statusEl = document.getElementById('status');
-
   function log(msg, cls) {
-    var line = document.createElement('div');
-    if (cls) line.className = cls;
-    line.textContent = msg;
-    logEl.appendChild(line);
+    var d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = msg;
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
   }
 
   var PLAN_KEY = 'marathon_plan_v1';
   var CUTOFF   = '2026-07-27';
 
-  // ── Load existing plan, preserve history ─────────────────────────
   var plan;
   try { plan = JSON.parse(localStorage.getItem(PLAN_KEY)); } catch(_) {}
   if (!plan || typeof plan !== 'object') {
@@ -48,85 +64,364 @@
   if (!Array.isArray(plan.entries)) plan.entries = [];
 
   var historical = plan.entries.filter(function(e) { return e.date < CUTOFF; });
-  log('Existing plan: ' + plan.entries.length + ' total entries', 'inf');
-  log('Keeping ' + historical.length + ' historical entries (before ' + CUTOFF + ')', 'inf');
+  log('Existing plan: ' + plan.entries.length + ' entries · keeping ' + historical.length + ' historical (before ' + CUTOFF + ')', 'inf');
 
-  // ── 8-Week Plan: Mon Jul 27 → Sun Sep 20 ─────────────────────────
-  // Goal: sub-4:00 (9:09/mi race pace)
-  // Easy 10:45–11:00/mi · Tempo 8:40–8:45/mi · Long 10:45/mi · Speed 8:10–8:15/mi
-  var newEntries = [
-    // WEEK 1 (Jul 27–Aug 2): Base
-    {date:'2026-07-27',wk:1,dow:'Mon',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Recovery — hydrate, stretch, prepare for the week'},
-    {date:'2026-07-28',wk:1,dow:'Tue',type:'easy', label:'Easy 5mi',             mi:5.0,   pace:'10:45/mi', notes:'Conversational pace, HR Zone 2 the whole way'},
-    {date:'2026-07-29',wk:1,dow:'Wed',type:'tempo',label:'Tempo 4mi',            mi:4.0,   pace:'8:45/mi',  notes:'1mi warm-up, 2mi tempo @ 8:45, 1mi cool-down'},
-    {date:'2026-07-30',wk:1,dow:'Thu',type:'easy', label:'Easy 4mi',             mi:4.0,   pace:'10:45/mi', notes:'Recovery effort between hard days'},
-    {date:'2026-07-31',wk:1,dow:'Fri',type:'speed',label:'Speed 3mi (6×400m)',   mi:3.0,   pace:'8:15/mi',  notes:'6×400m @ 8:15/mi, 400m jog recovery between each'},
-    {date:'2026-08-01',wk:1,dow:'Sat',type:'easy', label:'Easy 3mi',             mi:3.0,   pace:'11:00/mi', notes:'Active recovery — very easy, no effort'},
-    {date:'2026-08-02',wk:1,dow:'Sun',type:'long', label:'Long 13mi',            mi:13.0,  pace:'10:45/mi', notes:'Steady aerobic effort. Fuel every 45 min.'},
-    // WEEK 2 (Aug 3–9): Build
-    {date:'2026-08-03',wk:2,dow:'Mon',type:'easy', label:'Recovery 4mi',         mi:4.0,   pace:'11:00/mi', notes:'Post-long-run shakeout — very easy, stiff legs are normal'},
-    {date:'2026-08-04',wk:2,dow:'Tue',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Full rest or light yoga/stretching'},
-    {date:'2026-08-05',wk:2,dow:'Wed',type:'tempo',label:'Tempo 5mi',            mi:5.0,   pace:'8:45/mi',  notes:'1mi warm-up, 3mi tempo @ 8:45, 1mi cool-down'},
-    {date:'2026-08-06',wk:2,dow:'Thu',type:'easy', label:'Easy 5mi',             mi:5.0,   pace:'10:45/mi', notes:'Comfortable aerobic pace'},
-    {date:'2026-08-07',wk:2,dow:'Fri',type:'speed',label:'Speed 4mi (8×400m)',   mi:4.0,   pace:'8:15/mi',  notes:'8×400m @ 8:15/mi, 90s jog recovery — volume up from wk 1'},
-    {date:'2026-08-08',wk:2,dow:'Sat',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Rest before long run. Light carb-load tonight.'},
-    {date:'2026-08-09',wk:2,dow:'Sun',type:'long', label:'Long 15mi',            mi:15.0,  pace:'10:45/mi', notes:'Start slow, push last 3mi closer to 10:15. Practice race nutrition.'},
-    // WEEK 3 (Aug 10–16): Peak Build
-    {date:'2026-08-10',wk:3,dow:'Mon',type:'easy', label:'Recovery 4mi',         mi:4.0,   pace:'11:00/mi', notes:'Easy shakeout — legs will feel heavy from 15mi'},
-    {date:'2026-08-11',wk:3,dow:'Tue',type:'easy', label:'Easy 6mi',             mi:6.0,   pace:'10:45/mi', notes:'Building aerobic base'},
-    {date:'2026-08-12',wk:3,dow:'Wed',type:'tempo',label:'Tempo 6mi',            mi:6.0,   pace:'8:45/mi',  notes:'1mi warm-up, 4mi tempo @ 8:45, 1mi cool-down — longest tempo of the cycle'},
-    {date:'2026-08-13',wk:3,dow:'Thu',type:'easy', label:'Easy 4mi',             mi:4.0,   pace:'11:00/mi', notes:'Easy recovery between hard days'},
-    {date:'2026-08-14',wk:3,dow:'Fri',type:'speed',label:'Speed 5mi (10×400m)', mi:5.0,   pace:'8:10/mi',  notes:'10×400m @ 8:10/mi — peak speed session of the plan'},
-    {date:'2026-08-15',wk:3,dow:'Sat',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Full rest before peak long run. Extra sleep.'},
-    {date:'2026-08-16',wk:3,dow:'Sun',type:'long', label:'Long 18mi ★ PEAK',     mi:18.0,  pace:'10:45/mi', notes:'PEAK LONG RUN #1. Fuel every 45 min. Practice full race-day nutrition plan.'},
-    // WEEK 4 (Aug 17–23): Cutback
-    {date:'2026-08-17',wk:4,dow:'Mon',type:'easy', label:'Recovery 4mi',         mi:4.0,   pace:'11:00/mi', notes:'Very easy — 18mi takes real toll; run by feel'},
-    {date:'2026-08-18',wk:4,dow:'Tue',type:'easy', label:'Easy 5mi',             mi:5.0,   pace:'10:45/mi', notes:'Comfortable, building back up'},
-    {date:'2026-08-19',wk:4,dow:'Wed',type:'tempo',label:'Tempo 4mi',            mi:4.0,   pace:'8:45/mi',  notes:'Cutback week — shorter tempo to recover'},
-    {date:'2026-08-20',wk:4,dow:'Thu',type:'easy', label:'Easy 3mi',             mi:3.0,   pace:'11:00/mi', notes:'Easy recovery'},
-    {date:'2026-08-21',wk:4,dow:'Fri',type:'cross',label:'Cross-Train 60min',    mi:0,     pace:null,       notes:'Bike, swim, yoga, or elliptical — active recovery, no impact'},
-    {date:'2026-08-22',wk:4,dow:'Sat',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Cutback week rest'},
-    {date:'2026-08-23',wk:4,dow:'Sun',type:'long', label:'Long 12mi',            mi:12.0,  pace:'10:45/mi', notes:'Cutback long run — legs should feel fresh after lower volume week'},
-    // WEEK 5 (Aug 24–30): PEAK WEEK
-    {date:'2026-08-24',wk:5,dow:'Mon',type:'easy', label:'Recovery 4mi',         mi:4.0,   pace:'11:00/mi', notes:'Shakeout after cutback — legs should feel good'},
-    {date:'2026-08-25',wk:5,dow:'Tue',type:'easy', label:'Easy 6mi',             mi:6.0,   pace:'10:45/mi', notes:'Back to volume — aerobic base work'},
-    {date:'2026-08-26',wk:5,dow:'Wed',type:'tempo',label:'Tempo 6mi',            mi:6.0,   pace:'8:40/mi',  notes:'1mi warm-up, 4mi tempo @ 8:40 (slightly faster), 1mi cool-down'},
-    {date:'2026-08-27',wk:5,dow:'Thu',type:'easy', label:'Easy 5mi',             mi:5.0,   pace:'11:00/mi', notes:'Easy between big days'},
-    {date:'2026-08-28',wk:5,dow:'Fri',type:'speed',label:'Speed 4mi (4×1mi)',    mi:4.0,   pace:'9:00/mi',  notes:'4×1mi @ 9:00/mi (race pace), 400m jog recovery — race specificity'},
-    {date:'2026-08-29',wk:5,dow:'Sat',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Full rest. Extra carbs tonight.'},
-    {date:'2026-08-30',wk:5,dow:'Sun',type:'long', label:'Long 20mi ★ LONGEST',  mi:20.0,  pace:'10:45/mi', notes:'LONGEST RUN — run first 13mi conservative, steady last 7mi. Full nutrition practice.'},
-    // WEEK 6 (Aug 31–Sep 6): Taper Begins
-    {date:'2026-08-31',wk:6,dow:'Mon',type:'easy', label:'Recovery 5mi',         mi:5.0,   pace:'11:00/mi', notes:'Post-20mi shakeout — very easy, celebrate the big run'},
-    {date:'2026-09-01',wk:6,dow:'Tue',type:'rest', label:'Rest (Labor Day)',      mi:0,     pace:null,       notes:'Full rest — enjoy the holiday'},
-    {date:'2026-09-02',wk:6,dow:'Wed',type:'tempo',label:'Tempo 5mi',            mi:5.0,   pace:'8:45/mi',  notes:'Taper tempo — quality over quantity. Fresh legs.'},
-    {date:'2026-09-03',wk:6,dow:'Thu',type:'easy', label:'Easy 4mi',             mi:4.0,   pace:'11:00/mi', notes:'Easy aerobic'},
-    {date:'2026-09-04',wk:6,dow:'Fri',type:'speed',label:'Speed 3mi (6×400m)',   mi:3.0,   pace:'8:15/mi',  notes:'6×400m @ 8:15 — maintain turnover as volume drops'},
-    {date:'2026-09-05',wk:6,dow:'Sat',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Rest'},
-    {date:'2026-09-06',wk:6,dow:'Sun',type:'long', label:'Long 14mi',            mi:14.0,  pace:'10:30/mi', notes:'Taper long run — include 3mi at race pace (9:09/mi) to practice the feel'},
-    // WEEK 7 (Sep 7–13): Deep Taper
-    {date:'2026-09-07',wk:7,dow:'Mon',type:'easy', label:'Easy 4mi',             mi:4.0,   pace:'11:00/mi', notes:'Easy shakeout — taper madness is normal, trust the process'},
-    {date:'2026-09-08',wk:7,dow:'Tue',type:'easy', label:'Easy 5mi',             mi:5.0,   pace:'10:45/mi', notes:'Comfortable pace, feeling good'},
-    {date:'2026-09-09',wk:7,dow:'Wed',type:'tempo',label:'Race-Pace 4mi',        mi:4.0,   pace:'9:09/mi',  notes:'1mi warm-up, 2mi @ race pace (9:09/mi), 1mi cool-down — feel the goal pace'},
-    {date:'2026-09-10',wk:7,dow:'Thu',type:'easy', label:'Easy 3mi',             mi:3.0,   pace:'11:00/mi', notes:'Short easy recovery'},
-    {date:'2026-09-11',wk:7,dow:'Fri',type:'speed',label:'Light Speed 2mi',      mi:2.0,   pace:'8:15/mi',  notes:'4×400m @ 8:15 — keep legs sharp, not tired. Stop if tired.'},
-    {date:'2026-09-12',wk:7,dow:'Sat',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Full rest — sleep in'},
-    {date:'2026-09-13',wk:7,dow:'Sun',type:'long', label:'Easy 10mi',            mi:10.0,  pace:'10:30/mi', notes:'Final long run — easy and conversational. Confirm race-day logistics.'},
-    // RACE WEEK (Sep 14–20)
-    {date:'2026-09-14',wk:8,dow:'Mon',type:'easy', label:'Easy 4mi',             mi:4.0,   pace:'11:00/mi', notes:'Legs feel bouncy? Good. Easy does it.'},
-    {date:'2026-09-15',wk:8,dow:'Tue',type:'easy', label:'Easy 3mi',             mi:3.0,   pace:'10:45/mi', notes:'Short easy run'},
-    {date:'2026-09-16',wk:8,dow:'Wed',type:'easy', label:'Strides 2mi',          mi:2.0,   pace:'10:30/mi', notes:'2mi easy + 4×20s strides at race pace — wake up the legs'},
-    {date:'2026-09-17',wk:8,dow:'Thu',type:'easy', label:'Easy 2mi',             mi:2.0,   pace:'11:00/mi', notes:'Very short and easy — just moving, staying loose'},
-    {date:'2026-09-18',wk:8,dow:'Fri',type:'rest', label:'Rest Day',             mi:0,     pace:null,       notes:'Full rest. Lay out race kit, confirm nutrition plan, early to bed.'},
-    {date:'2026-09-19',wk:8,dow:'Sat',type:'easy', label:'Shakeout 1mi',         mi:1.0,   pace:'10:30/mi', notes:'10-15 min very easy shakeout — settle nerves. Big carb-load dinner tonight.'},
-    {date:'2026-09-20',wk:8,dow:'Sun',type:'race', label:'Toledo Marathon',       mi:26.2188,pace:'9:09/mi', notes:'RACE DAY — Toledo Marathon. Goal: sub-4:00 (9:09/mi avg). Start conservative, negative split, finish strong.'},
-  ];
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PACE BASIS (from Strava history):
+  //   Mile PR Jun 16: 6:02/mi
+  //   5×800m Jul 23: ~7:00/mi per rep (7:24/mi GPS avg incl. jog recovery)
+  //   Easy/long runs: 9:45–10:00/mi (Jul 11 16mi@9:58, May 30 13mi@9:50)
+  //   Moderate efforts: 9:03–9:22/mi (Jul 22, Jul 26)
+  //
+  // TRAINING PACES:
+  //   Easy    9:45/mi   — conversational, HR Zone 2 (matches your actual easy data)
+  //   Long    9:45/mi   — some with MP progression in final miles
+  //   MP      9:07/mi   — race goal pace; sub-4:00 target
+  //   Tempo   8:05/mi   — lactate threshold; comfortably hard, can speak 2–3 words
+  //   1mi rep 7:10/mi   — VO2max effort; hard but controlled
+  //   1200m   5:21/rep  — 7:09/mi · longer aerobic interval
+  //   800m    3:30/rep  — 7:00/mi · based on your Jul 23 session rep pace
+  //   400m    1:42/rep  — 6:48/mi · faster turnover, short & sharp
+  //   Strides ~6:15 feel — 20s bursts, not timed, full walk-back recovery
+  // ─────────────────────────────────────────────────────────────────────────────
 
-  log('Building ' + newEntries.length + ' new entries (Jul 27 → Sep 20)…', 'inf');
+  var E = []; // entries
 
+  function push(date, wk, dow, type, label, mi, pace, note) {
+    E.push({ date:date, wk:wk, dow:dow, type:type, label:label, mi:mi, pace:pace, note:note });
+  }
+
+  function rest(date, wk, dow, note) {
+    push(date, wk, dow, 'rest', 'Rest', 0, null, note || 'Full rest — sleep, recover, hydrate');
+  }
+
+  // ── WEEK 1 (Jul 27 Mon – Aug 2 Sun) ─────────────────────────────────────────
+  // Total: ~26mi | Easy + 6×800m + Tempo + Long 12mi
+  log('Week 1 (Jul 27–Aug 2): Base', 'dim');
+
+  push('2026-07-27', 1, 'Mon', 'easy', 'Easy 4mi',
+    4.0, '9:45/mi',
+    'EASY 4mi @ 9:45/mi · Total: 39:00 · HR Zone 2, fully conversational — if you can\'t hold a sentence, slow down');
+
+  push('2026-07-28', 1, 'Tue', 'speed', '6×800m · Total ~5.5mi ~48min',
+    5.5, '7:00/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'INTERVALS: 6×800m @ 7:00/mi · 3:30 per rep · 90s STANDING rest between reps | ' +
+    'Reps: 3:30 · 3:30 · 3:30 · 3:30 · 3:30 · 3:30 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~5.5mi · ~48min | ' +
+    'Feel: hard but controlled — you should be able to finish all 6 at the same split');
+
+  rest('2026-07-29', 1, 'Wed');
+
+  push('2026-07-30', 1, 'Thu', 'tempo', '3mi Tempo · Total 5mi ~44min',
+    5.0, '8:05/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'TEMPO: 3mi @ 8:05/mi · splits: 8:05 · 8:05 · 8:05 · total tempo time 24:15 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: 5mi · ~44min | ' +
+    'Feel: comfortably hard — can speak 2–3 words but not a sentence; nose-breathing just barely possible');
+
+  rest('2026-07-31', 1, 'Fri');
+
+  push('2026-08-01', 1, 'Sat', 'long', 'Long 12mi · ~1:57',
+    12.0, '9:45/mi',
+    'LONG RUN: 12mi @ 9:45/mi · Total: 1:57:00 | ' +
+    'Run all 12mi at easy conversational pace · No pace pressure | ' +
+    'Fuel: 1 gel at mile 4 and mile 8 · ~18–20oz water per hour | ' +
+    'Purpose: aerobic base, time on feet, nutrition rehearsal');
+
+  rest('2026-08-02', 1, 'Sun', 'Recovery day — light walk OK, extra sleep encouraged');
+
+  // ── WEEK 2 (Aug 3 Mon – Aug 9 Sun) ──────────────────────────────────────────
+  // Total: ~30mi | Easy + 8×400m + Tempo + Long 14mi w/ MP finish
+  log('Week 2 (Aug 3–9): Build', 'dim');
+
+  push('2026-08-03', 2, 'Mon', 'easy', 'Easy 5mi',
+    5.0, '9:45/mi',
+    'EASY 5mi @ 9:45/mi · Total: 48:45 · Zone 2 — post-long-run legs may feel heavy, that\'s normal');
+
+  push('2026-08-04', 2, 'Tue', 'speed', '8×400m · Total ~4.5mi ~44min',
+    4.5, '6:48/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'INTERVALS: 8×400m @ 6:48/mi · 1:42 per rep · 90s STANDING rest between reps | ' +
+    'Reps: 1:42 · 1:42 · 1:42 · 1:42 · 1:42 · 1:42 · 1:42 · 1:42 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~4.5mi · ~44min | ' +
+    'Rule: do NOT go faster than 1:42 on early reps — pace discipline is the workout');
+
+  rest('2026-08-05', 2, 'Wed');
+
+  push('2026-08-06', 2, 'Thu', 'tempo', '4mi Tempo · Total 6mi ~52min',
+    6.0, '8:05/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'TEMPO: 4mi @ 8:05/mi · splits: 8:05 · 8:05 · 8:05 · 8:05 · total tempo time 32:20 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: 6mi · ~52min | ' +
+    'First sustained 4mi tempo — mile 3 will be the hardest; hold form and trust the pace');
+
+  rest('2026-08-07', 2, 'Fri');
+
+  push('2026-08-08', 2, 'Sat', 'long', 'Long 14mi w/ MP finish · ~2:15',
+    14.0, '9:45/mi',
+    'LONG RUN: 14mi | ' +
+    'Miles 1–11 @ 9:45/mi (1:47:15) | ' +
+    'Miles 12–14 @ 9:07/mi — marathon pace (27:21) | ' +
+    'Total: ~2:15 | ' +
+    'Only push to MP in the final 3mi if legs feel good at mile 11 — otherwise stay easy the whole way | ' +
+    'Fuel every 45min, water every mile');
+
+  rest('2026-08-09', 2, 'Sun');
+
+  // ── WEEK 3 (Aug 10 Mon – Aug 16 Sun) ─────────────────────────────────────────
+  // Total: ~34mi | Easy + 5×1mi + Tempo 5mi + Long 16mi
+  log('Week 3 (Aug 10–16): Peak Build', 'dim');
+
+  push('2026-08-10', 3, 'Mon', 'easy', 'Easy 5mi',
+    5.0, '9:45/mi',
+    'EASY 5mi @ 9:45/mi · Total: 48:45 · Easy shakeout — legs may feel heavy from 14mi');
+
+  push('2026-08-11', 3, 'Tue', 'speed', '5×1mi Repeats · Total ~7.5mi ~63min',
+    7.5, '7:10/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'INTERVALS: 5×1mi @ 7:10/mi · 7:10 per rep · 2:00 JOG rest between reps | ' +
+    'Reps: 7:10 · 7:10 · 7:10 · 7:10 · 7:10 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~7.5mi · ~63min | ' +
+    'VO2max effort — hard, breathing labored but controlled; this is the toughest session of weeks 1–4');
+
+  rest('2026-08-12', 3, 'Wed');
+
+  push('2026-08-13', 3, 'Thu', 'tempo', '5mi Tempo · Total 7mi ~60min',
+    7.0, '8:05/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'TEMPO: 5mi @ 8:05/mi · splits: 8:05 · 8:05 · 8:05 · 8:05 · 8:05 · total tempo time 40:25 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: 7mi · ~60min | ' +
+    'Longest tempo of the cycle (this week) — mental checkpoint at mile 3, keep form through mile 4');
+
+  rest('2026-08-14', 3, 'Fri');
+
+  push('2026-08-15', 3, 'Sat', 'long', 'Long 16mi · ~2:36',
+    16.0, '9:45/mi',
+    'LONG RUN: 16mi @ 9:45/mi · Total: 2:36:00 | ' +
+    'PEAK LONG RUN #1 — matches your Jul 11 distance (16.13mi), now with a pace target | ' +
+    'Run all 16mi at 9:45/mi — no MP miles today, volume is the stimulus | ' +
+    'Fuel: gel every 45min (miles ~5, 10, 14) · Practice your race-day nutrition plan exactly');
+
+  rest('2026-08-16', 3, 'Sun', 'Extra rest — 16mi warrants full recovery, prioritize sleep and nutrition');
+
+  // ── WEEK 4 (Aug 17 Mon – Aug 23 Sun) — CUTBACK ───────────────────────────────
+  // Total: ~24mi | Easy + 6×400m + Tempo 3mi + Long 13mi
+  log('Week 4 (Aug 17–23): Cutback', 'dim');
+
+  push('2026-08-17', 4, 'Mon', 'easy', 'Easy 4mi',
+    4.0, '9:45/mi',
+    'EASY 4mi @ 9:45/mi · Total: 39:00 · Cutback week begins — legs may still be tired from wk 3 volume');
+
+  push('2026-08-18', 4, 'Tue', 'speed', '6×400m · Total ~4mi ~37min',
+    4.0, '6:48/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'INTERVALS: 6×400m @ 6:48/mi · 1:42 per rep · 90s STANDING rest | ' +
+    'Reps: 1:42 · 1:42 · 1:42 · 1:42 · 1:42 · 1:42 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~4mi · ~37min | ' +
+    'Cutback week — same intensity as wk 2, 2 fewer reps; feel sharper and more controlled');
+
+  rest('2026-08-19', 4, 'Wed');
+
+  push('2026-08-20', 4, 'Thu', 'tempo', '3mi Tempo · Total 5mi ~44min',
+    5.0, '8:05/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'TEMPO: 3mi @ 8:05/mi · splits: 8:05 · 8:05 · 8:05 · total tempo time 24:15 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: 5mi · ~44min | ' +
+    'Cutback tempo — same pace as wk 1 Thu, should feel noticeably more controlled now');
+
+  rest('2026-08-21', 4, 'Fri');
+
+  push('2026-08-22', 4, 'Sat', 'long', 'Long 13mi · ~2:07',
+    13.0, '9:45/mi',
+    'LONG RUN: 13mi @ 9:45/mi · Total: 2:06:45 | ' +
+    'Cutback long run — enjoy the lighter load, check in with form and cadence | ' +
+    'No MP miles today · Keep it purely easy | ' +
+    'Should feel fresh vs last week\'s 16mi — that\'s the point of a cutback week');
+
+  rest('2026-08-22', 4, 'Sun');
+
+  // ── WEEK 5 (Aug 24 Mon – Aug 30 Sun) — PEAK WEEK ────────────────────────────
+  // Total: ~37mi | Easy + 4×1200m + Tempo 6mi + Long 18mi
+  log('Week 5 (Aug 24–30): PEAK', 'dim');
+
+  push('2026-08-24', 5, 'Mon', 'easy', 'Easy 5mi',
+    5.0, '9:45/mi',
+    'EASY 5mi @ 9:45/mi · Total: 48:45 · Coming off cutback — legs should feel recharged and bouncy');
+
+  push('2026-08-25', 5, 'Tue', 'speed', '4×1200m · Total ~5.5mi ~45min',
+    5.5, '7:09/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'INTERVALS: 4×1200m @ 7:09/mi · 5:21 per rep · 90s JOG rest between reps | ' +
+    'Reps: 5:21 · 5:21 · 5:21 · 5:21 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~5.5mi · ~45min | ' +
+    '1200m teaches pacing patience — you\'ll want to go out fast; resist it. Rep 3 should feel like reps 1–2.');
+
+  rest('2026-08-26', 5, 'Wed');
+
+  push('2026-08-27', 5, 'Thu', 'tempo', '6mi Tempo ★ · Total 8mi ~1:08',
+    8.0, '8:05/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'TEMPO: 6mi @ 8:05/mi · splits: 8:05 · 8:05 · 8:05 · 8:05 · 8:05 · 8:05 · total tempo time 48:30 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: 8mi · ~1:08 | ' +
+    'LONGEST TEMPO OF THE CYCLE — break it into 2×3mi mentally (9:45 + 24:15 + brief mental reset + 24:15 + 9:45) | ' +
+    'Miles 4–5 are the hardest — hold form, shorten stride if needed, never slow below 8:10');
+
+  rest('2026-08-28', 5, 'Fri');
+
+  push('2026-08-29', 5, 'Sat', 'long', 'Long 18mi ★ PEAK · ~2:55',
+    18.0, '9:45/mi',
+    'LONG RUN: 18mi | ' +
+    'Miles 1–14 @ 9:45/mi (2:16:30) | ' +
+    'Miles 15–18 @ 9:07/mi — marathon pace if legs allow (36:28) | ' +
+    'Total: ~2:53–2:56 | ' +
+    'PEAK LONG RUN — your longest run before Toledo | ' +
+    'If legs are struggling at mile 14, skip the MP finish and run all 18 easy (still a great workout) | ' +
+    'Full race-day nutrition rehearsal: gel at miles 5, 9, 13, 17 · exactly what you\'ll do on Sep 20');
+
+  rest('2026-08-30', 5, 'Sun', 'Extra sleep — 18mi deserves full recovery, keep legs up today');
+
+  // ── WEEK 6 (Aug 31 Mon – Sep 6 Sun) — TAPER BEGINS ──────────────────────────
+  // Total: ~28mi | Easy + 2×1200m + 4×400m + Tempo 4mi + Long 14mi
+  log('Week 6 (Aug 31–Sep 6): Taper Begins', 'dim');
+
+  push('2026-08-31', 6, 'Mon', 'easy', 'Easy 5mi',
+    5.0, '9:45/mi',
+    'EASY 5mi @ 9:45/mi · Total: 48:45 · Post-18mi shakeout — very easy, run by feel, stiffness is normal');
+
+  push('2026-09-01', 6, 'Tue', 'speed', '2×1200m + 4×400m · Total ~5mi ~43min',
+    5.0, '7:00/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'BLOCK A: 2×1200m @ 7:09/mi · 5:21 per rep · 90s jog rest | Reps: 5:21 · 5:21 | ' +
+    'REST: 90s between blocks | ' +
+    'BLOCK B: 4×400m @ 6:48/mi · 1:42 per rep · 90s standing rest | Reps: 1:42 · 1:42 · 1:42 · 1:42 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~5mi · ~43min | ' +
+    'Taper: same paces as peak, reduced reps — intensity maintained, legs should feel sharper than wk 3–5');
+
+  rest('2026-09-02', 6, 'Wed');
+
+  push('2026-09-03', 6, 'Thu', 'tempo', '4mi Tempo · Total 6mi ~52min',
+    6.0, '8:05/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'TEMPO: 4mi @ 8:05/mi · splits: 8:05 · 8:05 · 8:05 · 8:05 · total tempo time 32:20 | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: 6mi · ~52min | ' +
+    'Taper tempo — same as wk 2, but legs fresher now; if you run a 7:58–8:02 split by feel, let it happen');
+
+  rest('2026-09-04', 6, 'Fri');
+
+  push('2026-09-05', 6, 'Sat', 'long', 'Long 14mi w/ MP miles · ~2:15',
+    14.0, '9:45/mi',
+    'LONG RUN: 14mi | ' +
+    'Miles 1–8 @ 9:45/mi (1:18:00) | ' +
+    'Miles 9–11 @ 9:07/mi — marathon pace (27:21) | ' +
+    'Miles 12–14 @ 9:45/mi (29:15) | ' +
+    'Total: ~2:15 | ' +
+    'Purpose: embed the feel of 9:07 into fatigued legs · This is your most race-specific long run');
+
+  rest('2026-09-06', 6, 'Sun');
+
+  // ── WEEK 7 (Sep 7 Mon – Sep 13 Sun) — DEEP TAPER ────────────────────────────
+  // Total: ~22mi | Easy + 5×400m + strides + Race-pace + Long 10mi
+  log('Week 7 (Sep 7–13): Deep Taper', 'dim');
+
+  push('2026-09-07', 7, 'Mon', 'easy', 'Easy 4mi',
+    4.0, '9:45/mi',
+    'EASY 4mi @ 9:45/mi · Total: 39:00 | ' +
+    '"Taper madness" is real — legs may feel heavy or oddly flat; this is normal and temporary | ' +
+    'Do NOT add extra mileage to compensate');
+
+  push('2026-09-08', 7, 'Tue', 'speed', '5×400m + 4 Strides · Total ~3.5mi ~39min',
+    3.5, '6:48/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'INTERVALS: 5×400m @ 6:48/mi · 1:42 per rep · 90s standing rest | Reps: 1:42 · 1:42 · 1:42 · 1:42 · 1:42 | ' +
+    'STRIDES: 4×20s @ ~6:15/mi feel (not timed) · full 90s walk-back recovery between each | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~3.5mi · ~39min | ' +
+    'Deep taper — short and sharp; strides should feel fast and effortless, like your legs remember what fast is');
+
+  rest('2026-09-09', 7, 'Wed');
+
+  push('2026-09-10', 7, 'Thu', 'tempo', 'Race-Pace 2mi + 4 Strides · Total ~4mi ~43min',
+    4.0, '9:07/mi',
+    'WU: 1mi @ 9:45/mi (9:45) | ' +
+    'RACE-PACE SEGMENT: 2mi @ 9:07/mi · splits: 9:07 · 9:07 · total 18:14 | ' +
+    'STRIDES: 4×20s @ ~6:15/mi feel (not timed) · full 90s walk-back recovery | ' +
+    'CD: 1mi @ 9:45/mi (9:45) | ' +
+    'Total: ~4mi · ~43min | ' +
+    '9:07/mi should feel EASY now — that\'s the point. Your body knows this pace. Confirm it, then bank it mentally.');
+
+  rest('2026-09-11', 7, 'Fri');
+
+  push('2026-09-12', 7, 'Sat', 'long', 'Easy 10mi · ~1:37',
+    10.0, '9:45/mi',
+    'LONG RUN: 10mi @ 9:45/mi · Total: 1:37:30 | ' +
+    'Final "long" run — purely easy and conversational | ' +
+    'Goal: confirm your legs feel good and race-day logistics are locked in | ' +
+    'Map your gear bag, confirm hotel/parking, review the course, finalize nutrition plan today');
+
+  rest('2026-09-13', 7, 'Sun');
+
+  // ── RACE WEEK (Sep 14 Mon – Sep 20 Sun) ──────────────────────────────────────
+  log('Race Week (Sep 14–20)', 'dim');
+
+  push('2026-09-14', 8, 'Mon', 'easy', 'Easy 3mi',
+    3.0, '9:45/mi',
+    'EASY 3mi @ 9:45/mi · Total: 29:15 | ' +
+    'If legs feel heavy: that\'s taper, it passes. If they feel great: still run easy, don\'t waste it.');
+
+  push('2026-09-15', 8, 'Tue', 'easy', 'Easy 2mi + 6 Strides · ~28min',
+    2.3, '9:45/mi',
+    'EASY: 2mi @ 9:45/mi (19:30) | ' +
+    'STRIDES: 6×20s @ ~6:15/mi feel · full 90s walk-back recovery between each | ' +
+    'Total: ~2.3mi · ~28min | ' +
+    'Strides should feel smooth and springy — if they don\'t, skip the last 2 and rest more');
+
+  rest('2026-09-16', 8, 'Wed', 'Rest. Lay out race kit. Finalize nutrition plan. Review course elevation.');
+
+  push('2026-09-17', 8, 'Thu', 'easy', 'Shakeout 2mi',
+    2.0, '9:45/mi',
+    'EASY 2mi @ 9:45/mi · Total: 19:30 | ' +
+    'Very short and easy — just keeping legs loose | ' +
+    'Drink extra water today · Sleep early tonight');
+
+  rest('2026-09-18', 8, 'Fri', 'Full rest. Carb-load dinner (pasta/rice, 400–600g carbs). No new foods. 8+ hrs sleep.');
+
+  push('2026-09-19', 8, 'Sat', 'easy', 'Shakeout 1.5mi',
+    1.5, '9:45/mi',
+    'SHAKEOUT: 1.5mi @ 9:45/mi · Total: ~15min | ' +
+    '10–15 min easy jog only — settle nerves, confirm legs feel ready | ' +
+    'Big carb-load dinner tonight (same foods as last night) | ' +
+    'Set alarm 3hrs before race start · Prep race breakfast tonight');
+
+  push('2026-09-20', 8, 'Sun', 'race', 'Toledo Marathon',
+    26.2188, '9:07/mi',
+    'RACE DAY — Toledo Marathon · Goal: sub-4:00 · Target pace: 9:07/mi · Target time: 3:59:06 | ' +
+    'PRE-RACE: eat 2–3hrs before start, arrive 75min early, warm-up 0.5mi easy jog + 4 strides | ' +
+    'MILES 1–6 @ 9:20–9:25/mi — hold back, let the crowd go, bank energy not time | ' +
+    'MILES 7–18 @ 9:07/mi — settle into goal pace, keep effort steady not pace | ' +
+    'MILES 19–22 @ 9:07/mi — gut-check miles; short on this feeling is a mile of history | ' +
+    'MILES 23–26.2 @ 8:50–9:00/mi — empty the tank, run the tangents | ' +
+    'FUEL: gel at miles 5, 10, 15, 20, 24 · water at every station · electrolytes at miles 10 and 18');
+
+  log('Plan built: ' + E.length + ' entries (Jul 27–Sep 20)', 'inf');
+
+  // Merge & write
   var ts = Date.now();
-  plan.entries = historical.concat(newEntries.map(function(e, i) {
+  plan.entries = historical.concat(E.map(function(e, i) {
     return {
-      id: 'm_v2_' + i + '_' + ts,
+      id: 'm_v4_' + i + '_' + ts,
       date: e.date,
       weekNumber: e.wk,
       dayOfWeek: e.dow,
@@ -134,52 +429,54 @@
       label: e.label,
       plannedDistanceMi: e.mi || null,
       plannedPace: e.pace || null,
-      notes: e.notes || '',
+      notes: e.note || '',
       completed: false,
       source: 'plan',
     };
   }));
   plan.raceDate = '2026-09-20';
+  plan.goalSec = 14346; // 3:59:06 (sub-4:00 @ 9:07/mi × 26.2188mi)
   plan.updatedAt = ts;
 
-  // Write to localStorage
   try {
     localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
-    log('✅ Written to localStorage (' + plan.entries.length + ' total entries)', 'ok');
-  } catch(e) {
-    log('❌ localStorage write failed: ' + e, 'err');
+    log('✅ Written to localStorage — ' + plan.entries.length + ' total entries (' + historical.length + ' historical + ' + E.length + ' new)', 'ok');
+  } catch(err) {
+    log('❌ localStorage write failed: ' + err, 'err');
     statusEl.textContent = 'Failed — localStorage error.';
     statusEl.style.color = '#FF8A8A';
     return;
   }
 
-  // Push to Supabase
   log('Pushing to Supabase…', 'inf');
   var secret = window.DASH_APP_SECRET || '';
-  if (!secret) {
-    log('⚠ DASH_APP_SECRET not set — push may fail', 'warn');
-  }
+  if (!secret) log('⚠ DASH_APP_SECRET not set — push may fail', 'warn');
+
   fetch('/api/db', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
     body: JSON.stringify({ key: 'marathon', data: { marathon_plan_v1: plan } })
   }).then(function(r) {
     if (r.ok) {
-      log('✅ Plan pushed to server successfully!', 'ok');
+      log('✅ Pushed to server!', 'ok');
       statusEl.innerHTML = '✅ Done! <a href="/marathon.html">Open marathon.html →</a>';
       statusEl.style.color = '#6BE3A4';
     } else {
       r.text().then(function(t) {
-        log('❌ Server push failed: ' + r.status + ' — ' + t.slice(0, 200), 'err');
-        statusEl.textContent = 'localStorage OK but server push failed — reload marathon.html anyway, it will sync.';
+        log('❌ Push failed: ' + r.status + ' ' + t.slice(0,200), 'err');
+        statusEl.textContent = 'localStorage OK — plan syncs on next 30s poll.';
         statusEl.style.color = '#F2C063';
       });
     }
-  }).catch(function(e) {
-    log('❌ Push error: ' + e, 'err');
-    statusEl.textContent = 'Push error — plan is in localStorage, will sync on next poll.';
+  }).catch(function(err) {
+    log('❌ Network error: ' + (err && err.message ? err.message : String(err)), 'err');
+    statusEl.textContent = 'Plan in localStorage — will sync on next poll.';
     statusEl.style.color = '#F2C063';
   });
+
+  if (window.location.pathname.includes('marathon')) {
+    setTimeout(function() { window.location.reload(); }, 900);
+  }
 })();
 </script>
 </body>
