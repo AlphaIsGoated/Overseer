@@ -1234,15 +1234,19 @@ body.topbar-modal-open {
             // data after a push that completed but hasn't propagated, or after a push failure).
             if (k.startsWith('goals:') && (onGoalsPage || (_coachLastGoalsWrite > 0 && Date.now() - _coachLastGoalsWrite < PROTECT_MS))) return;
             if (k === 'marathon_plan_v1') {
-              // Skip if the local plan has a newer updatedAt than the server snapshot.
-              // This prevents a stale applyRemote/primeCoachData from overwriting a
-              // coach-edited plan whose push is still in-flight or just failed.
+              // Primary guard: if coach wrote this plan recently this session, don't overwrite.
+              // _coachLastMarathonWrite is set BEFORE the push await so this covers the
+              // window where primeCoachData's fetch returns while the push is in-flight.
+              if (_coachLastMarathonWrite > 0 && Date.now() - _coachLastMarathonWrite < PROTECT_MS) return;
+              // Secondary guard: if local has a timestamp and server is older or missing one,
+              // keep local. Use >= (not >) so same-timestamp local isn't overwritten.
               try {
                 const localPlan = JSON.parse(localStorage.getItem('marathon_plan_v1') || 'null');
                 const serverPlan = typeof v === 'object' ? v : JSON.parse(v);
-                if (localPlan && serverPlan && localPlan.updatedAt && serverPlan.updatedAt
-                    && localPlan.updatedAt > serverPlan.updatedAt) {
-                  return; // local is newer — don't overwrite
+                if (localPlan && localPlan.updatedAt) {
+                  if (!serverPlan || !serverPlan.updatedAt || localPlan.updatedAt >= serverPlan.updatedAt) {
+                    return; // local is same age or newer — don't overwrite
+                  }
                 }
               } catch (_) {}
             }
@@ -1799,9 +1803,10 @@ body.topbar-modal-open {
           // Stamp updatedAt so marathon.html's onApplied can reject a stale server snapshot
           plan.updatedAt = Date.now();
           try { localStorage.setItem('marathon_plan_v1', JSON.stringify(plan)); } catch (e) { console.warn('[Coach] marathon write failed', e); }
-          // Await the push — don't return until the server has the new data.
-          // On mobile the user may navigate to marathon.html immediately; if the push
-          // is fire-and-forget, applyRemote can overwrite localStorage with old server data.
+          // Set session guard immediately after localStorage write — BEFORE the push await.
+          // primeCoachData() may return concurrent server data while the push is in-flight;
+          // setting this now ensures the guard is active for any concurrent primeCoachData forEach.
+          _coachLastMarathonWrite = Date.now();
           const marathonPushBody = JSON.stringify({ key: 'marathon', data: { 'marathon_plan_v1': plan } });
           const marathonPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: marathonPushBody };
           let mRes;
@@ -1815,7 +1820,6 @@ body.topbar-modal-open {
           if (!mRes || !mRes.ok) {
             return { ok: false, error: 'Server error (' + (mRes ? mRes.status : '?') + ') saving marathon plan. Changes are local only — try again.' };
           }
-          _coachLastMarathonWrite = Date.now();
           return { ok: true };
         }
 
@@ -1878,6 +1882,8 @@ body.topbar-modal-open {
           }
           const goalsPushBody = JSON.stringify({ key: 'goals', data: allGoalsData });
           const goalsPushOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: goalsPushBody };
+          // Set session guard before await so concurrent primeCoachData can't overwrite mid-push
+          _coachLastGoalsWrite = Date.now();
           let gRes;
           try {
             gRes = await fetch('/api/db', goalsPushOpts);
@@ -1889,7 +1895,6 @@ body.topbar-modal-open {
           if (!gRes || !gRes.ok) {
             return { ok: false, error: 'Server error (' + (gRes ? gRes.status : '?') + ') saving goals. Changes are local only — try again.' };
           }
-          _coachLastGoalsWrite = Date.now();
           return { ok: true };
         }
 
@@ -2256,7 +2261,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-27-v2';
+    const COACH_PROMPT_BUILD = '2026-07-27-v3';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
