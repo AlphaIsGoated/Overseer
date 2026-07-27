@@ -756,7 +756,18 @@ body.topbar-modal-open {
           }
           // entries_recent_history: last 30 past entries newest-first (trimmed for AI context)
           const recentPast = past.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
-          out[k] = { ...v, entries_recent_history: recentPast, entries_upcoming: future.slice(0, 30), last_logged_run: lastLoggedRun };
+          // entries_upcoming: explicitly sorted chronological, cap 90 (covers 3 months — enough for Toledo Sep 20).
+          // 30 was too few: entries beyond day 30 (late August, September) were invisible, hiding race week/taper.
+          const futureSorted = future.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(0, 90);
+          // Precompute race countdown so coach doesn't re-derive from raw raceDate (Invariant §5)
+          let raceCountdownDays = null, raceWhen = null;
+          if (v.raceDate) {
+            const raceDay = new Date(v.raceDate + 'T00:00');
+            raceCountdownDays = Math.round((raceDay - todayMidnight) / 86400000);
+            raceWhen = raceCountdownDays === 0 ? 'today' : raceCountdownDays === 1 ? 'tomorrow'
+              : raceCountdownDays > 0 ? raceCountdownDays + ' days from now' : Math.abs(raceCountdownDays) + ' days ago';
+          }
+          out[k] = { ...v, entries_recent_history: recentPast, entries_upcoming: futureSorted, last_logged_run: lastLoggedRun, race_countdown_days: raceCountdownDays, race_when: raceWhen };
           delete out[k].entries; // replaced by split arrays above
         } else if (k === 'notes:items' && Array.isArray(v)) {
           out[k] = v.slice(0, 25).map(n => ({ title:n.title, category:n.category,
@@ -1047,7 +1058,7 @@ body.topbar-modal-open {
         "Fall back to actualDistanceMi/plannedDistanceMi only if no strava fields. Use 'when' verbatim. " +
         "If last_logged_run is null, use the most recent strava_activities_v1 entry (pace is already MM:SS/mi format). " +
         "NEVER report a multi-week running gap if marathon plan entries_upcoming has a run today/recently or last_logged_run exists. " +
-        "Note upcoming key workouts (long runs, tempo, race) from entries_upcoming this week.\n\n" +
+        "RACE: use marathon_plan_v1.race_when (precomputed) for countdown — do NOT calculate from raceDate yourself. Note upcoming key workouts (long runs, tempo, race) from entries_upcoming this week.\n\n" +
         "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). " +
         "Hydration: po_water_v1 is pre-slimmed — use today_bottles vs today_target (both already in your unit). Compute pct from today_pct. " +
         "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
@@ -1096,11 +1107,12 @@ body.topbar-modal-open {
     //   4. po_coach_inbody_img_* older than 90 days — local-only JPEG base64 blobs;
     //      the scan metadata (po_coach_inbody) is synced, only the raw image is lost
     function pruneOldStorage() {
-      // 1. All coach_proactive_* (each is a tiny "1" string but they accumulate daily)
+      // 1. Old coach_proactive_* keys (keep today's so the scan doesn't re-fire)
+      const todayPKey = proactiveDayKey();
       const toDelete = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('coach_proactive_')) toDelete.push(k);
+        if (k && k.startsWith('coach_proactive_') && k !== todayPKey) toDelete.push(k);
       }
       toDelete.forEach(function(k) { try { localStorage.removeItem(k); } catch (_) {} });
 
@@ -1524,9 +1536,6 @@ body.topbar-modal-open {
             speak(reply);
             addMsg('coach', 'Review the draft above — click Send to confirm, or Cancel to discard.', false);
           } else {
-            // Clear today's proactive key so the next panel open re-runs the sweep
-            // and the user can verify the changes were applied correctly.
-            try { localStorage.removeItem(proactiveDayKey()); } catch (_) {}
             addMsg('coach', (reply || 'Done.') + '\n\n✅ All changes saved.', false);
             speak(reply);
           }
@@ -2247,7 +2256,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-27-v1';
+    const COACH_PROMPT_BUILD = '2026-07-27-v2';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
