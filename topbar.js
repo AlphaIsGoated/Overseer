@@ -1014,7 +1014,9 @@ body.topbar-modal-open {
         " • Add entry: {\"module\":\"marathon\",\"op\":\"add_entry\",\"date\":\"YYYY-MM-DD\",\"type\":\"easy\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0}\n" +
         " • Remove entry: {\"module\":\"marathon\",\"op\":\"remove_entry\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Set race date: {\"module\":\"marathon\",\"op\":\"set_race\",\"raceDate\":\"YYYY-MM-DD\"}\n" +
-        " • Replace full plan: {\"module\":\"marathon\",\"op\":\"replace_plan\",\"entries\":[{\"date\":\"YYYY-MM-DD\",\"type\":\"easy|long|speed|tempo|rest|cross|race|other\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0},...]} — ALWAYS use this (not multiple add_entry) when generating a new plan from scratch. Optional: \"raceDate\":\"YYYY-MM-DD\", \"goalSec\":integer.\n" +
+        " • Replace full plan: {\"module\":\"marathon\",\"op\":\"replace_plan\",\"entries\":[...]} — clears ALL existing entries and writes a new set. Use for the FIRST batch when generating a fresh plan. Keep to ≤20 entries per block to avoid response truncation. Optional: \"raceDate\":\"YYYY-MM-DD\", \"goalSec\":integer.\n" +
+        " • Append entries (additive batch): {\"module\":\"marathon\",\"op\":\"append_entries\",\"entries\":[...]} — adds entries WITHOUT clearing existing ones. Use for subsequent batches (weeks 2+) after replace_plan. Keep to ≤20 entries per block. Same entry schema as replace_plan.\n" +
+        " LARGE PLAN RULE: Never try to write a full multi-week plan in one block — responses will be truncated. Instead: batch 1 = replace_plan(entries ≤20), batch 2 = append_entries(next ≤20), etc. Tell the user how many batches you will send and ask them to confirm each one is saved before sending the next.\n" +
         "GOALS (module:\"goals\"): today's date for goals is " + (function(){ const d=new Date(); if(d.getHours()<6)d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })() + ".\n" +
         " • Add goal: {\"module\":\"goals\",\"op\":\"add\",\"text\":\"Goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Complete goal: {\"module\":\"goals\",\"op\":\"complete\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
@@ -1846,6 +1848,18 @@ body.topbar-modal-open {
             plan.entries.sort(function(a, b) { return a.date.localeCompare(b.date); });
             if (act.raceDate) plan.raceDate = act.raceDate;
             if (act.goalSec != null) plan.goalSec = act.goalSec;
+
+          } else if (act.op === 'append_entries') {
+            // Additive batch: adds multiple entries without clearing existing ones.
+            // Use this for subsequent batches after replace_plan when the full plan
+            // is too large to fit in a single AI reply without truncation.
+            if (!Array.isArray(act.entries)) return { ok: false, error: 'append_entries requires an entries array' };
+            act.entries.forEach(function(e, idx) {
+              plan.entries.push({ id: 'm_' + (Date.now() + idx), date: e.date, weekNumber: e.weekNumber || null,
+                dayOfWeek: mDow(e.date), type: e.type || 'other', label: e.label || '',
+                plannedDistanceMi: e.plannedDistanceMi || null, notes: e.notes || null, completed: false });
+            });
+            plan.entries.sort(function(a, b) { return a.date.localeCompare(b.date); });
 
           } else {
             return { ok: false, error: 'Unknown marathon op: ' + act.op };
