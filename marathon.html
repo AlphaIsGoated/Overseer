@@ -785,13 +785,17 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         return;
       }
 
-      if (!en.completed || en.source === 'strava') {
-        en.completed = true; en.source = 'strava'; en.stravaActivityId = primary.id;
-        en.actualDistanceMi = totalDist;
-        en.actualDurationSec = totalSec;
-        en.actualPaceSecPerMi = pace;
-        changed = true;
-      }
+      // Always update non-manualOverride entries with Strava GPS data.
+      // Previously gated on (!en.completed || en.source === 'strava'), which missed
+      // imported plan entries that are completed=true, source='manual', manualOverride=false
+      // (e.g. set by the original plan import or coach). Those entries never got their
+      // actualDistanceMi refreshed from Strava, causing the weekly chart to show
+      // planned mileage instead of GPS mileage.
+      en.completed = true; en.source = 'strava'; en.stravaActivityId = primary.id;
+      en.actualDistanceMi = totalDist;
+      en.actualDurationSec = totalSec;
+      en.actualPaceSecPerMi = pace;
+      changed = true;
     });
     plan.entries.sort((a, b) => a.date.localeCompare(b.date));
     if (changed) savePlan();

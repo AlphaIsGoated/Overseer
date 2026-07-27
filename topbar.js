@@ -941,15 +941,29 @@ body.topbar-modal-open {
         };
       }
 
-      // Final guard: trim the biggest remaining values until we're under 40 KB
+      // Final guard: trim until under 40 KB.
+      // marathon_plan_v1 is protected — the coach needs entry dates/types to emit
+      // valid write ops. Trim everything else first (by descending size), then
+      // reduce marathon's entries_upcoming to 20 (from 90) before trimming it entirely.
       let json = JSON.stringify(out);
       if (json.length > 40000) {
-        const bySize = Object.keys(out).sort((a,b) => JSON.stringify(out[b]).length - JSON.stringify(out[a]).length);
-        for (const k of bySize) {
+        const otherKeys = Object.keys(out)
+          .filter(k => k !== 'marathon_plan_v1')
+          .sort((a,b) => JSON.stringify(out[b]).length - JSON.stringify(out[a]).length);
+        for (const k of otherKeys) {
           out[k] = '[trimmed]';
           json = JSON.stringify(out);
           if (json.length <= 40000) break;
         }
+      }
+      // Still over? Shrink marathon entries_upcoming before nuking it entirely.
+      if (json.length > 40000 && out['marathon_plan_v1'] && out['marathon_plan_v1'].entries_upcoming) {
+        out['marathon_plan_v1'] = Object.assign({}, out['marathon_plan_v1'],
+          { entries_upcoming: out['marathon_plan_v1'].entries_upcoming.slice(0, 20) });
+        json = JSON.stringify(out);
+      }
+      if (json.length > 40000 && out['marathon_plan_v1']) {
+        out['marathon_plan_v1'] = '[trimmed]';
       }
       return out;
     }

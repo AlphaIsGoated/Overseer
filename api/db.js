@@ -20,6 +20,28 @@ function supaFetch(url, opts) {
     .finally(() => clearTimeout(timer));
 }
 
+// One automatic retry on transient Supabase failures (network blips, brief 5xx).
+// Reduces the rate of 5xx responses visible to Vercel monitoring. AbortError
+// (timeout) is never retried — if we already waited 8s once, retrying would exceed
+// Vercel's 10s function limit.
+async function supaFetchWithRetry(url, opts) {
+  try {
+    const r = await supaFetch(url, opts);
+    if (r.ok) return r;
+    // Non-ok but not a network error — retry once after a short delay.
+    const status = r.status;
+    if (status >= 500) {
+      await new Promise(res => setTimeout(res, 600));
+      return supaFetch(url, opts);
+    }
+    return r;
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw e; // timeout is final — don't retry
+    await new Promise(res => setTimeout(res, 600));
+    return supaFetch(url, opts);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Secret');
@@ -43,7 +65,7 @@ export default async function handler(req, res) {
     const appKey = req.query && req.query.key;
     if (!appKey) return res.status(400).json({ error: 'key required' });
     try {
-      const r = await supaFetch(
+      const r = await supaFetchWithRetry(
         supaUrl + '/rest/v1/app_state?key=eq.' + encodeURIComponent(appKey) + '&select=data',
         { headers: authHeaders }
       );
@@ -68,7 +90,7 @@ export default async function handler(req, res) {
     const data = body && body.data;
     if (!appKey) return res.status(400).json({ error: 'key required' });
     try {
-      const r = await supaFetch(supaUrl + '/rest/v1/app_state?on_conflict=key', {
+      const r = await supaFetchWithRetry(supaUrl + '/rest/v1/app_state?on_conflict=key', {
         method: 'POST',
         headers: { ...authHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({ key: appKey, data, updated_at: new Date().toISOString() }),
