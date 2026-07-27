@@ -415,6 +415,15 @@ Mobile tab eviction causes the page to reload from scratch, which triggers `onAp
 
 ---
 
+### `apply-plan.html` — One-Shot Plan Applier
+
+| Date | Commit | Change | What could break |
+|------|--------|--------|-----------------|
+| 2026-07-27 | `c473503` | Rewrote with Strava-calibrated paces for sub-4:00 Toledo Marathon (Sep 20). 56 entries, Jul 27–Sep 20, 4-day schedule (Mon easy · Tue hard · Thu hard · Sat long). Paces derived from actual Strava history: mile PR 6:02, 5×800 session avg 7:24/mi, long runs 9:50–9:58/mi. Key paces: Easy 9:45/mi, Tempo 8:05/mi, 800m 3:30/rep (7:00/mi), 400m 1:42/rep (6:48/mi), 1mi rep 7:10/mi, 1200m 5:21/rep (7:09/mi). Preserves historical entries before 2026-07-27. Full per-rep splits, total time, and execution notes in every entry. | Visiting /apply-plan.html auto-applies the plan — there is no confirmation step. Run only once per plan version. If apply-plan.html is visited again with new entries, it will replace all entries from CUTOFF date onward again (historical data is always safe). |
+| 2026-07-27 | `c7a3677` | Initial commit — 4-day structure with generic paces (superseded by c473503). | — |
+
+---
+
 ### `marathon.html` — Marathon Training
 
 | Date | Commit | Change | What could break |
