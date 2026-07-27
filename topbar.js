@@ -845,12 +845,57 @@ body.topbar-modal-open {
               return { subject: t.subject, from: t.from, when: t.when, snippet: (t.snippet || '').slice(0, 160) };
             }),
           };
+        } else if (k === 'po_water_v1' && v && typeof v === 'object') {
+          // Precompute hydration summary — raw logs make coach pick wrong date (Invariant §5).
+          // Passing all date-keyed log entries is the same as passing raw Strava dates: the AI
+          // has to guess which key is "today" and gets it wrong. Slim to precomputed fields.
+          const wToday = (function() {
+            const d = new Date(); if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          })();
+          const wLogs = v.logs || {};
+          const wTodayBottles = wLogs[wToday] || 0;
+          const wp = v.profile || {};
+          const wBase = (wp.weightKg || 0) * 35;
+          const wExercise = (wp.activityHrsPerWeek || 0) / 7 * 500;
+          const wCaffeine = Math.max(0, (v.caffeineMgPerDay || 0) - 200) * 1.5;
+          let wAdjust = 0;
+          if (wp.sex === 'm') wAdjust += 200;
+          if ((wp.age || 0) >= 50) wAdjust += 100;
+          const wTotalMl = wBase + wExercise + wCaffeine + wAdjust;
+          let wUnitVol = v.bottleMl || 500;
+          if (v.unit === 'glass') wUnitVol = v.glassMl || 250;
+          else if (v.unit === 'oz') wUnitVol = 30;
+          else if (v.unit === 'ml') wUnitVol = 1;
+          const wTarget = Math.max(1, Math.ceil(wTotalMl / wUnitVol));
+          const wUnit = v.unit || 'bottle';
+          const wTm = new Date(); wTm.setHours(0,0,0,0);
+          const wRecent = [];
+          for (let di = 0; di < 7; di++) {
+            const dd = new Date(wTm.getTime() - di * 86400000);
+            const dk = dd.getFullYear() + '-' + String(dd.getMonth()+1).padStart(2,'0') + '-' + String(dd.getDate()).padStart(2,'0');
+            if (wLogs[dk] != null) {
+              wRecent.push({ when: di === 0 ? 'today' : di === 1 ? 'yesterday' : di + ' days ago', [wUnit + 's']: wLogs[dk] });
+            }
+          }
+          out[k] = { today_bottles: wTodayBottles, today_target: wTarget, today_pct: Math.round(wTodayBottles / wTarget * 100), unit: wUnit, recent_7d: wRecent };
         } else if (k === 'po_coach_weights' && Array.isArray(v)) {
           out[k] = v.slice(-20);
         } else if ((k === 'po_coach_photos' || k === 'po_coach_inbody') && v) {
           out[k] = '[photos omitted for size]';
         } else if (typeof v === 'string' && v.length > 4000) {
           out[k] = v.slice(0, 400) + '…';
+        } else if (k.startsWith('goals:') && Array.isArray(v)) {
+          // Annotate snoozed goals so the coach knows to exclude them from briefings.
+          // A goal with snoozedUntil in the future must not appear in counts or alerts.
+          const gToday = (function() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          })();
+          out[k] = v.map(function(g) {
+            if (g && g.snoozedUntil && g.snoozedUntil > gToday) return Object.assign({}, g, { snoozed: true });
+            return g;
+          });
         } else {
           out[k] = v;
         }
@@ -963,6 +1008,9 @@ body.topbar-modal-open {
         " • Complete goal: {\"module\":\"goals\",\"op\":\"complete\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Remove goal: {\"module\":\"goals\",\"op\":\"remove\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Update goal: {\"module\":\"goals\",\"op\":\"update\",\"oldText\":\"Old text\",\"newText\":\"New text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        " • Snooze goal (hide from briefings/alerts until a date): {\"module\":\"goals\",\"op\":\"snooze\",\"text\":\"partial or full goal text (substring match)\",\"date\":\"YYYY-MM-DD\",\"until\":\"YYYY-MM-DD\"}\n" +
+        " • Unsnooze goal: {\"module\":\"goals\",\"op\":\"unsnooze\",\"text\":\"Goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
+        "HYDRATION NOTE: po_water_v1 in dashboard data is pre-slimmed to {today_bottles, today_target, today_pct, unit, recent_7d}. Use today_bottles/today_target directly — never try to read raw date keys from logs.\n" +
         "WATER (module:\"water\"): You CAN update the user's hydration log (po_water_v1). Today's date for water is " + (function(){ const d=new Date(); if(d.getHours()<6)d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })() + ".\n" +
         " • Set bottles for a date: {\"module\":\"water\",\"op\":\"set\",\"date\":\"YYYY-MM-DD\",\"bottles\":8}\n" +
         " • Add bottles to a date: {\"module\":\"water\",\"op\":\"add\",\"date\":\"YYYY-MM-DD\",\"bottles\":2}\n" +
@@ -1000,7 +1048,8 @@ body.topbar-modal-open {
         "If last_logged_run is null, use the most recent strava_activities_v1 entry (pace is already MM:SS/mi format). " +
         "NEVER report a multi-week running gap if marathon plan entries_upcoming has a run today/recently or last_logged_run exists. " +
         "Note upcoming key workouts (long runs, tempo, race) from entries_upcoming this week.\n\n" +
-        "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). Hydration from po_water_v1. " +
+        "3. HEALTH & HABITS — Supplement stack status (stack:items + stack:taken). " +
+        "Hydration: po_water_v1 is pre-slimmed — use today_bottles vs today_target (both already in your unit). Compute pct from today_pct. " +
         "Any caffeine notes from caf:logs. Skip if nothing to report.\n\n" +
         "4. CALENDAR — Upcoming events from google_cal_events_v1 (today and tomorrow). Skip if none.\n\n" +
         "5. EMAIL — From gmail_summary_v1: unread count, any important/starred threads needing action, and any shipping emails (packages in transit or arriving soon). Skip entirely if inbox is clear or no gmail data.\n\n" +
@@ -1009,7 +1058,8 @@ body.topbar-modal-open {
         "(1) done=true = COMPLETED — never list as outstanding. " +
         "(2) strava/marathon 'when' is precomputed — use verbatim, never recalculate. " +
         "(3) po_coach_workout_done {YYYY-MM-DD:true} = gym session logged. " +
-        "(4) No-repeat rule: any item from a previous briefing that hasn't materially changed must be omitted." +
+        "(4) No-repeat rule: any item from a previous briefing that hasn't materially changed must be omitted. " +
+        "(5) snoozed:true = goal is snoozed (hidden) until its snoozedUntil date — NEVER list in goal counts, task bullets, or alerts. Treat as if it does not exist." +
         prevBriefing;
     }
 
@@ -1410,7 +1460,7 @@ body.topbar-modal-open {
       // Detect explicit user instructions and persist them as permanent rules
       // that survive beyond the MAX_CTX window and across sessions/devices.
       // Pattern matches any message that contains an instruction directive anywhere.
-      const INSTR_RE = /\b(always|never|remember that|from now on|going forward|make sure you|please always|please never|stop doing|don't |do not |i want you to|i need you to|i'd like you to|you should always|you should never|change your|keep in mind|note that|for future|in the future|every time|each time)\b/i;
+      const INSTR_RE = /\b(always|never|remember that|from now on|going forward|make sure you|please always|please never|stop doing|don't |do not |i want you to|i need you to|i'd like you to|you should always|you should never|change your|keep in mind|note that|for future|in the future|every time|each time|ignore |skip |until august|until sept|until oct|until nov|until dec|until jan|until feb|until march|until april|until may|until june|until july)\b/i;
       if (INSTR_RE.test(text)) {
         try {
           if (!memArr.includes(text)) {
@@ -1785,6 +1835,23 @@ body.topbar-modal-open {
             var gu = goals.find(function(g) { return g.id === act.id || g.text === act.oldText; });
             if (!gu) return { ok: false, error: 'Goal not found for ' + dateStr };
             if (act.newText) gu.text = act.newText; if (act.done !== undefined) gu.done = act.done;
+          } else if (act.op === 'snooze') {
+            // Find by exact text/id, then fall back to case-insensitive substring match
+            // so "ignore math 223" matches "MATH 223 homework assignment"
+            var gs = goals.find(function(g) { return g.text === act.text || g.id === act.id; });
+            if (!gs && act.text) {
+              var needle = act.text.toLowerCase();
+              gs = goals.find(function(g) { return g.text && g.text.toLowerCase().includes(needle); });
+            }
+            if (!gs) return { ok: false, error: 'Goal matching "' + act.text + '" not found for ' + dateStr };
+            gs.snoozedUntil = act.until || '2099-01-01';
+          } else if (act.op === 'unsnooze') {
+            var gus = goals.find(function(g) { return g.text === act.text || g.id === act.id; });
+            if (!gus && act.text) {
+              var nueedle = act.text.toLowerCase();
+              gus = goals.find(function(g) { return g.text && g.text.toLowerCase().includes(nueedle); });
+            }
+            if (gus) delete gus.snoozedUntil;
           } else {
             return { ok: false, error: 'Unknown goals op: ' + act.op };
           }
@@ -1848,11 +1915,10 @@ body.topbar-modal-open {
             return { ok: false, error: 'Unknown water op: ' + act.op };
           }
           try { localStorage.setItem('po_water_v1', JSON.stringify(water)); } catch (e) { console.warn('[Coach] water write failed', e); }
-          fetch('/api/db', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
-            body: JSON.stringify({ key: 'profile', data: { po_water_v1: water } }),
-          }).catch(function(e) { console.warn('[Coach] water push failed', e); });
+          let wRes;
+          try { wRes = await fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret }, body: JSON.stringify({ key: 'profile', data: { po_water_v1: water } }) }); }
+          catch (e) { console.warn('[Coach] water push failed', e); return { ok: false, error: 'Network error saving hydration — updated locally, try again.' }; }
+          if (!wRes || !wRes.ok) return { ok: false, error: 'Server error (' + (wRes ? wRes.status : '?') + ') saving hydration.' };
           return { ok: true };
         }
 
@@ -2181,7 +2247,7 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-23-v8';
+    const COACH_PROMPT_BUILD = '2026-07-27-v1';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
       try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
