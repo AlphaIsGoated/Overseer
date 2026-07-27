@@ -50,9 +50,11 @@ export default async function handler(req, res) {
     // their full budget since truncating those breaks the actual feature
     // rather than just making replies shorter.
     const conservation = !!(body && body.conservation);
+    const hasAttachment = !!(body && body.hasAttachment);
     const payload = {
       model: selectedModel,
-      max_tokens: tool ? 8192 : (conservation ? 512 : 1024),
+      // Attachments (images, large text files) need more tokens for a thorough analysis.
+      max_tokens: tool ? 8192 : (conservation ? 512 : hasAttachment ? 2048 : 1024),
       system,
       messages,
     };

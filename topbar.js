@@ -210,10 +210,17 @@
 .coach-input { flex: 1; min-width: 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(110,231,183,0.2); color: #eafff6; border-radius: 11px; padding: 11px 13px; font-family: inherit; font-size: 13.5px; outline: none; }
 .coach-input:focus { border-color: rgba(110,231,183,0.5); }
 .coach-input::placeholder { color: rgba(255,255,255,0.3); }
-.coach-send, .coach-mic { width: 42px; flex-shrink: 0; border: 0; border-radius: 11px; cursor: pointer; font-size: 16px; }
+.coach-send, .coach-mic, .coach-attach { width: 42px; flex-shrink: 0; border: 0; border-radius: 11px; cursor: pointer; font-size: 16px; }
 .coach-send { background: #6EE7B7; color: #04140d; }
 .coach-mic { background: rgba(110,231,183,0.08); color: #8eeebf; border: 1px solid rgba(110,231,183,0.2); }
 .coach-mic.listening { background: #67E8F9; color: #04140d; }
+.coach-attach { background: rgba(110,231,183,0.08); color: #8eeebf; border: 1px solid rgba(110,231,183,0.2); }
+.coach-attach.has-file { background: rgba(110,231,183,0.22); color: #6EE7B7; border-color: rgba(110,231,183,0.5); }
+.coach-attach-preview { display: none; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 4px; background: rgba(110,231,183,0.07); border: 1px solid rgba(110,231,183,0.2); border-radius: 9px; font-size: 12px; color: #8eeebf; }
+.coach-attach-preview.show { display: flex; }
+.coach-attach-preview img { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; flex-shrink: 0; }
+.coach-attach-preview .attach-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach-attach-remove { background: none; border: none; color: rgba(110,231,183,0.5); cursor: pointer; font-size: 14px; flex-shrink: 0; padding: 0 2px; }
 .coach-dots { display: inline-flex; gap: 4px; } .coach-dots i { width: 5px; height: 5px; border-radius: 50%; background: #6EE7B7; opacity: 0.4; animation: coachDot 1.2s ease-in-out infinite; }
 .coach-dots i:nth-child(2) { animation-delay: 0.2s; } .coach-dots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes coachDot { 0%,100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } }
@@ -344,8 +351,15 @@ body.topbar-modal-open {
       <button class="coach-close" id="coachClose" type="button" aria-label="Close">✕</button>
     </div>
     <div class="coach-feed" id="coachFeed"></div>
+    <div class="coach-attach-preview" id="coachAttachPreview">
+      <img id="coachAttachThumb" src="" alt="" style="display:none">
+      <span class="attach-name" id="coachAttachName"></span>
+      <button class="coach-attach-remove" id="coachAttachRemove" type="button" title="Remove attachment">✕</button>
+    </div>
     <div class="coach-input-row">
       <input class="coach-input" id="coachInput" placeholder="Ask your coach…" autocomplete="off">
+      <input type="file" id="coachFileInput" accept="image/*,.txt,.md,.markdown,.json,.csv,.py,.js,.ts,.html,.css" style="display:none">
+      <button class="coach-attach" id="coachAttach" type="button" title="Attach file (image, markdown, text…)" aria-label="Attach file">📎</button>
       <button class="coach-mic" id="coachMic" type="button" aria-label="Speak">🎙️</button>
       <button class="coach-send" id="coachSend" type="button" aria-label="Send">→</button>
     </div>
@@ -1187,10 +1201,29 @@ body.topbar-modal-open {
     const chatHistory = [];
     function DATA_SYS() { return CHAT_SYS() + JSON.stringify(dashboardData()); }
 
-    async function callAI(system, userText, addToHistory) {
+    // attachment: { type:'image'|'text', mediaType?:string, data:string, name:string }
+    async function callAI(system, userText, addToHistory, attachment) {
+      // Build the content for this message — multimodal when an attachment is present.
+      let userContent;
+      let historyText = userText; // what we store in chatHistory (text-only, no base64 blobs)
+      if (attachment) {
+        if (attachment.type === 'image') {
+          userContent = [
+            { type: 'image', source: { type: 'base64', media_type: attachment.mediaType, data: attachment.data } },
+            { type: 'text', text: userText || 'Please describe and analyze this image.' },
+          ];
+          historyText = '[Attached image: ' + attachment.name + ']\n' + (userText || '');
+        } else {
+          // Text/markdown/code — prepend as a fenced block so Claude sees the full content
+          userContent = '--- FILE: ' + attachment.name + ' ---\n' + attachment.data + '\n--- END FILE ---\n\n' + (userText || 'Please analyze the file above.');
+          historyText = '[Attached file: ' + attachment.name + ']\n' + (userText || '');
+        }
+      } else {
+        userContent = userText;
+      }
       const msgs = addToHistory
-        ? [...chatHistory, { role: 'user', content: userText }]
-        : [{ role: 'user', content: userText }];
+        ? [...chatHistory, { role: 'user', content: userContent }]
+        : [{ role: 'user', content: userContent }];
       const res = await fetch('/api/ai/ai-chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-app-secret': (window.DASH_APP_SECRET || '') },
@@ -1198,6 +1231,7 @@ body.topbar-modal-open {
           system,
           model: window.getPreferredModel ? window.getPreferredModel() : 'claude-opus-4-8',
           conservation: window.isConservationMode ? window.isConservationMode() : false,
+          hasAttachment: !!attachment,
           messages: msgs,
         }),
       });
@@ -1206,7 +1240,7 @@ body.topbar-modal-open {
       if (!res.ok || json.error) throw new Error(json.error || 'Something went wrong.');
       const reply = json.text || '(no response)';
       if (addToHistory) {
-        chatHistory.push({ role: 'user', content: userText });
+        chatHistory.push({ role: 'user', content: historyText }); // store text summary, not the full base64 blob
         chatHistory.push({ role: 'assistant', content: reply });
         if (chatHistory.length > MAX_CTX) chatHistory.splice(0, chatHistory.length - MAX_CTX);
       }
@@ -1449,9 +1483,25 @@ body.topbar-modal-open {
     // primeCoachData() uses these to avoid overwriting local changes with stale server data.
     let _coachLastGoalsWrite = 0;
     let _coachLastMarathonWrite = 0;
+
+    // ── Attachment state ──────────────────────────────────────────────────────
+    // pendingAttachment: { type:'image'|'text', mediaType?:string, data:string, name:string }
+    let pendingAttachment = null;
+
+    function clearAttachment() {
+      pendingAttachment = null;
+      const preview = document.getElementById('coachAttachPreview');
+      const attachBtn = document.getElementById('coachAttach');
+      const fileInput = document.getElementById('coachFileInput');
+      if (preview) preview.classList.remove('show');
+      if (attachBtn) attachBtn.classList.remove('has-file');
+      if (fileInput) fileInput.value = '';
+    }
+
     async function ask(text) {
       text = (text || '').trim();
-      if (!text || busy) return;
+      const hasAttach = !!pendingAttachment;
+      if ((!text && !hasAttach) || busy) return;
 
       // Shortcut: any message with a redo-intent word AND a scan-target word re-runs the
       // proactive scan without sending to the AI. Bypasses the once-per-day guard.
@@ -1472,8 +1522,13 @@ body.topbar-modal-open {
         return;
       }
 
+      // Capture and clear attachment before any await so a second send can't reuse it
+      const attachment = pendingAttachment;
+      clearAttachment();
+
       busy = true;
-      addMsg('user', text);  // persists user message
+      const displayText = attachment ? '[📎 ' + attachment.name + ']' + (text ? '\n' + text : '') : text;
+      addMsg('user', displayText);  // persists user message
       input.value = '';
 
       // Detect explicit user instructions and persist them as permanent rules
@@ -1505,7 +1560,7 @@ body.topbar-modal-open {
       }
       const loading = addLoading();
       try {
-        let reply = await callAI(DATA_SYS(), text, true);
+        let reply = await callAI(DATA_SYS(), text, true, attachment);
         loading.remove();
 
         // ── Calendar write action: [CALENDAR_ADD:{...}] ──
@@ -2133,6 +2188,63 @@ body.topbar-modal-open {
     fab.addEventListener('click', unlockAudio);
     document.getElementById('coachSend').addEventListener('click', () => { unlockAudio(); ask(input.value); });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { unlockAudio(); ask(input.value); } });
+
+    // ── File attachment wiring ────────────────────────────────────────────────
+    const attachBtn = document.getElementById('coachAttach');
+    const fileInput = document.getElementById('coachFileInput');
+    const attachPreview = document.getElementById('coachAttachPreview');
+    const attachThumb = document.getElementById('coachAttachThumb');
+    const attachName = document.getElementById('coachAttachName');
+    const attachRemove = document.getElementById('coachAttachRemove');
+
+    attachBtn.addEventListener('click', () => fileInput.click());
+    attachRemove.addEventListener('click', clearAttachment);
+
+    fileInput.addEventListener('change', function() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+
+      const MAX_IMAGE = 5 * 1024 * 1024;  // 5 MB
+      const MAX_TEXT  = 500 * 1024;       // 500 KB
+      const isImage = file.type.startsWith('image/');
+
+      if (isImage && file.size > MAX_IMAGE) {
+        addMsg('coach', '⚠ Image too large — max 5 MB.', false);
+        fileInput.value = '';
+        return;
+      }
+      if (!isImage && file.size > MAX_TEXT) {
+        addMsg('coach', '⚠ File too large — max 500 KB for text files.', false);
+        fileInput.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        if (isImage) {
+          // Strip the data:image/xxx;base64, prefix — Claude needs just the base64
+          const dataUrl = ev.target.result;
+          const comma = dataUrl.indexOf(',');
+          const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+          pendingAttachment = { type: 'image', mediaType: file.type, data: b64, name: file.name };
+          attachThumb.src = dataUrl;
+          attachThumb.style.display = '';
+        } else {
+          pendingAttachment = { type: 'text', data: ev.target.result, name: file.name };
+          attachThumb.style.display = 'none';
+        }
+        attachName.textContent = file.name;
+        attachPreview.classList.add('show');
+        attachBtn.classList.add('has-file');
+        input.focus();
+      };
+      reader.onerror = function() {
+        addMsg('coach', '⚠ Could not read file — try again.', false);
+        fileInput.value = '';
+      };
+      if (isImage) reader.readAsDataURL(file);
+      else reader.readAsText(file);
+    });
     function speak(text) {
       if (!voiceOn || !text) return;
       const clean = text.replace(/\*\*/g, '').replace(/^[-•*]\s+/gm, '').trim();
