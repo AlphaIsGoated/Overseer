@@ -1014,6 +1014,7 @@ body.topbar-modal-open {
         " • Add entry: {\"module\":\"marathon\",\"op\":\"add_entry\",\"date\":\"YYYY-MM-DD\",\"type\":\"easy\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0}\n" +
         " • Remove entry: {\"module\":\"marathon\",\"op\":\"remove_entry\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Set race date: {\"module\":\"marathon\",\"op\":\"set_race\",\"raceDate\":\"YYYY-MM-DD\"}\n" +
+        " • Replace full plan: {\"module\":\"marathon\",\"op\":\"replace_plan\",\"entries\":[{\"date\":\"YYYY-MM-DD\",\"type\":\"easy|long|speed|tempo|rest|cross|race|other\",\"label\":\"Easy 6mi\",\"plannedDistanceMi\":6.0},...]} — ALWAYS use this (not multiple add_entry) when generating a new plan from scratch. Optional: \"raceDate\":\"YYYY-MM-DD\", \"goalSec\":integer.\n" +
         "GOALS (module:\"goals\"): today's date for goals is " + (function(){ const d=new Date(); if(d.getHours()<6)d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })() + ".\n" +
         " • Add goal: {\"module\":\"goals\",\"op\":\"add\",\"text\":\"Goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
         " • Complete goal: {\"module\":\"goals\",\"op\":\"complete\",\"text\":\"Exact goal text\",\"date\":\"YYYY-MM-DD\"}\n" +
@@ -1796,6 +1797,19 @@ body.topbar-modal-open {
             if (act.raceDate) plan.raceDate = act.raceDate;
             if (act.goalSec != null) plan.goalSec = act.goalSec;
 
+          } else if (act.op === 'replace_plan') {
+            // Atomically replaces all entries with a fresh set — use when generating
+            // a new training plan from scratch so old entries don't persist alongside new ones.
+            if (!Array.isArray(act.entries)) return { ok: false, error: 'replace_plan requires an entries array' };
+            plan.entries = act.entries.map(function(e, idx) {
+              return { id: 'm_' + (Date.now() + idx), date: e.date, weekNumber: e.weekNumber || null,
+                dayOfWeek: mDow(e.date), type: e.type || 'other', label: e.label || '',
+                plannedDistanceMi: e.plannedDistanceMi || null, notes: e.notes || null, completed: false };
+            });
+            plan.entries.sort(function(a, b) { return a.date.localeCompare(b.date); });
+            if (act.raceDate) plan.raceDate = act.raceDate;
+            if (act.goalSec != null) plan.goalSec = act.goalSec;
+
           } else {
             return { ok: false, error: 'Unknown marathon op: ' + act.op };
           }
@@ -1963,8 +1977,12 @@ body.topbar-modal-open {
       try {
         const text = await callAI(PROACTIVE_SYS() + JSON.stringify(dashboardData()), 'Scan everything and tell me what is most worth knowing right now.', false);
         loading.remove();
+        // Set the proactive key BEFORE addMsg so the daily gate is locked even if
+        // chat history save fails (full localStorage). Retry once on quota.
+        let savedKey = false;
+        try { localStorage.setItem(proactiveDayKey(), '1'); savedKey = true; } catch (_) {}
+        if (!savedKey) { pruneOldStorage(); try { localStorage.setItem(proactiveDayKey(), '1'); } catch (e) { console.warn('[Coach] proactive key save failed', e); } }
         addMsg('coach', text, true);  // persists to chat history
-        localStorage.setItem(proactiveDayKey(), '1');
         // Prune old day keys to avoid localStorage bloat
         try {
           const todayKey = proactiveDayKey();
@@ -2261,10 +2279,22 @@ body.topbar-modal-open {
     // Clear today's proactive scan flag whenever the prompt build version changes.
     // This ensures bug fixes to the scan (e.g. strava date wording) take effect
     // the same day rather than waiting until midnight for a new proactive key.
-    const COACH_PROMPT_BUILD = '2026-07-27-v3';
+    //
+    // IMPORTANT: pruneOldStorage() runs first to free space before the setItem.
+    // If coach_prompt_build fails to save (quota), the version check fires on every
+    // page load → proactiveDayKey() is deleted → scan re-runs infinitely.
+    pruneOldStorage();
+    const COACH_PROMPT_BUILD = '2026-07-27-v4';
     if (localStorage.getItem('coach_prompt_build') !== COACH_PROMPT_BUILD) {
       try { localStorage.removeItem(proactiveDayKey()); } catch (e) { console.warn('[Coach] proactive key remove failed', e); }
-      try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] prompt_build save failed', e); }
+      // Retry once on quota — pruneOldStorage() should have freed space above,
+      // but retry guards against edge cases where prune couldn't free enough.
+      let savedBuild = false;
+      try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); savedBuild = true; } catch (_) {}
+      if (!savedBuild) {
+        pruneOldStorage();
+        try { localStorage.setItem('coach_prompt_build', COACH_PROMPT_BUILD); } catch (e) { console.warn('[Coach] coach_prompt_build save failed after prune', e); }
+      }
     }
   }
 
