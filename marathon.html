@@ -737,21 +737,59 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   // one so the run still shows up in the schedule, mileage chart, pace
   // trend, and progress callout — none of which read raw Strava data
   // directly, only plan.entries.
+  //
+  // GROUPING BY DATE: multiple runs on the same day (double days, warmup +
+  // long run, etc.) are SUMMED so the weekly mileage chart matches Strava's
+  // weekly total. Previously each run overwrote the previous one's distance.
   function matchStravaToSchedule(runs) {
     let changed = false;
+
+    // Group all runs by date so doubles are summed, not last-write-wins.
+    const byDate = {};
     runs.forEach(hit => {
-      let en = plan.entries.find(e => e.date === hit.date);
+      if (!byDate[hit.date]) byDate[hit.date] = [];
+      byDate[hit.date].push(hit);
+    });
+
+    Object.entries(byDate).forEach(([date, dayRuns]) => {
+      const totalDist = +(dayRuns.reduce((s, r) => s + (r.distanceMi || 0), 0).toFixed(2));
+      const totalSec  = dayRuns.reduce((s, r) => s + (r.movingSec || 0), 0);
+      const pace      = totalDist > 0 ? totalSec / totalDist : null;
+      const primary   = dayRuns[0];
+      const label     = dayRuns.length > 1
+        ? (primary.name || 'Run') + ' +' + (dayRuns.length - 1) + ' more'
+        : (primary.name || 'Run');
+
+      let en = plan.entries.find(e => e.date === date);
       if (!en) {
-        en = { id: 'm_strava_' + hit.id, date: hit.date, weekNumber: null, dayOfWeek: DAY_NAMES[isoDayIndex(parseKey(hit.date))], type: 'other', label: hit.name || 'Run', plannedDistanceMi: null };
+        en = { id: 'm_strava_' + primary.id, date, weekNumber: null,
+               dayOfWeek: DAY_NAMES[isoDayIndex(parseKey(date))],
+               type: 'other', label, plannedDistanceMi: null };
         plan.entries.push(en);
         changed = true;
       }
-      // A day the user has explicitly tapped (checked OR unchecked) stays
-      // exactly as they left it — Strava sync never overrides a manual call.
-      if (en.manualOverride) return;
+
+      if (en.manualOverride) {
+        // User manually set the completion checkbox — don't flip it.
+        // But DO update the Strava GPS mileage so the chart stays accurate
+        // even for days the user tapped manually (e.g., checked a run that
+        // Strava also has — the GPS distance should win over any placeholder).
+        if (en.completed && en.actualDistanceMi !== totalDist) {
+          en.actualDistanceMi = totalDist;
+          en.actualDurationSec = totalSec;
+          en.actualPaceSecPerMi = pace;
+          en.stravaActivityId = primary.id;
+          en.source = 'strava';
+          changed = true;
+        }
+        return;
+      }
+
       if (!en.completed || en.source === 'strava') {
-        en.completed = true; en.source = 'strava'; en.stravaActivityId = hit.id;
-        en.actualDistanceMi = hit.distanceMi; en.actualDurationSec = hit.movingSec; en.actualPaceSecPerMi = hit.paceSecPerMi;
+        en.completed = true; en.source = 'strava'; en.stravaActivityId = primary.id;
+        en.actualDistanceMi = totalDist;
+        en.actualDurationSec = totalSec;
+        en.actualPaceSecPerMi = pace;
         changed = true;
       }
     });
