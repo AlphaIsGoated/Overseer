@@ -1518,16 +1518,53 @@ body.topbar-modal-open {
         }
 
         // ── Module write actions: one or more [COACH_ACTION:{...}] blocks ──
-        const ACTION_RE = /\[COACH_ACTION:([\s\S]*?)\]/g;
-        const actionMatches = [];
-        let m;
-        while ((m = ACTION_RE.exec(reply)) !== null) actionMatches.push(m);
-        if (actionMatches.length) {
-          reply = reply.replace(/\[COACH_ACTION:[\s\S]*?\]/g, '').trim();
+        // Cannot use a simple lazy regex like /\[COACH_ACTION:([\s\S]*?)\]/ because
+        // the JSON payload can contain ] characters (e.g. replace_plan's entries array).
+        // Bracket-depth parsing finds the matching ] regardless of nested brackets.
+        function extractCoachActions(text) {
+          const PREFIX = '[COACH_ACTION:';
+          const hits = [];
+          let i = 0;
+          while (i < text.length) {
+            const s = text.indexOf(PREFIX, i);
+            if (s === -1) break;
+            let depth = 0, j = s, end = -1;
+            while (j < text.length) {
+              if (text[j] === '[') depth++;
+              else if (text[j] === ']') { depth--; if (depth === 0) { end = j; break; } }
+              j++;
+            }
+            if (end === -1) break; // unterminated block — stop
+            hits.push(text.slice(s + PREFIX.length, end));
+            i = end + 1;
+          }
+          return hits;
+        }
+        function stripCoachActions(text) {
+          const PREFIX = '[COACH_ACTION:';
+          let out = '';
+          let i = 0;
+          while (i < text.length) {
+            const s = text.indexOf(PREFIX, i);
+            if (s === -1) { out += text.slice(i); break; }
+            out += text.slice(i, s);
+            let depth = 0, j = s, end = -1;
+            while (j < text.length) {
+              if (text[j] === '[') depth++;
+              else if (text[j] === ']') { depth--; if (depth === 0) { end = j; break; } }
+              j++;
+            }
+            i = end === -1 ? text.length : end + 1;
+          }
+          return out.trim();
+        }
+        const actionJsons = extractCoachActions(reply);
+        if (actionJsons.length) {
+          reply = stripCoachActions(reply);
           // Await all actions before displaying anything — errors appear in the same
           // message as the AI reply so they can never be separated from "I've done it!" claims.
-          const results = await Promise.allSettled(actionMatches.map(function(am) {
-            try { return executeCoachAction(JSON.parse(am[1])); }
+          const results = await Promise.allSettled(actionJsons.map(function(json) {
+            try { return executeCoachAction(JSON.parse(json)); }
             catch (e) { return Promise.resolve({ ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }); }
           }));
           const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok && !r.value.pendingConfirm); })
