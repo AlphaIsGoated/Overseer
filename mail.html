@@ -13,118 +13,200 @@
 :root {
   --text-primary: #FAFAFA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
   --success: #6BE3A4; --warning: #F2C063; --danger: #FF6B6B; --accent: #7DD3FC;
+  --surface: rgba(255,255,255,0.04); --border: rgba(255,255,255,0.07);
   --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #050506; color: var(--text-secondary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
-body { min-height: 100vh; overflow-x: hidden; padding: max(28px, env(safe-area-inset-top)) 20px 80px; }
-body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 78% 18%, rgba(125,211,252,0.12), transparent 45%), radial-gradient(circle at 18% 88%, rgba(107,227,164,0.07), transparent 50%); filter: blur(40px); pointer-events: none; z-index: -2; animation: drift 36s ease-in-out infinite alternate; }
-body::after { content: ''; position: fixed; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; z-index: -1; }
+body {
+  min-height: 100vh; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 80px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background: radial-gradient(circle at 78% 18%, rgba(125,211,252,0.12), transparent 45%),
+              radial-gradient(circle at 18% 88%, rgba(107,227,164,0.07), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
 @keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-20px,12px,0)} }
 
-.page { max-width: 720px; margin: 0 auto; }
-.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; margin: 0 0 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; }
+.page { max-width: 740px; margin: 0 auto; }
+
+/* ── Header ── */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; gap: 12px; }
+.back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; flex-shrink: 0; }
 .back-btn:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
-.page-title { margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(180deg, #FFFFFF 0%, #B8D8F0 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
-.page-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 20px; }
-@media (max-width: 480px) { .page-title { font-size: 22px; } }
+.header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sync-label { font-size: 11px; color: var(--text-tertiary); }
+.refresh-btn { display: flex; align-items: center; gap: 6px; padding: 7px 13px; background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--text-tertiary); font-size: 12px; font-family: inherit; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.refresh-btn:hover:not(:disabled) { background: var(--surface); color: var(--text-secondary); }
+.refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin: 22px 0 12px; }
-.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.5; }
-.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.page-title { margin: 14px 0 2px; font-size: 30px; font-weight: 700; letter-spacing: -0.03em; background: linear-gradient(180deg, #FFFFFF 0%, #B8D8F0 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.page-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 22px; }
+@media (max-width: 480px) { .page-title { font-size: 24px; } .sync-label { display: none; } }
 
-.gm-card { position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
-
-/* Stats row */
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-.stat-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 14px 16px; text-align: center; }
-.stat-num { font-size: 26px; font-weight: 700; color: var(--text-primary); line-height: 1; }
-.stat-num.accent { color: var(--accent); }
-.stat-num.warn { color: var(--warning); }
+/* ── Stats row ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 10px; text-align: center;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.stat-card.hi-blue  { border-color: rgba(125,211,252,0.22); background: rgba(125,211,252,0.05); }
+.stat-card.hi-warn  { border-color: rgba(242,192,99,0.22);  background: rgba(242,192,99,0.05);  }
+.stat-card.hi-green { border-color: rgba(107,227,164,0.22); background: rgba(107,227,164,0.05); }
+.stat-num { font-size: 26px; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+.stat-num.c-accent  { color: var(--accent); }
+.stat-num.c-warn    { color: var(--warning); }
+.stat-num.c-success { color: var(--success); }
 .stat-label { font-size: 10px; color: var(--text-tertiary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; }
+@media (max-width: 460px) { .stats-row { grid-template-columns: repeat(2,1fr); } .stat-num { font-size: 22px; } }
 
-/* Tabs */
-.tabs { display: flex; gap: 4px; margin-bottom: 14px; background: rgba(255,255,255,0.03); border-radius: 10px; padding: 4px; }
-.tab { flex: 1; text-align: center; padding: 7px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--text-tertiary); font-family: inherit; transition: all 0.15s; }
-.tab.active { background: rgba(125,211,252,0.15); color: var(--accent); border: 1px solid rgba(125,211,252,0.3); }
+/* ── Section label ── */
+.section-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.section-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px; }
+.section-lbl::before { content: ''; width: 16px; height: 1px; background: currentColor; opacity: 0.5; }
+.pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.pill-warn   { background: rgba(242,192,99,0.18);  color: var(--warning);  border: 1px solid rgba(242,192,99,0.3);  }
+.pill-accent { background: rgba(125,211,252,0.18); color: var(--accent);   border: 1px solid rgba(125,211,252,0.3); }
+
+/* ── Priority digest ── */
+.digest-card {
+  background: linear-gradient(135deg, rgba(242,192,99,0.05) 0%, rgba(255,255,255,0.025) 100%);
+  border: 1px solid rgba(242,192,99,0.18); border-radius: 14px; overflow: hidden;
+  margin-bottom: 20px;
+}
+.digest-empty { padding: 18px 20px; text-align: center; font-size: 13px; color: var(--text-tertiary); font-style: italic; }
+.digest-row {
+  display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.15s;
+}
+.digest-row:last-child { border-bottom: none; }
+.digest-row:hover { background: rgba(255,255,255,0.03); }
+
+/* ── Activity chart ── */
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 18px 20px 14px; margin-bottom: 20px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.chart-wrap { overflow-x: auto; padding-top: 4px; }
+.chart-wrap svg { min-width: 260px; display: block; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; background: rgba(255,255,255,0.03); border-radius: 11px; padding: 4px; }
+.tab { flex: 1; text-align: center; padding: 8px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--text-tertiary); font-family: inherit; transition: all 0.15s; }
+.tab.active { background: rgba(125,211,252,0.14); color: var(--accent); border: 1px solid rgba(125,211,252,0.28); }
 .tab:hover:not(.active) { color: var(--text-secondary); }
+.tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: rgba(125,211,252,0.22); color: var(--accent); font-size: 9px; font-weight: 700; margin-left: 5px; line-height: 1; }
 
-/* Thread list */
-.thread-list { display: flex; flex-direction: column; gap: 6px; }
-.thread-row { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; cursor: pointer; transition: background 0.15s; }
+/* ── Thread cards ── */
+.thread-list { display: flex; flex-direction: column; gap: 5px; }
+.thread-row {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  cursor: pointer; transition: background 0.15s;
+}
 .thread-row:hover { background: rgba(255,255,255,0.06); }
-.thread-row.unread { border-left: 3px solid var(--accent); background: rgba(125,211,252,0.04); }
-.thread-row.shipping { border-left: 3px solid var(--warning); background: rgba(242,192,99,0.04); }
-.thread-avatar { width: 34px; height: 34px; border-radius: 50%; background: rgba(125,211,252,0.15); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--accent); flex-shrink: 0; text-transform: uppercase; }
-.thread-avatar.shipping-av { background: rgba(242,192,99,0.15); color: var(--warning); }
-.thread-body { flex: 1; min-width: 0; }
-.thread-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-.thread-from { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
-.thread-when { font-size: 11px; color: var(--text-tertiary); margin-left: auto; flex-shrink: 0; }
-.thread-subject { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
-.thread-snippet { font-size: 11.5px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.thread-unread-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 3px; }
-.empty-state { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 28px 0; font-style: italic; }
+.thread-row.is-unread { border-left: 3px solid var(--accent); background: rgba(125,211,252,0.04); }
+.thread-row.is-important { border-left: 3px solid var(--warning); }
+.thread-row.is-unread.is-important { background: rgba(242,192,99,0.04); }
+.thread-row.is-shipping { border-left: 3px solid rgba(107,227,164,0.6); background: rgba(107,227,164,0.03); }
 
-/* Connection prompt */
-.connect-card { background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2); border-radius: 14px; padding: 24px; text-align: center; }
-.connect-icon { font-size: 40px; margin-bottom: 10px; }
-.connect-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
-.connect-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
-.connect-btn { display: inline-block; padding: 10px 22px; background: rgba(125,211,252,0.18); border: 1px solid rgba(125,211,252,0.4); border-radius: 10px; color: var(--accent); font-weight: 700; font-size: 13px; text-decoration: none; cursor: pointer; font-family: inherit; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; text-transform: uppercase; }
+.thread-body { flex: 1; min-width: 0; }
+.thread-meta { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; }
+.thread-from { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.thread-flags { font-size: 10px; flex-shrink: 0; display: flex; gap: 3px; }
+.flag-star { color: var(--warning); }
+.thread-when { font-size: 11px; color: var(--text-tertiary); margin-left: auto; flex-shrink: 0; }
+.thread-subject { font-size: 13px; color: var(--text-secondary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.thread-snippet { font-size: 11.5px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unread-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 5px; }
+.empty-state { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 32px 0; font-style: italic; }
+
+/* ── Shipping ── */
+.ship-card { padding: 14px 16px; background: rgba(107,227,164,0.04); border: 1px solid rgba(107,227,164,0.15); border-radius: 12px; margin-bottom: 6px; }
+.ship-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.ship-from { font-size: 12px; font-weight: 600; color: var(--success); }
+.ship-when { font-size: 11px; color: var(--text-tertiary); margin-left: auto; }
+.ship-subject { font-size: 13px; color: var(--text-primary); font-weight: 500; margin-bottom: 3px; }
+.ship-snippet { font-size: 11.5px; color: var(--text-tertiary); }
+
+/* ── Connection prompt ── */
+.connect-card { background: rgba(125,211,252,0.05); border: 1px solid rgba(125,211,252,0.18); border-radius: 16px; padding: 36px 24px; text-align: center; }
+.connect-icon { font-size: 48px; margin-bottom: 14px; }
+.connect-title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.connect-desc { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; max-width: 360px; margin-left: auto; margin-right: auto; }
+.connect-btn { display: inline-block; padding: 11px 26px; background: rgba(125,211,252,0.18); border: 1px solid rgba(125,211,252,0.4); border-radius: 11px; color: var(--accent); font-weight: 700; font-size: 13px; text-decoration: none; cursor: pointer; font-family: inherit; }
 .connect-btn:hover { background: rgba(125,211,252,0.28); }
 
-/* Compose */
-.compose-form { display: flex; flex-direction: column; gap: 10px; }
+/* ── Compose ── */
+.compose-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+.compose-form { display: flex; flex-direction: column; gap: 11px; }
 .compose-field { display: flex; flex-direction: column; gap: 4px; }
-.compose-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); }
-.compose-input { padding: 10px 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 13.5px; outline: none; }
+.compose-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); }
+.compose-input { padding: 10px 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 13.5px; outline: none; transition: border-color 0.15s; }
 .compose-input:focus { border-color: rgba(125,211,252,0.4); }
-.compose-textarea { min-height: 140px; resize: vertical; }
+.compose-textarea { min-height: 150px; resize: vertical; }
 .compose-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-.btn-primary { padding: 9px 20px; border: none; border-radius: 9px; background: rgba(125,211,252,0.2); border: 1px solid rgba(125,211,252,0.4); color: var(--accent); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.btn-primary:hover { background: rgba(125,211,252,0.32); }
-.btn-secondary { padding: 9px 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 9px; background: transparent; color: var(--text-tertiary); font-family: inherit; font-size: 13px; cursor: pointer; }
-.btn-secondary:hover { background: rgba(255,255,255,0.06); }
-.compose-status { font-size: 12px; color: var(--text-tertiary); text-align: center; padding: 6px 0; }
+.btn-primary { padding: 10px 22px; border-radius: 10px; background: rgba(125,211,252,0.2); border: 1px solid rgba(125,211,252,0.4); color: var(--accent); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+.btn-primary:hover:not(:disabled) { background: rgba(125,211,252,0.32); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { padding: 10px 16px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--text-tertiary); font-family: inherit; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+.btn-secondary:hover { background: var(--surface); }
+.compose-status { font-size: 12px; color: var(--text-tertiary); text-align: center; padding: 4px 0; min-height: 20px; }
 
-/* Refresh button */
-.refresh-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.refresh-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-tertiary); font-size: 12px; font-family: inherit; cursor: pointer; }
-.refresh-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
-.last-sync { font-size: 11px; color: var(--text-tertiary); }
-.spinning { animation: spin 1s linear infinite; display: inline-block; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-/* Shipping badge */
-.shipping-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(242,192,99,0.2); color: var(--warning); border: 1px solid rgba(242,192,99,0.3); margin-left: 6px; }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.spinning { display: inline-block; animation: spin 1s linear infinite; }
 </style>
 </head>
 <body>
 <div class="page">
-  <a href="/" class="back-btn">← Back</a>
+
+  <div class="page-header">
+    <a href="/" class="back-btn">← Back</a>
+    <div class="header-right">
+      <span class="sync-label" id="lastSyncLabel"></span>
+      <button class="refresh-btn" id="refreshBtn">⟳ Refresh</button>
+    </div>
+  </div>
+
   <h1 class="page-title">✉ Mail</h1>
   <p class="page-sub" id="mailSub">Loading inbox…</p>
 
+  <!-- Connection prompt -->
   <div id="connectPrompt" style="display:none">
     <div class="connect-card">
-      <div class="connect-icon">📧</div>
+      <div class="connect-icon">📬</div>
       <div class="connect-title">Connect Gmail</div>
-      <div class="connect-desc">Connect your Google account with Gmail permissions to see your inbox, shipping tracking, and let your coach send emails for you.</div>
+      <div class="connect-desc">Connect your Google account with Gmail permissions to view your inbox, track packages, and let your coach draft and send emails on your behalf.</div>
       <a href="/calendar.html" class="connect-btn">Connect in Calendar →</a>
     </div>
   </div>
 
+  <!-- Main content -->
   <div id="mailContent" style="display:none">
 
     <!-- Stats -->
     <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-num accent" id="statUnread">—</div>
+      <div class="stat-card hi-blue">
+        <div class="stat-num c-accent" id="statUnread">—</div>
         <div class="stat-label">Unread</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-num warn" id="statShipping">—</div>
+      <div class="stat-card hi-warn">
+        <div class="stat-num c-warn" id="statImportant">—</div>
+        <div class="stat-label">Important</div>
+      </div>
+      <div class="stat-card hi-green">
+        <div class="stat-num c-success" id="statShipping">—</div>
         <div class="stat-label">Packages</div>
       </div>
       <div class="stat-card">
@@ -133,36 +215,49 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       </div>
     </div>
 
-    <!-- Refresh row -->
-    <div class="refresh-row">
-      <span class="last-sync" id="lastSyncLabel"></span>
-      <button class="refresh-btn" id="refreshBtn">⟳ Refresh</button>
+    <!-- Priority digest -->
+    <div class="section-hdr">
+      <span class="section-lbl">⭐ Important</span>
+      <span class="pill pill-warn" id="digestPill" style="display:none"></span>
+    </div>
+    <div class="digest-card" id="digestCard">
+      <div class="digest-empty">No important emails — inbox is clear.</div>
+    </div>
+
+    <!-- Activity chart -->
+    <div class="chart-card">
+      <div class="section-hdr" style="margin-bottom:14px">
+        <span class="section-lbl">Activity — last 7 days</span>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <div style="text-align:center;font-size:12px;color:var(--text-tertiary);padding:16px 0">—</div>
+      </div>
     </div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab active" data-tab="inbox">Inbox</button>
-      <button class="tab" data-tab="shipping">📦 Shipping</button>
+      <button class="tab active" data-tab="inbox">Inbox<span class="tab-badge" id="badgeInbox">—</span></button>
+      <button class="tab" data-tab="shipping">📦 Shipping<span class="tab-badge" id="badgeShip">—</span></button>
       <button class="tab" data-tab="compose">✉ Compose</button>
     </div>
 
-    <!-- Inbox tab -->
+    <!-- Inbox -->
     <div id="tabInbox">
       <div class="thread-list" id="threadList">
         <div class="empty-state">No inbox data yet — click Refresh.</div>
       </div>
     </div>
 
-    <!-- Shipping tab -->
+    <!-- Shipping -->
     <div id="tabShipping" style="display:none">
-      <div class="thread-list" id="shippingList">
+      <div id="shippingList">
         <div class="empty-state">No shipping emails detected.</div>
       </div>
     </div>
 
-    <!-- Compose tab -->
+    <!-- Compose -->
     <div id="tabCompose" style="display:none">
-      <div class="gm-card">
+      <div class="compose-card">
         <div class="compose-form">
           <div class="compose-field">
             <label class="compose-label">To</label>
@@ -192,211 +287,273 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
 (function () {
   'use strict';
 
-  var SUMMARY_KEY = 'gmail_summary_v1';
+  var SUMMARY_KEY  = 'gmail_summary_v1';
   var LAST_SYNC_KEY = 'gmail_last_sync';
 
+  // ── Utilities ─────────────────────────────────────────────────────────────
   function esc(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-
   function relTime(ts) {
-    if (!ts) return 'never';
-    var diff = (Date.now() - ts) / 60000;
-    if (diff < 1) return 'just now';
-    if (diff < 60) return Math.round(diff) + 'm ago';
-    if (diff < 1440) return Math.round(diff / 60) + 'h ago';
-    return Math.round(diff / 1440) + 'd ago';
+    if (!ts) return '';
+    var d = (Date.now() - ts) / 60000;
+    if (d < 1)    return 'just now';
+    if (d < 60)   return Math.round(d) + 'm ago';
+    if (d < 1440) return Math.round(d / 60) + 'h ago';
+    return Math.round(d / 1440) + 'd ago';
   }
-
   function initials(name) {
     var parts = (name || '?').trim().split(/\s+/);
     return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
   }
 
-  // ── Tab switching ──
-  document.querySelectorAll('.tab').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      ['tabInbox','tabShipping','tabCompose'].forEach(function (id) {
-        document.getElementById(id).style.display = 'none';
-      });
-      var target = btn.dataset.tab;
-      if (target === 'inbox') document.getElementById('tabInbox').style.display = '';
-      if (target === 'shipping') document.getElementById('tabShipping').style.display = '';
-      if (target === 'compose') document.getElementById('tabCompose').style.display = '';
-    });
-  });
-
-  // ── Render summary from localStorage ──
-  function renderSummary(summary) {
-    if (!summary) return;
-    document.getElementById('statUnread').textContent = summary.unreadCount || 0;
-    document.getElementById('statShipping').textContent = (summary.shipping || []).length;
-    document.getElementById('statTotal').textContent = (summary.threads || []).length;
-
-    var lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
-    document.getElementById('lastSyncLabel').textContent = lastSync ? ('Updated ' + relTime(lastSync)) : '';
-
-    // Inbox threads
-    var threadList = document.getElementById('threadList');
-    var threads = summary.threads || [];
-    if (!threads.length) {
-      threadList.innerHTML = '<div class="empty-state">Inbox is empty or no data yet.</div>';
-    } else {
-      threadList.innerHTML = threads.map(function (t) {
-        var cls = 'thread-row' + (t.isUnread ? ' unread' : '') + (t.isShipping ? ' shipping' : '');
-        var avCls = 'thread-avatar' + (t.isShipping ? ' shipping-av' : '');
-        var shipBadge = t.isShipping ? '<span class="shipping-badge">📦</span>' : '';
-        return '<div class="' + cls + '">' +
-          '<div class="' + avCls + '">' + esc(initials(t.from)) + '</div>' +
-          '<div class="thread-body">' +
-          '<div class="thread-meta">' +
-          '<span class="thread-from">' + esc(t.from) + '</span>' +
-          shipBadge +
-          '<span class="thread-when">' + esc(t.when) + '</span>' +
-          '</div>' +
-          '<div class="thread-subject">' + esc(t.subject) + '</div>' +
-          '<div class="thread-snippet">' + esc(t.snippet) + '</div>' +
-          '</div>' +
-          (t.isUnread ? '<div class="thread-unread-dot"></div>' : '') +
-          '</div>';
-      }).join('');
-    }
-
-    // Shipping threads
-    var shippingList = document.getElementById('shippingList');
-    var shipping = summary.shipping || [];
-    if (!shipping.length) {
-      shippingList.innerHTML = '<div class="empty-state">No shipping emails in your recent inbox.</div>';
-    } else {
-      shippingList.innerHTML = shipping.map(function (t) {
-        return '<div class="thread-row shipping">' +
-          '<div class="thread-avatar shipping-av">📦</div>' +
-          '<div class="thread-body">' +
-          '<div class="thread-meta"><span class="thread-from">' + esc(t.from) + '</span><span class="thread-when">' + esc(t.when) + '</span></div>' +
-          '<div class="thread-subject">' + esc(t.subject) + '</div>' +
-          '<div class="thread-snippet">' + esc(t.snippet) + '</div>' +
-          '</div></div>';
-      }).join('');
-    }
-
-    document.getElementById('mailSub').textContent = threads.length + ' thread' + (threads.length === 1 ? '' : 's') + ' · ' + (summary.unreadCount || 0) + ' unread';
+  // Deterministic color from sender name
+  var COLORS = ['#7DD3FC','#6BE3A4','#F2C063','#A78BFA','#F97316','#34D399','#FB7185','#60A5FA'];
+  function senderColor(name) {
+    var h = 0;
+    for (var i = 0; i < (name || '').length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+    return COLORS[Math.abs(h) % COLORS.length];
   }
 
-  // ── Check if Gmail scope is granted ──
+  function avatarHtml(name, isShipping) {
+    if (isShipping) return '<div class="avatar" style="background:rgba(107,227,164,0.2);color:#6BE3A4;font-size:17px">📦</div>';
+    var c = senderColor(name);
+    return '<div class="avatar" style="background:' + c + ';color:#050506">' + esc(initials(name)) + '</div>';
+  }
+
+  // Parse "when" → day index (0=today)
+  function whenIdx(when) {
+    if (when === 'today')     return 0;
+    if (when === 'yesterday') return 1;
+    var m = (when || '').match(/^(\d+)\s+days?\s+ago$/);
+    return m ? parseInt(m[1], 10) : -1;
+  }
+
+  // ── SVG Activity chart ────────────────────────────────────────────────────
+  function buildChart(threads) {
+    var counts = new Array(7).fill(0);
+    threads.forEach(function(t) { var i = whenIdx(t.when); if (i >= 0 && i < 7) counts[i]++; });
+
+    // Display oldest→newest (index 6 → 0), i.e. reverse
+    var vals = counts.slice().reverse(); // vals[6] = today
+    var max  = Math.max.apply(null, vals.concat([1]));
+
+    var now = new Date();
+    var labels = [];
+    for (var k = 6; k >= 0; k--) {
+      var d = new Date(Date.now() - k * 86400000);
+      labels.push(k === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' }));
+    }
+
+    var BW = 30, GAP = 8, CH = 60, LH = 18;
+    var W = (BW + GAP) * 7 - GAP;
+    var svg = '<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7DD3FC"/><stop offset="100%" stop-color="#5BA8D6"/></linearGradient></defs>';
+
+    for (var j = 0; j < 7; j++) {
+      var v    = vals[j];
+      var bh   = v > 0 ? Math.max(Math.round((v / max) * CH), 6) : 2;
+      var x    = j * (BW + GAP);
+      var y    = CH - bh;
+      var isT  = (j === 6); // today is rightmost
+      var fill = isT ? 'url(#bg)' : 'rgba(125,211,252,0.25)';
+      svg += '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + bh + '" rx="5" fill="' + fill + '"/>';
+      if (v > 0) svg += '<text x="' + (x + BW/2) + '" y="' + (y - 5) + '" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="-apple-system,sans-serif" font-weight="600">' + v + '</text>';
+      svg += '<text x="' + (x + BW/2) + '" y="' + (CH + 13) + '" text-anchor="middle" fill="' + (isT ? '#7DD3FC' : '#76746E') + '" font-size="9.5" font-family="-apple-system,sans-serif" font-weight="' + (isT ? '700':'400') + '">' + esc(labels[j]) + '</text>';
+    }
+
+    return '<svg width="100%" viewBox="0 0 ' + W + ' ' + (CH + LH) + '" style="overflow:visible">' + svg + '</svg>';
+  }
+
+  // ── Render summary ────────────────────────────────────────────────────────
+  function renderSummary(s) {
+    if (!s) return;
+    var threads  = s.threads  || [];
+    var shipping = s.shipping || [];
+    var unread   = s.unreadCount || 0;
+    var important       = threads.filter(function(t) { return t.isImportant; });
+    var importantUnread = threads.filter(function(t) { return t.isImportant && t.isUnread; });
+
+    // Stats
+    el('statUnread').textContent    = unread;
+    el('statImportant').textContent = important.length;
+    el('statShipping').textContent  = shipping.length;
+    el('statTotal').textContent     = threads.length;
+
+    // Tab badges
+    el('badgeInbox').textContent = unread || threads.length;
+    el('badgeShip').textContent  = shipping.length;
+
+    // Sync label
+    var ls = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    el('lastSyncLabel').textContent = ls ? 'Updated ' + relTime(ls) : '';
+    el('mailSub').textContent = threads.length + ' thread' + (threads.length === 1 ? '' : 's') +
+      ' · ' + unread + ' unread' +
+      (important.length ? ' · ' + important.length + ' important' : '');
+
+    // Priority digest
+    var pill = el('digestPill');
+    var card = el('digestCard');
+    var digestSrc = importantUnread.length ? importantUnread : important;
+    if (digestSrc.length) {
+      pill.textContent = importantUnread.length
+        ? importantUnread.length + ' unread'
+        : important.length + ' flagged';
+      pill.style.display = '';
+      card.innerHTML = digestSrc.slice(0, 5).map(function(t) {
+        return '<div class="digest-row">' +
+          avatarHtml(t.from) +
+          '<div class="thread-body">' +
+            '<div class="thread-meta">' +
+              '<span class="thread-from">' + esc(t.from) + '</span>' +
+              '<span class="thread-flags"><span class="flag-star">★</span>' + (t.isShipping ? ' 📦' : '') + '</span>' +
+              '<span class="thread-when">' + esc(t.when) + '</span>' +
+            '</div>' +
+            '<div class="thread-subject">' + esc(t.subject) + '</div>' +
+            '<div class="thread-snippet">' + esc(t.snippet) + '</div>' +
+          '</div>' +
+          (t.isUnread ? '<div class="unread-dot"></div>' : '') +
+        '</div>';
+      }).join('');
+    } else {
+      pill.style.display = 'none';
+      card.innerHTML = '<div class="digest-empty">No important emails — inbox is clear.</div>';
+    }
+
+    // Chart
+    el('chartWrap').innerHTML = buildChart(threads);
+
+    // Inbox — sorted: unread+important > unread > important > rest
+    if (!threads.length) {
+      el('threadList').innerHTML = '<div class="empty-state">Inbox is empty or no data yet.</div>';
+    } else {
+      var sorted = threads.slice().sort(function(a, b) {
+        return ((b.isUnread ? 2 : 0) + (b.isImportant ? 1 : 0)) -
+               ((a.isUnread ? 2 : 0) + (a.isImportant ? 1 : 0));
+      });
+      el('threadList').innerHTML = sorted.map(function(t) {
+        var cls = 'thread-row';
+        if (t.isUnread && t.isImportant) cls += ' is-unread is-important';
+        else if (t.isUnread)    cls += ' is-unread';
+        else if (t.isImportant) cls += ' is-important';
+        else if (t.isShipping)  cls += ' is-shipping';
+        var flags = (t.isImportant ? '<span class="flag-star">★</span>' : '') + (t.isShipping ? '📦' : '');
+        return '<div class="' + cls + '">' +
+          avatarHtml(t.from, t.isShipping) +
+          '<div class="thread-body">' +
+            '<div class="thread-meta">' +
+              '<span class="thread-from">' + esc(t.from) + '</span>' +
+              (flags ? '<span class="thread-flags">' + flags + '</span>' : '') +
+              '<span class="thread-when">' + esc(t.when) + '</span>' +
+            '</div>' +
+            '<div class="thread-subject">' + esc(t.subject) + '</div>' +
+            '<div class="thread-snippet">' + esc(t.snippet) + '</div>' +
+          '</div>' +
+          (t.isUnread ? '<div class="unread-dot"></div>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    // Shipping tab
+    if (!shipping.length) {
+      el('shippingList').innerHTML = '<div class="empty-state">No shipping emails in your recent inbox.</div>';
+    } else {
+      el('shippingList').innerHTML = shipping.map(function(t) {
+        return '<div class="ship-card">' +
+          '<div class="ship-hdr"><span style="font-size:18px">📦</span><span class="ship-from">' + esc(t.from) + '</span><span class="ship-when">' + esc(t.when) + '</span></div>' +
+          '<div class="ship-subject">' + esc(t.subject) + '</div>' +
+          '<div class="ship-snippet">' + esc(t.snippet) + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  // ── Scope check ───────────────────────────────────────────────────────────
   function hasGmailScope() {
     try {
-      var accs = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]');
-      return accs && accs.length > 0 && accs[0].scope && accs[0].scope.includes('gmail.readonly');
+      var a = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]');
+      return a && a.length > 0 && a[0].scope && a[0].scope.includes('gmail.readonly');
     } catch (_) { return false; }
   }
 
-  // ── Refresh: call loadGmailSummary from topbar.js (exposed as window.loadGmailSummary) ──
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      ['tabInbox','tabShipping','tabCompose'].forEach(function(id) { el(id).style.display = 'none'; });
+      var t = btn.dataset.tab;
+      if (t === 'inbox')    el('tabInbox').style.display    = '';
+      if (t === 'shipping') el('tabShipping').style.display = '';
+      if (t === 'compose')  el('tabCompose').style.display  = '';
+    });
+  });
+
+  // ── Refresh ───────────────────────────────────────────────────────────────
   async function doRefresh() {
-    var btn = document.getElementById('refreshBtn');
-    var icon = btn.querySelector('span') || btn;
+    var btn = el('refreshBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinning">⟳</span> Refreshing…';
-
-    // Clear throttle so loadGmailSummary actually fetches
     localStorage.removeItem(LAST_SYNC_KEY);
 
     if (typeof window.loadGmailSummary === 'function') {
-      var secret = window.DASH_APP_SECRET || '';
-      await window.loadGmailSummary(secret);
+      await window.loadGmailSummary(window.DASH_APP_SECRET || '');
     } else {
-      // topbar.js not loaded yet — wait briefly and try once more
-      await new Promise(function(r) { setTimeout(r, 800); });
-      if (typeof window.loadGmailSummary === 'function') {
+      await new Promise(function(r) { setTimeout(r, 900); });
+      if (typeof window.loadGmailSummary === 'function')
         await window.loadGmailSummary(window.DASH_APP_SECRET || '');
-      }
     }
 
-    try {
-      var summary = JSON.parse(localStorage.getItem(SUMMARY_KEY));
-      renderSummary(summary);
-    } catch (_) {}
-
+    try { var s = JSON.parse(localStorage.getItem(SUMMARY_KEY)); if (s) renderSummary(s); } catch (_) {}
     btn.disabled = false;
     btn.textContent = '⟳ Refresh';
   }
 
-  document.getElementById('refreshBtn').addEventListener('click', doRefresh);
+  el('refreshBtn').addEventListener('click', doRefresh);
 
-  // ── Compose send ──
-  document.getElementById('composeSend').addEventListener('click', async function () {
-    var to = document.getElementById('composeTo').value.trim();
-    var subject = document.getElementById('composeSubject').value.trim();
-    var body = document.getElementById('composeBody').value.trim();
-    var status = document.getElementById('composeStatus');
+  // ── Compose ───────────────────────────────────────────────────────────────
+  el('composeSend').addEventListener('click', async function() {
+    var to = el('composeTo').value.trim(), subject = el('composeSubject').value.trim(), body = el('composeBody').value.trim();
+    var status = el('composeStatus');
     if (!to || !subject || !body) { status.textContent = 'Fill in To, Subject, and Message.'; status.style.color = '#f87171'; return; }
-
     this.disabled = true; this.textContent = '⟳ Sending…';
     status.textContent = ''; status.style.color = '';
-
-    // Use sendGmailNow exposed from topbar.js
     if (typeof window.sendGmailNow !== 'function') {
-      // Build and send directly via proxy if not available from topbar
-      status.textContent = 'Coach not ready yet — open the coach panel first, then retry.';
-      status.style.color = '#f87171';
-      this.disabled = false; this.textContent = '📤 Send';
-      return;
+      status.textContent = 'Coach not ready — open the coach panel first, then retry.';
+      status.style.color = '#f87171'; this.disabled = false; this.textContent = '📤 Send'; return;
     }
-
     var result = await window.sendGmailNow({ to, subject, body }, window.DASH_APP_SECRET || '');
     if (result.ok) {
-      status.textContent = '📤 Sent to ' + to;
-      status.style.color = '#6EE7B7';
-      document.getElementById('composeTo').value = '';
-      document.getElementById('composeSubject').value = '';
-      document.getElementById('composeBody').value = '';
-      localStorage.removeItem(LAST_SYNC_KEY); // invalidate cache
-    } else {
-      status.textContent = '⚠ ' + result.error;
-      status.style.color = '#f87171';
-    }
+      status.textContent = '📤 Sent to ' + to; status.style.color = '#6EE7B7';
+      el('composeTo').value = ''; el('composeSubject').value = ''; el('composeBody').value = '';
+      localStorage.removeItem(LAST_SYNC_KEY);
+    } else { status.textContent = '⚠ ' + result.error; status.style.color = '#f87171'; }
     this.disabled = false; this.textContent = '📤 Send';
   });
 
-  document.getElementById('composeClear').addEventListener('click', function () {
-    document.getElementById('composeTo').value = '';
-    document.getElementById('composeSubject').value = '';
-    document.getElementById('composeBody').value = '';
-    document.getElementById('composeStatus').textContent = '';
+  el('composeClear').addEventListener('click', function() {
+    el('composeTo').value = ''; el('composeSubject').value = ''; el('composeBody').value = ''; el('composeStatus').textContent = '';
   });
 
-  // ── Expose sendGmailNow to compose (topbar.js loads after this script) ──
-  // We expose it on window in topbar.js, so compose can call it directly.
-
-  // ── Boot ──
+  // ── Boot ──────────────────────────────────────────────────────────────────
   function init() {
     if (!hasGmailScope()) {
-      document.getElementById('connectPrompt').style.display = '';
-      document.getElementById('mailContent').style.display = 'none';
-      document.getElementById('mailSub').textContent = 'Gmail not connected';
+      el('connectPrompt').style.display = '';
+      el('mailContent').style.display   = 'none';
+      el('mailSub').textContent          = 'Gmail not connected';
       return;
     }
+    el('connectPrompt').style.display = 'none';
+    el('mailContent').style.display   = '';
 
-    document.getElementById('connectPrompt').style.display = 'none';
-    document.getElementById('mailContent').style.display = '';
+    try { var c = JSON.parse(localStorage.getItem(SUMMARY_KEY)); if (c) renderSummary(c); } catch (_) {}
 
-    // Try cached summary first for instant render
-    try {
-      var cached = JSON.parse(localStorage.getItem(SUMMARY_KEY));
-      if (cached) { renderSummary(cached); }
-    } catch (_) {}
-
-    // Auto-refresh if stale (>15 min) or no cache
-    var lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
-    if (Date.now() - lastSync > 15 * 60 * 1000) {
-      doRefresh();
-    }
+    var ls = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    if (Date.now() - ls > 15 * 60 * 1000) doRefresh();
   }
 
-  // topbar.js loads deferred — wait for it before calling sendGmailNow in compose
   window.addEventListener('load', init);
-  // Also expose sendGmailNow from topbar — it's set on window after topbar loads
 })();
 </script>
 </body>

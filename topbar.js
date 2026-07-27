@@ -1473,6 +1473,23 @@ body.topbar-modal-open {
         const summary = { fetchedAt: Date.now(), threads, shipping, unreadCount: threads.filter(function(t) { return t.isUnread; }).length };
         try { localStorage.setItem('gmail_summary_v1', JSON.stringify(summary)); } catch(e) { console.warn('[Gmail] write failed', e); }
         localStorage.setItem('gmail_last_sync', String(Date.now()));
+
+        // Push compact gmail_alerts to Supabase so push-send.js cron can surface
+        // important/unread email counts in morning and reminders notifications.
+        const importantUnread = threads.filter(function(t) { return t.isImportant && t.isUnread; });
+        const gmailAlerts = {
+          unreadCount: summary.unreadCount,
+          importantCount: importantUnread.length,
+          shippingCount: shipping.length,
+          topImportant: importantUnread.slice(0, 3).map(function(t) { return { from: t.from, subject: t.subject, when: t.when }; }),
+          updatedAt: Date.now(),
+        };
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret || window.DASH_APP_SECRET || '' },
+          body: JSON.stringify({ key: 'gmail_alerts', data: gmailAlerts }),
+        }).catch(function(e) { console.warn('[Gmail] alerts push failed', e); });
+
         return summary;
       } catch (e) { console.warn('[Gmail] loadGmailSummary failed', e); }
     }

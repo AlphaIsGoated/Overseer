@@ -77,35 +77,51 @@ async function buildPayload(type, supaUrl, supaKey) {
     case 'reminders': {
       const thisWeek = isoWeekKey(new Date());
       const yesterday = dateKey(new Date(Date.now() - 86400000));
-      const [goalsData, choresData, pcData] = await Promise.all([
+      const twoDaysAgo = dateKey(new Date(Date.now() - 2 * 86400000));
+      const [goalsData, choresData, pcData, gmailAlerts] = await Promise.all([
         fetchModuleData(supaUrl, supaKey, 'goals'),
         fetchModuleData(supaUrl, supaKey, 'chores'),
         fetchModuleData(supaUrl, supaKey, 'personalcare'),
+        fetchModuleData(supaUrl, supaKey, 'gmail_alerts'),
       ]);
 
-      // Main goals (main.html) — primary source for this notification.
-      // goals:today is only created in the browser after the user opens main.html.
-      // If the notification fires before the app is opened (9 AM), fall back to
-      // goals:yesterday — rollover copies uncompleted goals to today, so yesterday's
-      // pending goals are the same tasks the user needs to do today.
-      const todayGoals = (goalsData && goalsData['goals:' + today]) || [];
-      const yesterdayGoals = (goalsData && goalsData['goals:' + yesterday]) || [];
-      const goalsSource = todayGoals.length > 0 ? todayGoals : yesterdayGoals;
-      const goalsPending = goalsSource.filter(g => g && !g.done).map(g => g.text).filter(Boolean);
+      // Main goals — search last 3 days newest-first.
+      // goals:today only exists after the user opens main.html; before that, yesterday's
+      // pending goals (copied by rollover) represent today's work. Snoozed goals excluded.
+      let goalsPending = [];
+      for (const day of [today, yesterday, twoDaysAgo]) {
+        const goals = (goalsData && goalsData['goals:' + day]) || [];
+        const pending = goals
+          .filter(g => g && !g.done && (!g.snoozedUntil || g.snoozedUntil <= today))
+          .map(g => g.text).filter(Boolean);
+        if (pending.length > 0) { goalsPending = pending; break; }
+      }
 
       if (goalsPending.length > 0) {
         let body;
         if (goalsPending.length === 1) {
-          body = `Still to do: "${goalsPending[0]}"`;
+          body = `"${goalsPending[0]}"`;
         } else if (goalsPending.length === 2) {
-          body = `Still to do: "${goalsPending[0]}" and "${goalsPending[1]}"`;
+          body = `"${goalsPending[0]}" and "${goalsPending[1]}"`;
         } else {
-          body = `Still to do: "${goalsPending[0]}", "${goalsPending[1]}" + ${goalsPending.length - 2} more`;
+          body = `"${goalsPending[0]}", "${goalsPending[1]}" +${goalsPending.length - 2} more`;
+        }
+        if (gmailAlerts && gmailAlerts.importantCount > 0) {
+          body += ` · 📧 ${gmailAlerts.importantCount} important email${gmailAlerts.importantCount === 1 ? '' : 's'}`;
         }
         return { tag: 'reminders', title: `✅ ${goalsPending.length} goal${goalsPending.length === 1 ? '' : 's'} remaining`, body, url: '/main.html' };
       }
 
-      // All main goals done — fall back to chores / personal care
+      // No pending goals — surface important Gmail alerts before falling through to chores
+      if (gmailAlerts && gmailAlerts.importantCount > 0) {
+        const top = gmailAlerts.topImportant && gmailAlerts.topImportant[0];
+        const body = top
+          ? `"${top.subject.slice(0, 70)}" from ${top.from}`
+          : `${gmailAlerts.importantCount} important email${gmailAlerts.importantCount === 1 ? '' : 's'} need your attention`;
+        return { tag: 'gmail', title: `📧 ${gmailAlerts.importantCount} important email${gmailAlerts.importantCount === 1 ? '' : 's'}`, body, url: '/mail.html' };
+      }
+
+      // Fall back to chores / personal care
       const choreItems = (choresData && (Array.isArray(choresData) ? choresData : choresData['chores:items'])) || [];
       const chorePending = choreItems.filter(c => {
         if (c.recurring === 'daily') return c.lastDoneKey !== today;
@@ -130,28 +146,40 @@ async function buildPayload(type, supaUrl, supaKey) {
     case 'morning':
     default: {
       const yesterday = dateKey(new Date(Date.now() - 86400000));
-      const [plan, goalsData] = await Promise.all([
+      const [plan, goalsData, gmailAlerts] = await Promise.all([
         fetchModuleData(supaUrl, supaKey, 'marathon').then(readMarathonPlan),
         fetchModuleData(supaUrl, supaKey, 'goals'),
+        fetchModuleData(supaUrl, supaKey, 'gmail_alerts'),
       ]);
       const todayRun = ((plan && plan.entries) || []).find(e => e.date === today && e.type !== 'rest');
       // goals:today may not exist yet if app hasn't been opened — fall back to yesterday's
-      const todayGoals = (goalsData && goalsData['goals:' + today]) || [];
-      const yGoals = (goalsData && goalsData['goals:' + yesterday]) || [];
-      const goalsSource = todayGoals.length > 0 ? todayGoals : yGoals;
-      const pendingCount = goalsSource.filter(g => g && !g.done).length;
+      let pendingGoals = [];
+      for (const day of [today, yesterday]) {
+        const goals = (goalsData && goalsData['goals:' + day]) || [];
+        const pending = goals.filter(g => g && !g.done && (!g.snoozedUntil || g.snoozedUntil <= today));
+        if (pending.length > 0) { pendingGoals = pending; break; }
+      }
+      const pendingCount = pendingGoals.length;
 
       const parts = [];
       if (todayRun) {
         const dist = todayRun.plannedDistanceMi ? ` (${todayRun.plannedDistanceMi} mi)` : '';
         parts.push(`Run: ${todayRun.label || todayRun.type}${dist}`);
       }
-      if (pendingCount > 0) parts.push(`${pendingCount} goal${pendingCount === 1 ? '' : 's'} to do`);
+      if (pendingCount > 0) {
+        const topText = pendingGoals[0] && pendingGoals[0].text;
+        parts.push(topText
+          ? `"${topText}"${pendingCount > 1 ? ' +' + (pendingCount - 1) + ' more' : ''}`
+          : `${pendingCount} goal${pendingCount === 1 ? '' : 's'} to do`);
+      }
+      if (gmailAlerts && gmailAlerts.importantCount > 0) {
+        parts.push(`${gmailAlerts.importantCount} important email${gmailAlerts.importantCount === 1 ? '' : 's'}`);
+      }
 
       const body = parts.length > 0
-        ? parts.join(' · ') + '. Open coach for full briefing.'
-        : 'Your daily check-in is ready. Open coach for your full briefing.';
-      return { tag: 'morning', title: "Shrey's Dashboard · Good morning", body, url: '/index.html' };
+        ? parts.join(' · ')
+        : 'Open coach for your full daily briefing.';
+      return { tag: 'morning', title: 'Good morning, Shrey ☀️', body, url: '/index.html' };
     }
   }
 }
