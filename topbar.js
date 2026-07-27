@@ -1635,12 +1635,19 @@ body.topbar-modal-open {
         const actionJsons = extractCoachActions(reply);
         if (actionJsons.length) {
           reply = stripCoachActions(reply);
-          // Await all actions before displaying anything — errors appear in the same
-          // message as the AI reply so they can never be separated from "I've done it!" claims.
-          const results = await Promise.allSettled(actionJsons.map(function(json) {
-            try { return executeCoachAction(JSON.parse(json)); }
-            catch (e) { return Promise.resolve({ ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }); }
-          }));
+          // Execute actions SEQUENTIALLY (not in parallel) so each action reads the
+          // localStorage state that the PREVIOUS action already wrote. Parallel execution
+          // (Promise.allSettled + .map) causes all actions to read the same stale base,
+          // then race to write — last write wins and earlier changes are silently lost.
+          // This is especially critical for replace_plan + append_entries batches where
+          // action 2 must see action 1's entries in localStorage before it appends.
+          const results = [];
+          for (const json of actionJsons) {
+            let res;
+            try { res = await executeCoachAction(JSON.parse(json)); }
+            catch (e) { res = { ok: false, error: 'Invalid action JSON: ' + (e.message || String(e)) }; }
+            results.push({ status: 'fulfilled', value: res });
+          }
           const errs = results.filter(function(r) { return r.status === 'rejected' || (r.value && !r.value.ok && !r.value.pendingConfirm); })
             .map(function(r) { return r.reason ? r.reason.message : (r.value && r.value.error) || 'unknown error'; });
           const hasPending = results.some(function(r) { return r.status === 'fulfilled' && r.value && r.value.pendingConfirm; });

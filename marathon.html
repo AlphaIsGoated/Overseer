@@ -1655,7 +1655,10 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
         const currentTs = plan && plan.updatedAt ? plan.updatedAt : 0;
         if (incomingTs < currentTs) {
           // Server snapshot is older than current in-memory plan — server hasn't
-          // received the latest push yet. Keep in-memory state; don't re-render.
+          // received the latest push yet. applyRemote already overwrote localStorage
+          // with the stale snapshot before calling onApplied, so restore it from the
+          // in-memory plan to prevent a page refresh from loading stale data.
+          saveJSON(PLAN_KEY, plan);
           return;
         }
         plan = incoming;
