@@ -473,7 +473,12 @@ body::after {
   function hasGmailScope() {
     try {
       var a = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]');
-      return a && a.length > 0 && a[0].scope && a[0].scope.includes('gmail.readonly');
+      if (!a || !a.length || !a[0].access) return false;
+      // If scope is stored and explicitly lacks gmail.readonly, the user needs to reconnect.
+      // If scope isn't stored at all (accounts saved before scope tracking was added),
+      // allow through — the actual API call will 403 if Gmail wasn't granted.
+      if (a[0].scope && !a[0].scope.includes('gmail.readonly')) return false;
+      return true;
     } catch (_) { return false; }
   }
 
