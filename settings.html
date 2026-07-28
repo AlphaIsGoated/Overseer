@@ -448,6 +448,8 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
   // Each entry describes what changed for that release so you can trace
   // what was added when, which is useful for debugging "when did X appear?"
   const CHANGELOG = [
+    { ver: '3.150', date: '2026-07-28', items: ['Fix Gmail scope never being stored in google_accounts_v1'] },
+
     { ver: '3.149', date: '2026-07-27', items: ['Add Training Paces card + dynamic pace glossary to marathon.html'] },
 
     { ver: '3.148', date: '2026-07-27', items: ['chore: add apply-plan.html changelog to CLAUDE.md', 'Rewrite apply-plan.html with Strava-calibrated sub-4:00 marathon paces'] },
