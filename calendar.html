@@ -301,7 +301,7 @@ body::after { content: ''; position: fixed; inset: 0; background-image: radial-g
       var name  = info.name  || email;
       var accounts = getAccounts();
       var idx = accounts.findIndex(function(a) { return a.email === email; });
-      var updated = { email: email, name: name, access: access, refresh: refresh, expires: expires };
+      var updated = { email: email, name: name, access: access, refresh: refresh, expires: expires, scope: SCOPE };
       if (idx >= 0) {
         updated.displayName = accounts[idx].displayName; // preserve custom name
         accounts[idx] = updated;
