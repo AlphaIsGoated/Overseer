@@ -386,9 +386,11 @@ body::after {
     // Sync label
     var ls = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
     el('lastSyncLabel').textContent = ls ? 'Updated ' + relTime(ls) : '';
+    var _connEmail = '';
+    try { var _ac = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]'); _connEmail = (_ac && _ac[0] && _ac[0].email) ? ' · ' + _ac[0].email : ''; } catch(_) {}
     el('mailSub').textContent = threads.length + ' thread' + (threads.length === 1 ? '' : 's') +
       ' · ' + unread + ' unread' +
-      (important.length ? ' · ' + important.length + ' important' : '');
+      (important.length ? ' · ' + important.length + ' important' : '') + _connEmail;
 
     // Priority digest
     var pill = el('digestPill');
@@ -552,10 +554,16 @@ body::after {
     el('connectPrompt').style.display = 'none';
     el('mailContent').style.display   = '';
 
+    // Show connected account email immediately as placeholder subtitle
+    try {
+      var _a = JSON.parse(localStorage.getItem('google_accounts_v1') || '[]');
+      if (_a && _a[0] && _a[0].email) el('mailSub').textContent = 'Connected: ' + _a[0].email;
+    } catch(_) {}
+
     try { var c = JSON.parse(localStorage.getItem(SUMMARY_KEY)); if (c) renderSummary(c); } catch (_) {}
 
     var ls = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
-    if (Date.now() - ls > 15 * 60 * 1000) doRefresh();
+    if (!localStorage.getItem(SUMMARY_KEY) || Date.now() - ls > 15 * 60 * 1000) doRefresh();
   }
 
   window.addEventListener('load', init);
