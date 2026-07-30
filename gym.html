@@ -3272,9 +3272,13 @@ img, video, canvas, svg { max-width: 100%; }
     if (isBw) {
       text = `Your best is <strong>${bestVal} reps</strong>. Next session: push for <em>${rx.reps} reps</em>.`;
     } else {
-      const nextWt = (last.weight + (ex.step || 2.5)).toFixed(1);
-      const sameMoreRep = last.reps + 1;
-      text = `Your best is <strong>${bestVal} ${u} × ${last.reps}</strong>. Beat it next session: <em>${nextWt} ${u}</em>, or <em>${bestVal} ${u} × ${sameMoreRep}</em>.`;
+      if (rx.type === 'up') {
+        text = `Last: <strong>${last.weight} ${u} × ${last.reps}</strong>. You've earned a jump — next: <em>${rx.weight.toFixed(1)} ${u} × ${rx.reps}</em>.`;
+      } else if (rx.type === 'down') {
+        text = `Last: <strong>${last.weight} ${u} × ${last.reps}</strong>. Deload — drop to <em>${rx.weight.toFixed(1)} ${u} × ${rx.reps}</em> and rebuild.`;
+      } else {
+        text = `Last: <strong>${last.weight} ${u} × ${last.reps}</strong>. Stay here — push for <em>${rx.weight.toFixed(1)} ${u} × ${rx.reps}</em> next session.`;
+      }
     }
     textEl.innerHTML = text;
     card.style.display = 'flex';
@@ -3393,8 +3397,11 @@ img, video, canvas, svg { max-width: 100%; }
     const defReps = log ? log.reps : (ex ? (ex.repMin || 5) : 5);
     $('olRepsVal').textContent = defReps;
 
-    // Sets
-    const defSets = log ? log.sets : 4;
+    // Sets — for new sessions use last session's count, not a hardcoded default
+    const defSets = log ? log.sets : (() => {
+      const prev = (state.logs[state.currentEx] || []).map(olNorm).filter(l => !l.isRest);
+      return prev.length ? prev[prev.length - 1].sets : 4;
+    })();
     $('olSetsVal').textContent = defSets;
 
     // Per-set reps
